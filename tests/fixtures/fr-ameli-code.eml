@@ -1,0 +1,23 @@
+Return-Path: <bounce@assurance-maladie.fr>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=assurance-maladie.fr; spf=pass smtp.mailfrom=assurance-maladie.fr; dmarc=pass
+From: l'Assurance Maladie <ne-pas-repondre@assurance-maladie.fr>
+To: silver-otter-4821@mail.example.test
+Subject: =?UTF-8?B?Vm90cmUgY29kZSBkZSBzw6ljdXJpdMOpIGFtZWxp?=
+Date: Mon, 14 Oct 2024 09:23:00 +0000
+Message-ID: <fr-ameli-code.1013@assurance-maladie.fr>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Bonjour,
+
+Vous avez demand=C3=A9 =C3=A0 vous connecter =C3=A0 votre compte ameli.
+
+Votre code de s=C3=A9curit=C3=A9 est : 482193
+
+Ce code est valable 10 minutes. Ne le communiquez =C3=A0 personne.
+
+Pour toute question, contactez le 36 46 (service gratuit + prix d'un appel)=
+ du lundi au vendredi de 8h30 =C3=A0 17h30.
+
+Caisse Primaire d'Assurance Maladie de Paris, 75948 Paris Cedex 19

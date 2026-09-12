@@ -1,0 +1,22 @@
+Return-Path: <bounce@linear.app>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=linear.app; spf=pass smtp.mailfrom=linear.app; dmarc=pass
+From: Linear <notifications@linear.app>
+To: silver-otter-4821@mail.example.test
+Subject: Your Linear login link
+Date: Mon, 14 Oct 2024 09:33:00 +0000
+Message-ID: <magic-link-only.1023@linear.app>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Log in to Linear
+
+Click the link below to log in to Linear. This link will expire in 10 minut=
+es.
+
+https://linear.app/auth/magic-link?token=3DeyJhbGciOiJIUzI1NiJ9.c2lsdmVyLW9=
+0dGVy.Qm4xZ0RkS2pYcFQ&redirect=3D%2Fteam
+
+If you didn't request this, you can ignore this email.
+
+Unsubscribe: https://linear.app/unsubscribe?u=3Dabc123def456

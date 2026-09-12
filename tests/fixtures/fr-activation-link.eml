@@ -1,0 +1,25 @@
+Return-Path: <bounce@sncf-connect.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=sncf-connect.com; spf=pass smtp.mailfrom=sncf-connect.com; dmarc=pass
+From: SNCF Connect <noreply@sncf-connect.com>
+To: silver-otter-4821@mail.example.test
+Subject: Activez votre compte SNCF Connect
+Date: Mon, 14 Oct 2024 09:42:00 +0000
+Message-ID: <fr-activation-link.1032@sncf-connect.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html><html><head><meta charset=3D"utf-8"><title></title><style>bo=
+dy{font-family:Helvetica,Arial,sans-serif}.btn{background:#5865f2;color:#ff=
+f}</style></head><body style=3D"margin:0;padding:0;background:#f4f4f4"><div=
+ style=3D"display:none;max-height:0;overflow:hidden"> &nbsp;&zwnj;&nbsp;&zw=
+nj;</div><table role=3D"presentation" width=3D"100%" cellpadding=3D"0" cell=
+spacing=3D"0"><tr><td align=3D"center"><table width=3D"600" style=3D"backgr=
+ound:#ffffff"><tr><td style=3D"padding:24px"><p>Bonjour,</p><p>Merci pour v=
+otre inscription ! Cliquez sur le bouton ci-dessous pour activer votre comp=
+te. Ce lien est valable 72 heures.</p><p><a href=3D"https://www.sncf-connec=
+t.com/app/account/activation?key=3DZm9vYmFyYmF6cXV4MTIzNDU2Nzg5MA" style=3D=
+"background:#0c131f;color:#fff;padding:14px 22px">Activer mon compte</a></p=
+><p><a href=3D"https://www.sncf-connect.com/aide">Aide</a> =C2=B7 <a href=
+=3D"https://www.sncf-connect.com/desabonnement">Se d=C3=A9sinscrire</a></p>=
+</td></tr></table></td></tr></table></body></html>

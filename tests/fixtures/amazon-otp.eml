@@ -1,0 +1,47 @@
+Return-Path: <bounce@amazon.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=amazon.com; spf=pass smtp.mailfrom=amazon.com; dmarc=pass
+From: Amazon <account-update@amazon.com>
+To: silver-otter-4821@mail.example.test
+Subject: Verify your new Amazon account
+Date: Mon, 14 Oct 2024 09:15:00 +0000
+Message-ID: <amazon-otp.1005@amazon.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="----=_Part_5_1039595"
+
+------=_Part_5_1039595
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Verify your new Amazon account
+
+To verify your email address, please use the following One Time Password (O=
+TP):
+
+384756
+
+Don't share this OTP with anyone. Amazon takes your account security very s=
+eriously. Amazon Customer Service will never ask you to disclose or verify =
+your Amazon password, OTP, credit card, or banking account number.
+
+We hope to see you again soon.
+
+Amazon.com, 410 Terry Avenue N., Seattle, WA 98109-5210
+------=_Part_5_1039595
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html><html><head><meta charset=3D"utf-8"><title></title><style>bo=
+dy{font-family:Helvetica,Arial,sans-serif}.btn{background:#5865f2;color:#ff=
+f}</style></head><body style=3D"margin:0;padding:0;background:#f4f4f4"><div=
+ style=3D"display:none;max-height:0;overflow:hidden"> &nbsp;&zwnj;&nbsp;&zw=
+nj;</div><table role=3D"presentation" width=3D"100%" cellpadding=3D"0" cell=
+spacing=3D"0"><tr><td align=3D"center"><table width=3D"600" style=3D"backgr=
+ound:#ffffff"><tr><td style=3D"padding:20px"><img src=3D"https://m.media-am=
+azon.com/images/G/01/x-locale/cs/te/logo.png" alt=3D"amazon"><h2>Verify you=
+r new Amazon account</h2><p>To verify your email address, please use the fo=
+llowing One Time Password (OTP):</p><p style=3D"font-size:24px;font-weight:=
+bold">384756</p><p>Don't share this OTP with anyone. Amazon takes your acco=
+unt security very seriously.</p><p style=3D"font-size:11px">Amazon.com, 410=
+ Terry Avenue N., Seattle, WA 98109-5210</p></td></tr></table></td></tr></t=
+able></body></html>
+------=_Part_5_1039595--

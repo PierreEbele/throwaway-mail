@@ -1,0 +1,51 @@
+Return-Path: <bounce@accountprotection.microsoft.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=accountprotection.microsoft.com; spf=pass smtp.mailfrom=accountprotection.microsoft.com; dmarc=pass
+From: Microsoft account team <account-security-noreply@accountprotection.microsoft.com>
+To: silver-otter-4821@mail.example.test
+Subject: Microsoft account security code
+Date: Mon, 14 Oct 2024 09:17:00 +0000
+Message-ID: <microsoft-security-code.1007@accountprotection.microsoft.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="----=_Part_7_2355433"
+
+------=_Part_7_2355433
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Microsoft account
+
+Security code
+
+Please use the following security code for the Microsoft account si*****@ma=
+il.example.test.
+
+Security code: 581036
+
+If you don't recognize the Microsoft account si*****@mail.example.test, you=
+ can click https://account.live.com/dp?ft=3D-DjPq2oZ0lYbQwz to remove your =
+email address from that account.
+
+Thanks,
+The Microsoft account team
+
+Microsoft Corporation, One Microsoft Way, Redmond, WA 98052
+------=_Part_7_2355433
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html><html><head><meta charset=3D"utf-8"><title></title><style>bo=
+dy{font-family:Helvetica,Arial,sans-serif}.btn{background:#5865f2;color:#ff=
+f}</style></head><body style=3D"margin:0;padding:0;background:#f4f4f4"><div=
+ style=3D"display:none;max-height:0;overflow:hidden"> &nbsp;&zwnj;&nbsp;&zw=
+nj;</div><table role=3D"presentation" width=3D"100%" cellpadding=3D"0" cell=
+spacing=3D"0"><tr><td align=3D"center"><table width=3D"600" style=3D"backgr=
+ound:#ffffff"><tr><td style=3D"padding:20px;font-family:'Segoe UI',Tahoma">=
+<div style=3D"font-size:17px;color:#707070">Microsoft account</div><div sty=
+le=3D"font-size:41px;color:#2672ec">Security code</div><div style=3D"font-s=
+ize:14px;padding-top:25px">Please use the following security code for the M=
+icrosoft account <a href=3D"mailto:si*****@mail.example.test">si*****@mail.=
+example.test</a>.</div><div style=3D"font-size:14px;padding-top:25px">Secur=
+ity code: <span style=3D"font-weight:bold">581036</span></div><div style=3D=
+"font-size:14px">Thanks,<br>The Microsoft account team</div></td></tr></tab=
+le></td></tr></table></body></html>
+------=_Part_7_2355433--

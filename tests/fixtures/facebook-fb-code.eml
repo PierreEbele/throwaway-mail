@@ -1,0 +1,24 @@
+Return-Path: <bounce@facebookmail.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=facebookmail.com; spf=pass smtp.mailfrom=facebookmail.com; dmarc=pass
+From: Facebook <registration@facebookmail.com>
+To: silver-otter-4821@mail.example.test
+Subject: FB-48291 is your Facebook confirmation code
+Date: Mon, 14 Oct 2024 09:31:00 +0000
+Message-ID: <facebook-fb-code.1021@facebookmail.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Hi silver,
+
+You recently registered for Facebook. To complete your Facebook registratio=
+n, please confirm your account.
+
+You may be asked to enter this confirmation code:
+
+FB-48291
+
+Facebook helps you communicate and stay in touch with all of your friends.
+
+Meta Platforms, Inc., Attention: Community Support, 1 Meta Way, Menlo Park,=
+ CA 94025

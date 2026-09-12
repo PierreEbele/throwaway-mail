@@ -1,0 +1,54 @@
+Return-Path: <bounce@github.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=github.com; spf=pass smtp.mailfrom=github.com; dmarc=pass
+From: GitHub <noreply@github.com>
+To: silver-otter-4821@mail.example.test
+Subject: [GitHub] Please verify your device
+Date: Mon, 14 Oct 2024 09:11:00 +0000
+Message-ID: <github-device-verification.1001@github.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="----=_Part_1_267919"
+
+------=_Part_1_267919
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Hey silver-otter!
+
+A sign in attempt requires further verification because we did not recogniz=
+e your device. To complete the sign in, enter the verification code on the =
+unrecognized device.
+
+Device: Firefox on Linux
+Verification code: 593201
+
+If you did not attempt to sign in to your account, your password may be com=
+promised. Visit https://github.com/settings/security to create a new, stron=
+g password for your GitHub account.
+
+Thanks,
+The GitHub Team
+
+GitHub, Inc. =E3=83=BB88 Colin P Kelly Jr Street =E3=83=BBSan Francisco, CA=
+ 94107
+------=_Part_1_267919
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html><html><head><meta charset=3D"utf-8"><title>Please verify you=
+r device</title><style>body{font-family:Helvetica,Arial,sans-serif}.btn{bac=
+kground:#5865f2;color:#fff}</style></head><body style=3D"margin:0;padding:0=
+;background:#f4f4f4"><div style=3D"display:none;max-height:0;overflow:hidde=
+n">Please verify your device &nbsp;&zwnj;&nbsp;&zwnj;</div><table role=3D"p=
+resentation" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0"><tr><td ali=
+gn=3D"center"><table width=3D"600" style=3D"background:#ffffff"><tr><td sty=
+le=3D"padding:24px"><p>Hey silver-otter!</p><p>A sign in attempt requires f=
+urther verification because we did not recognize your device. To complete t=
+he sign in, enter the verification code on the unrecognized device.</p><p><=
+strong>Device:</strong> Firefox on Linux<br><strong>Verification code:</str=
+ong> 593201</p><p>If you did not attempt to sign in to your account, your p=
+assword may be compromised. Visit <a href=3D"https://github.com/settings/se=
+curity">https://github.com/settings/security</a> to create a new, strong pa=
+ssword.</p><p style=3D"color:#6a737d;font-size:12px">GitHub, Inc. =E3=83=BB=
+88 Colin P Kelly Jr Street =E3=83=BBSan Francisco, CA 94107</p></td></tr></=
+table></td></tr></table></body></html>
+------=_Part_1_267919--

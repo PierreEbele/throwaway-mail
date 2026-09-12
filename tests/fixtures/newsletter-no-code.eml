@@ -1,0 +1,26 @@
+Return-Path: <bounce@weeklybrew.example>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=weeklybrew.example; spf=pass smtp.mailfrom=weeklybrew.example; dmarc=pass
+From: The Weekly Brew <news@weeklybrew.example>
+To: silver-otter-4821@mail.example.test
+Subject: Black Friday 2024: our best deals
+Date: Mon, 14 Oct 2024 09:35:00 +0000
+Message-ID: <newsletter-no-code.1025@weeklybrew.example>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Hi there,
+
+Join 10000 members who already love our coffee! Since 2015 we roast 3 times=
+ a week.
+
+This week only: Ethiopia Yirgacheffe 1kg for =E2=82=AC149.00 instead of 189=
+.00 =E2=82=AC.
+Free shipping above 4900 points? No =E2=80=94 above =E2=82=AC49!
+
+Call us at +33 1 23 45 67 89 or visit us at 12 rue Oberkampf, 75011 Paris.
+
+See you soon,
+The Weekly Brew team
+
+Unsubscribe: https://weeklybrew.example/unsubscribe?id=3D55312

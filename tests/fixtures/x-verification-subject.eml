@@ -1,0 +1,28 @@
+Return-Path: <bounce@x.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=x.com; spf=pass smtp.mailfrom=x.com; dmarc=pass
+From: X <info@x.com>
+To: silver-otter-4821@mail.example.test
+Subject: 482910 is your X verification code
+Date: Mon, 14 Oct 2024 09:30:00 +0000
+Message-ID: <x-verification-subject.1020@x.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Confirm your email address
+
+There=E2=80=99s one quick step you need to complete before creating your X =
+account. Let=E2=80=99s make sure this is the right email address for you =
+=E2=80=94 please confirm this is the right address to use for your new acco=
+unt.
+
+Please enter this verification code to get started on X:
+
+482910
+
+Verification codes expire after two hours.
+
+Thanks,
+X
+
+X Corp. 1355 Market Street, Suite 900 San Francisco, CA 94103

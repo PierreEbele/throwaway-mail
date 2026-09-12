@@ -1,0 +1,51 @@
+Return-Path: <bounce@github.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=github.com; spf=pass smtp.mailfrom=github.com; dmarc=pass
+From: GitHub <noreply@github.com>
+To: silver-otter-4821@mail.example.test
+Subject: [GitHub] Please verify your email address.
+Date: Mon, 14 Oct 2024 09:12:00 +0000
+Message-ID: <github-verify-email.1002@github.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="----=_Part_2_1915838"
+
+------=_Part_2_1915838
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Hi @silver-otter!
+
+Help us secure your GitHub account by verifying your email address (silver-=
+otter-4821@mail.example.test). This lets you access all of GitHub's feature=
+s.
+
+https://github.com/users/silver-otter/emails/248193021/confirm_verification=
+/9f8a7d6c5b4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a?via_launch_code_email=3Dtrue
+
+This link will expire in 3 days. Not able to use the link? Copy and paste i=
+t into your browser.
+
+You're receiving this email because you recently created a new GitHub accou=
+nt or added a new email address.
+
+GitHub, Inc. =E3=83=BB88 Colin P Kelly Jr Street =E3=83=BBSan Francisco, CA=
+ 94107
+------=_Part_2_1915838
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html><html><head><meta charset=3D"utf-8"><title></title><style>bo=
+dy{font-family:Helvetica,Arial,sans-serif}.btn{background:#5865f2;color:#ff=
+f}</style></head><body style=3D"margin:0;padding:0;background:#f4f4f4"><div=
+ style=3D"display:none;max-height:0;overflow:hidden"> &nbsp;&zwnj;&nbsp;&zw=
+nj;</div><table role=3D"presentation" width=3D"100%" cellpadding=3D"0" cell=
+spacing=3D"0"><tr><td align=3D"center"><table width=3D"600" style=3D"backgr=
+ound:#ffffff"><tr><td style=3D"padding:24px"><h2>Almost done, @silver-otter=
+!</h2><p>Help us secure your GitHub account by verifying your email address=
+.</p><p><a class=3D"btn" href=3D"https://github.com/users/silver-otter/emai=
+ls/248193021/confirm_verification/9f8a7d6c5b4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a?=
+via_launch_code_email=3Dtrue" style=3D"padding:12px 24px;background:#2ea44f=
+;color:#fff">Verify email address</a></p><p>This link will expire in 3 days=
+.</p><p><a href=3D"https://github.com/site/privacy">Privacy</a> =C2=B7 <a h=
+ref=3D"https://docs.github.com/articles/github-terms-of-service">Terms</a><=
+/p></td></tr></table></td></tr></table></body></html>
+------=_Part_2_1915838--

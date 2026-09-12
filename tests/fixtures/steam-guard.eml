@@ -1,0 +1,50 @@
+Return-Path: <bounce@steampowered.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=steampowered.com; spf=pass smtp.mailfrom=steampowered.com; dmarc=pass
+From: Steam Support <noreply@steampowered.com>
+To: silver-otter-4821@mail.example.test
+Subject: Your Steam account: Access from new web or mobile device
+Date: Mon, 14 Oct 2024 09:20:00 +0000
+Message-ID: <steam-guard.1010@steampowered.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="----=_Part_10_1179190"
+
+------=_Part_10_1179190
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Dear silver_otter,
+
+Here is the Steam Guard code you need to login to account silver_otter:
+
+F7K2D
+
+This email was generated because of a login attempt from a web or mobile de=
+vice located at 82.64.12.190 (FR).
+
+The login attempt included your correct account name and password.
+The Steam Guard code is required to complete the login. No one can access y=
+our account without also accessing this email.
+
+If you are not attempting to login then please change your Steam password, =
+and consider changing your email password as well to ensure your account se=
+curity.
+
+Valve Corporation, PO Box 1688, Bellevue, WA 98009
+------=_Part_10_1179190
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html><html><head><meta charset=3D"utf-8"><title></title><style>bo=
+dy{font-family:Helvetica,Arial,sans-serif}.btn{background:#5865f2;color:#ff=
+f}</style></head><body style=3D"margin:0;padding:0;background:#f4f4f4"><div=
+ style=3D"display:none;max-height:0;overflow:hidden"> &nbsp;&zwnj;&nbsp;&zw=
+nj;</div><table role=3D"presentation" width=3D"100%" cellpadding=3D"0" cell=
+spacing=3D"0"><tr><td align=3D"center"><table width=3D"600" style=3D"backgr=
+ound:#ffffff"><tr><td style=3D"padding:20px;background:#171a21;color:#c6d4d=
+f"><p>Dear silver_otter,</p><p>Here is the Steam Guard code you need to log=
+in to account silver_otter:</p><table><tr><td style=3D"font-size:24px;color=
+:#ffffff;font-family:Arial;letter-spacing:2px;background:#3a3f44;padding:16=
+px">F7K2D</td></tr></table><p>This email was generated because of a login a=
+ttempt from a web or mobile device located at 82.64.12.190 (FR).</p></td></=
+tr></table></td></tr></table></body></html>
+------=_Part_10_1179190--

@@ -1,0 +1,23 @@
+Return-Path: <bounce@stripe.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=stripe.com; spf=pass smtp.mailfrom=stripe.com; dmarc=pass
+From: Acme Inc <invoice+statements@stripe.com>
+To: silver-otter-4821@mail.example.test
+Subject: Your receipt from Acme Inc #1234-5678
+Date: Mon, 14 Oct 2024 09:37:00 +0000
+Message-ID: <stripe-receipt.1027@stripe.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Receipt from Acme Inc
+
+Receipt #1234-5678
+Amount paid: $20.00
+Date paid: Oct 14, 2024
+Payment method: Visa ending in 4242
+
+Pro plan =C3=97 1   $20.00
+Total          $20.00
+
+If you have any questions, contact us at support@acme.example or call +1 41=
+5-555-0132.

@@ -1,0 +1,21 @@
+Return-Path: <bounce@linkedin.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=linkedin.com; spf=pass smtp.mailfrom=linkedin.com; dmarc=pass
+From: LinkedIn <security-noreply@linkedin.com>
+To: silver-otter-4821@mail.example.test
+Subject: Here's your PIN
+Date: Mon, 14 Oct 2024 09:41:00 +0000
+Message-ID: <linkedin-pin.1031@linkedin.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Hi Silver,
+
+Please use this verification code to complete your sign in: 284019
+
+If you didn't try to sign in, we recommend changing your password.
+
+Thanks for helping us keep your account secure.
+The LinkedIn Team
+
+=C2=A9 2024 LinkedIn Ireland Unlimited Company, Wilton Plaza, Dublin 2.

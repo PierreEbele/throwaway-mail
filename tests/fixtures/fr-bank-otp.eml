@@ -1,0 +1,25 @@
+Return-Path: <bounce@notifications.mabanque.fr>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=notifications.mabanque.fr; spf=pass smtp.mailfrom=notifications.mabanque.fr; dmarc=pass
+From: Ma Banque <securite@notifications.mabanque.fr>
+To: silver-otter-4821@mail.example.test
+Subject: Validation de votre paiement en ligne
+Date: Mon, 14 Oct 2024 09:26:00 +0000
+Message-ID: <fr-bank-otp.1016@notifications.mabanque.fr>
+MIME-Version: 1.0
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html><html><head><meta charset=3D"utf-8"><title></title><style>bo=
+dy{font-family:Helvetica,Arial,sans-serif}.btn{background:#5865f2;color:#ff=
+f}</style></head><body style=3D"margin:0;padding:0;background:#f4f4f4"><div=
+ style=3D"display:none;max-height:0;overflow:hidden"> &nbsp;&zwnj;&nbsp;&zw=
+nj;</div><table role=3D"presentation" width=3D"100%" cellpadding=3D"0" cell=
+spacing=3D"0"><tr><td align=3D"center"><table width=3D"600" style=3D"backgr=
+ound:#ffffff"><tr><td style=3D"padding:24px"><p>Bonjour Madame Dupont,</p><=
+p>Vous effectuez un paiement en ligne chez <b>FNAC DARTY</b>.</p><p>Montant=
+ : 129,90 =E2=82=AC<br>Date : 14/10/2024 =C3=A0 10:42<br>Carte se terminant=
+ par 4821</p><p>Pour valider ce paiement, saisissez le mot de passe =C3=A0 =
+usage unique suivant :</p><p style=3D"font-size:26px;font-weight:bold">6482=
+9135</p><p>Ce code est valable 5 minutes.</p><p style=3D"font-size:11px">Ma=
+ Banque SA au capital de 1 250 000 =E2=82=AC, RCS Paris 552 120 222</p></td=
+></tr></table></td></tr></table></body></html>

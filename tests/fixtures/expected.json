@@ -1,0 +1,106 @@
+{
+  "github-device-verification.eml": {
+    "code": "593201"
+  },
+  "github-verify-email.eml": {
+    "code": null,
+    "link": "confirm_verification"
+  },
+  "google-verification-code.eml": {
+    "code": "482913"
+  },
+  "discord-verify-email.eml": {
+    "code": null,
+    "link": "click.discord.com"
+  },
+  "amazon-otp.eml": {
+    "code": "384756"
+  },
+  "amazon-order-confirmation.eml": {
+    "code": null,
+    "noLink": true
+  },
+  "microsoft-security-code.eml": {
+    "code": "581036"
+  },
+  "microsoft-fr-code.eml": {
+    "code": "735910"
+  },
+  "paypal-code.eml": {
+    "code": "812456"
+  },
+  "steam-guard.eml": {
+    "code": "F7K2D"
+  },
+  "steam-guard-letters.eml": {
+    "code": "MGKRT"
+  },
+  "slack-confirmation-code.eml": {
+    "code": "ZK3TXM"
+  },
+  "fr-ameli-code.eml": {
+    "code": "482193"
+  },
+  "fr-leboncoin-code.eml": {
+    "code": "5831"
+  },
+  "fr-doctolib-code.eml": {
+    "code": "917364"
+  },
+  "fr-bank-otp.eml": {
+    "code": "64829135"
+  },
+  "html-only-login-code.eml": {
+    "code": "539104",
+    "link": "notion.so/loginwithemail"
+  },
+  "image-heavy-code.eml": {
+    "code": "TQ8RZ4"
+  },
+  "apple-id-code.eml": {
+    "code": "384920"
+  },
+  "x-verification-subject.eml": {
+    "code": "482910"
+  },
+  "facebook-fb-code.eml": {
+    "code": "48291"
+  },
+  "netflix-signin-code.eml": {
+    "code": "4829"
+  },
+  "magic-link-only.eml": {
+    "code": null,
+    "link": "linear.app/auth/magic-link"
+  },
+  "tracking-redirect-confirm.eml": {
+    "code": null,
+    "link": "https://app.acmecloud.io/confirm-email?token=7f3a9c2e1b8d4f6a0e5c"
+  },
+  "newsletter-no-code.eml": {
+    "code": null,
+    "noLink": true
+  },
+  "shipping-notification.eml": {
+    "code": null
+  },
+  "stripe-receipt.eml": {
+    "code": null
+  },
+  "twitch-grouped-code.eml": {
+    "code": "593012"
+  },
+  "fr-orange-access-code.eml": {
+    "code": "7KQ9P2"
+  },
+  "text-part-placeholder.eml": {
+    "code": "207481"
+  },
+  "linkedin-pin.eml": {
+    "code": "284019"
+  },
+  "fr-activation-link.eml": {
+    "code": null,
+    "link": "account/activation?key="
+  }
+}

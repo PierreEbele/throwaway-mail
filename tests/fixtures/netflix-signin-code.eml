@@ -1,0 +1,21 @@
+Return-Path: <bounce@account.netflix.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=account.netflix.com; spf=pass smtp.mailfrom=account.netflix.com; dmarc=pass
+From: Netflix <info@account.netflix.com>
+To: silver-otter-4821@mail.example.test
+Subject: Your sign-in code
+Date: Mon, 14 Oct 2024 09:32:00 +0000
+Message-ID: <netflix-signin-code.1022@account.netflix.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Enter this code to sign in
+
+4829
+
+This code will expire in 15 minutes.
+
+Questions? Visit the Help Center: https://help.netflix.com
+
+Netflix International B.V.
+=C2=A9 2024 Netflix

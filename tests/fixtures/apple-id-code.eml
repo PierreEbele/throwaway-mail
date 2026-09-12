@@ -1,0 +1,32 @@
+Return-Path: <bounce@id.apple.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=id.apple.com; spf=pass smtp.mailfrom=id.apple.com; dmarc=pass
+From: Apple <appleid@id.apple.com>
+To: silver-otter-4821@mail.example.test
+Subject: Verify your Apple ID email address
+Date: Mon, 14 Oct 2024 09:29:00 +0000
+Message-ID: <apple-id-code.1019@id.apple.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Verify your email address.
+
+Apple ID: silver-otter-4821@mail.example.test
+
+You have selected this email address as your new Apple ID. To verify this e=
+mail address belongs to you, enter the code below on the email verification=
+ page:
+
+384920
+
+This code will expire three hours after this email was sent.
+
+Why you received this email.
+Apple requires verification whenever an email address is selected as an App=
+le ID.
+
+Apple Support
+
+Apple ID | Support | Privacy Policy
+Copyright =C2=A9 2024 Apple Inc. One Apple Park Way, Cupertino, CA 95014, U=
+nited States. All rights reserved.

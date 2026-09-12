@@ -1,0 +1,27 @@
+Return-Path: <bounce@mail.acmecloud.io>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=mail.acmecloud.io; spf=pass smtp.mailfrom=mail.acmecloud.io; dmarc=pass
+From: Acme Cloud <hello@mail.acmecloud.io>
+To: silver-otter-4821@mail.example.test
+Subject: Please confirm your email
+Date: Mon, 14 Oct 2024 09:34:00 +0000
+Message-ID: <tracking-redirect-confirm.1024@mail.acmecloud.io>
+MIME-Version: 1.0
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html><html><head><meta charset=3D"utf-8"><title></title><style>bo=
+dy{font-family:Helvetica,Arial,sans-serif}.btn{background:#5865f2;color:#ff=
+f}</style></head><body style=3D"margin:0;padding:0;background:#f4f4f4"><div=
+ style=3D"display:none;max-height:0;overflow:hidden"> &nbsp;&zwnj;&nbsp;&zw=
+nj;</div><table role=3D"presentation" width=3D"100%" cellpadding=3D"0" cell=
+spacing=3D"0"><tr><td align=3D"center"><table width=3D"600" style=3D"backgr=
+ound:#ffffff"><tr><td style=3D"padding:24px"><p>Welcome to Acme Cloud! Plea=
+se confirm your email address to activate your 14-day trial.</p><p><a href=
+=3D"https://links.mail.acmecloud.io/ls/redirect?id=3D88213&amp;url=3Dhttps%=
+3A%2F%2Fapp.acmecloud.io%2Fconfirm-email%3Ftoken%3D7f3a9c2e1b8d4f6a0e5c" st=
+yle=3D"background:#111;color:#fff;padding:12px 20px">Confirm my email</a></=
+p><p><a href=3D"https://links.mail.acmecloud.io/ls/redirect?id=3D88214&amp;=
+url=3Dhttps%3A%2F%2Facmecloud.io%2Funsubscribe">Unsubscribe</a> =C2=B7 <a h=
+ref=3D"https://acmecloud.io/privacy">Privacy</a></p><p style=3D"font-size:1=
+1px">Acme Cloud SAS, 10 rue de Rivoli, 75004 Paris</p></td></tr></table></t=
+d></tr></table></body></html>

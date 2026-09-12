@@ -1,0 +1,23 @@
+Return-Path: <bounce@paypal.fr>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=paypal.fr; spf=pass smtp.mailfrom=paypal.fr; dmarc=pass
+From: PayPal <service@paypal.fr>
+To: silver-otter-4821@mail.example.test
+Subject: Your PayPal security code
+Date: Mon, 14 Oct 2024 09:19:00 +0000
+Message-ID: <paypal-code.1009@paypal.fr>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Hello,
+
+Your PayPal code is 812456. It expires in 10 minutes. Don't share this code=
+ with anyone =E2=80=93 we'll never call or email you asking for it.
+
+You recently sent =E2=82=AC25.00 EUR to Marie Dupont.
+Transaction ID: 8XG492817K3348205
+
+Help & Contact: https://www.paypal.com/fr/smarthelp/contact-us
+
+PayPal (Europe) S.=C3=A0 r.l. et Cie, S.C.A., 22-24 Boulevard Royal, L-2449=
+ Luxembourg

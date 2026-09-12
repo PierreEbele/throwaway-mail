@@ -1,0 +1,24 @@
+Return-Path: <bounce@ups.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=ups.com; spf=pass smtp.mailfrom=ups.com; dmarc=pass
+From: UPS <mcinfo@ups.com>
+To: silver-otter-4821@mail.example.test
+Subject: UPS Update: Package Scheduled for Delivery Today
+Date: Mon, 14 Oct 2024 09:36:00 +0000
+Message-ID: <shipping-notification.1026@ups.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Your package is on the way!
+
+Scheduled Delivery: Today, 10/14/2024
+Estimated Time: 12:00 PM - 4:00 PM
+Tracking Number: 1Z999AA10123456784
+Order number: 284733
+Ship To: SPRINGFIELD, IL 62704 US
+Number of Packages: 1
+Weight: 2.30 LBS
+
+Track your package: https://www.ups.com/track?tracknum=3D1Z999AA10123456784
+
+=C2=A9 2024 United Parcel Service of America, Inc.

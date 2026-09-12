@@ -1,0 +1,31 @@
+Return-Path: <bounce@spotify.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=spotify.com; spf=pass smtp.mailfrom=spotify.com; dmarc=pass
+From: Spotify <no-reply@spotify.com>
+To: silver-otter-4821@mail.example.test
+Subject: Your Spotify login code
+Date: Mon, 14 Oct 2024 09:40:00 +0000
+Message-ID: <text-part-placeholder.1030@spotify.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="----=_Part_30_21237570"
+
+------=_Part_30_21237570
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+View this email in your browser. Your email client does not support HTML.
+------=_Part_30_21237570
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html><html><head><meta charset=3D"utf-8"><title></title><style>bo=
+dy{font-family:Helvetica,Arial,sans-serif}.btn{background:#5865f2;color:#ff=
+f}</style></head><body style=3D"margin:0;padding:0;background:#f4f4f4"><div=
+ style=3D"display:none;max-height:0;overflow:hidden"> &nbsp;&zwnj;&nbsp;&zw=
+nj;</div><table role=3D"presentation" width=3D"100%" cellpadding=3D"0" cell=
+spacing=3D"0"><tr><td align=3D"center"><table width=3D"600" style=3D"backgr=
+ound:#ffffff"><tr><td style=3D"padding:24px"><h1 style=3D"font-size:28px">Y=
+our login code</h1><p>Enter this code on the login screen:</p><h2 style=3D"=
+font-size:40px;letter-spacing:10px">207481</h2><p>The code expires in 15 mi=
+nutes.</p><p style=3D"font-size:11px">Spotify AB, Regeringsgatan 19, 111 53=
+ Stockholm, Sweden</p></td></tr></table></td></tr></table></body></html>
+------=_Part_30_21237570--

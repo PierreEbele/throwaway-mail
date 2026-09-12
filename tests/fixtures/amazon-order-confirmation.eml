@@ -1,0 +1,32 @@
+Return-Path: <bounce@amazon.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=amazon.com; spf=pass smtp.mailfrom=amazon.com; dmarc=pass
+From: Amazon.com <auto-confirm@amazon.com>
+To: silver-otter-4821@mail.example.test
+Subject: Your Amazon.com order #112-8473621-3398201
+Date: Mon, 14 Oct 2024 09:16:00 +0000
+Message-ID: <amazon-order-confirmation.1006@amazon.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Hello silver-otter,
+
+Thank you for shopping with us. We'll send a confirmation when your item sh=
+ips.
+
+Order #112-8473621-3398201
+Placed on Monday, October 14, 2024
+
+Anker USB-C Charger 65W
+Quantity: 2
+$49.99
+
+Item Subtotal: $99.98
+Shipping & Handling: $0.00
+Order Total: $106.48
+
+Arriving: Thursday, October 17
+Ship to: Jane Doe, 1200 Market Street, Apt 4, Springfield, IL 62704
+
+Questions? Call 1-888-280-4331.
+=C2=A91996-2024, Amazon.com, Inc. or its affiliates

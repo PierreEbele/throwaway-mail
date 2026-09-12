@@ -1,0 +1,20 @@
+Return-Path: <bounce@doctolib.fr>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=doctolib.fr; spf=pass smtp.mailfrom=doctolib.fr; dmarc=pass
+From: Doctolib <no-reply@doctolib.fr>
+To: silver-otter-4821@mail.example.test
+Subject: Confirmez votre connexion
+Date: Mon, 14 Oct 2024 09:25:00 +0000
+Message-ID: <fr-doctolib-code.1015@doctolib.fr>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Bonjour,
+
+Votre code de confirmation =C3=A0 usage unique : 917364
+
+Ce code expire dans 10 minutes. Si vous n'=C3=AAtes pas =C3=A0 l'origine de=
+ cette demande, contactez notre support au 01 23 45 67 89.
+
+L'=C3=A9quipe Doctolib
+54 quai Charles Pasqua, 92300 Levallois-Perret

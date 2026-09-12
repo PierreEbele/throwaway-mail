@@ -1,0 +1,27 @@
+Return-Path: <bounce@makenotion.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=makenotion.com; spf=pass smtp.mailfrom=makenotion.com; dmarc=pass
+From: Notion Team <notify@makenotion.com>
+To: silver-otter-4821@mail.example.test
+Subject: Your Notion login code
+Date: Mon, 14 Oct 2024 09:27:00 +0000
+Message-ID: <html-only-login-code.1017@makenotion.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html><html><head><meta charset=3D"utf-8"><title></title><style>bo=
+dy{font-family:Helvetica,Arial,sans-serif}.btn{background:#5865f2;color:#ff=
+f}</style></head><body style=3D"margin:0;padding:0;background:#f4f4f4"><div=
+ style=3D"display:none;max-height:0;overflow:hidden"> &nbsp;&zwnj;&nbsp;&zw=
+nj;</div><table role=3D"presentation" width=3D"100%" cellpadding=3D"0" cell=
+spacing=3D"0"><tr><td align=3D"center"><table width=3D"600" style=3D"backgr=
+ound:#ffffff"><tr><td style=3D"padding:32px"><p style=3D"font-size:16px">He=
+re is your login code:</p><table><tr><td style=3D"font-family:monospace;fon=
+t-size:32px;letter-spacing:6px;padding:12px 24px;background:#f7f6f3;border-=
+radius:4px">539104</td></tr></table><p>Or, sign in using this link: <a href=
+=3D"https://www.notion.so/loginwithemail?state=3D8c1f6f5e&amp;password=3Dwf=
+8Kd2mQpL9vXz3R">Click here to log in with this magic link</a></p><p style=
+=3D"color:#aaa;font-size:12px">If you didn't try to login, you can safely i=
+gnore this email.</p><p style=3D"color:#aaa;font-size:12px">Notion Labs, In=
+c., 2300 Harrison Street, San Francisco, CA 94110</p></td></tr></table></td=
+></tr></table></body></html>

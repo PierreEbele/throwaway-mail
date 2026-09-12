@@ -1,0 +1,21 @@
+Return-Path: <bounce@steampowered.com>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=steampowered.com; spf=pass smtp.mailfrom=steampowered.com; dmarc=pass
+From: Steam Support <noreply@steampowered.com>
+To: silver-otter-4821@mail.example.test
+Subject: Your Steam account: Access from new computer
+Date: Mon, 14 Oct 2024 09:21:00 +0000
+Message-ID: <steam-guard-letters.1011@steampowered.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Dear silver_otter,
+
+Here is the Steam Guard code you need to login to account silver_otter:
+
+MGKRT
+
+This email was generated because of a login attempt from a computer located=
+ at 82.64.12.190 (FR).
+
+Valve Corporation, PO Box 1688, Bellevue, WA 98009

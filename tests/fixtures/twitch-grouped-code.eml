@@ -1,0 +1,23 @@
+Return-Path: <bounce@twitch.tv>
+Authentication-Results: mx.cloudflare.net; dkim=pass header.d=twitch.tv; spf=pass smtp.mailfrom=twitch.tv; dmarc=pass
+From: Twitch <no-reply@twitch.tv>
+To: silver-otter-4821@mail.example.test
+Subject: Your Twitch Login Verification Code
+Date: Mon, 14 Oct 2024 09:38:00 +0000
+Message-ID: <twitch-grouped-code.1028@twitch.tv>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Hey silver_otter,
+
+Someone (hopefully you) is attempting to log in to your Twitch account. To =
+finish logging in, enter the verification code below:
+
+593 012
+
+This code expires in 10 minutes. If this wasn't you, please reset your pass=
+word immediately.
+
+Twitch Interactive, Inc., 350 Bush Street, 2nd Floor, San Francisco, CA 941=
+04
