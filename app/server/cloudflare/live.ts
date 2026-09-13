@@ -1,0 +1,136 @@
+import type { CloudflareClient, DestinationInfo, DnsRecord, ZoneInfo } from "./index.js";
+import { CloudflareError } from "./index.js";
+
+const API = "https://api.cloudflare.com/client/v4";
+
+interface CfEnvelope<T> {
+  success: boolean;
+  errors?: Array<{ code: number; message: string }>;
+  result: T;
+}
+
+export class LiveCloudflareClient implements CloudflareClient {
+  readonly mode = "live" as const;
+  constructor(
+    private token: string,
+    private accountId: string,
+    private fetchImpl: typeof fetch = fetch,
+  ) {}
+
+  private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
+    let res: Response;
+    try {
+      res = await this.fetchImpl(API + path, {
+        method,
+        headers: { authorization: `Bearer ${this.token}`, "content-type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(15000),
+      });
+    } catch (e) {
+      throw new CloudflareError(`Cloudflare API unreachable: ${(e as Error).message}`, 502);
+    }
+    let json: CfEnvelope<T> | null = null;
+    try {
+      json = (await res.json()) as CfEnvelope<T>;
+    } catch {
+      /* non-JSON */
+    }
+    if (!res.ok || !json?.success) {
+      const err = json?.errors?.[0];
+      const msg = err ? `${err.message} (code ${err.code})` : `HTTP ${res.status}`;
+      throw new CloudflareError(`Cloudflare API error on ${method} ${path.replace(/\/accounts\/[^/]+/, "/accounts/…")}: ${msg}`, res.status, err?.code);
+    }
+    return json.result;
+  }
+
+  async findZone(domain: string): Promise<ZoneInfo | null> {
+    // Exact zone first, then parent zones (sub-domain routing).
+    const labels = domain.split(".");
+    for (let i = 0; i < labels.length - 1; i++) {
+      const name = labels.slice(i).join(".");
+      const zones = await this.call<Array<{ id: string; name: string; status: string }>>("GET", `/zones?name=${encodeURIComponent(name)}`);
+      if (zones[0]) return { id: zones[0].id, name: zones[0].name, status: zones[0].status };
+    }
+    return null;
+  }
+
+  async enableEmailRouting(zoneId: string, domain: string): Promise<void> {
+    const settings = await this.call<{ enabled: boolean; status?: string }>("GET", `/zones/${zoneId}/email/routing`);
+    if (settings.enabled) return;
+    try {
+      await this.call("POST", `/zones/${zoneId}/email/routing/dns`, { name: domain });
+    } catch (e) {
+      if (e instanceof CloudflareError && (e.status === 404 || e.status === 405)) {
+        await this.call("POST", `/zones/${zoneId}/email/routing/enable`, {});
+      } else throw e;
+    }
+  }
+
+  async setCatchAllToWorker(zoneId: string, workerName: string): Promise<void> {
+    await this.call("PUT", `/zones/${zoneId}/email/routing/rules/catch_all`, {
+      name: "Throwaway Mail catch-all",
+      enabled: true,
+      matchers: [{ type: "all" }],
+      actions: [{ type: "worker", value: [workerName] }],
+    });
+  }
+
+  async missingDnsRecords(zoneId: string, domain: string): Promise<DnsRecord[]> {
+    const res = await this.call<unknown>("GET", `/zones/${zoneId}/email/routing/dns?subdomain=${encodeURIComponent(domain)}`);
+    // Newer API: { errors: [{ code, missing: {type,name,content,priority} }], record: [...] }; older API: array of required records.
+    if (res && typeof res === "object" && !Array.isArray(res) && "errors" in res) {
+      const errs = (res as { errors?: Array<{ missing?: DnsRecord }> }).errors ?? [];
+      return errs.map((e) => e.missing).filter((m): m is DnsRecord => !!m);
+    }
+    const required = (Array.isArray(res) ? res : ((res as { record?: DnsRecord[] })?.record ?? [])) as DnsRecord[];
+    const existing = await this.call<DnsRecord[]>("GET", `/zones/${zoneId}/dns_records?per_page=100&name=${encodeURIComponent(domain)}`);
+    const norm = (s: string) => s.replace(/^"|"$/g, "").replace(/\.$/, "").toLowerCase();
+    return required.filter((r) => !existing.some((e) => e.type === r.type && norm(e.content) === norm(r.content)));
+  }
+
+  private toDest(r: { id?: string; tag?: string; email: string; verified: string | null }): DestinationInfo {
+    return { id: (r.id ?? r.tag)!, email: r.email, verified: r.verified ?? null };
+  }
+
+  async createDestination(email: string): Promise<DestinationInfo> {
+    try {
+      const r = await this.call<{ id?: string; tag?: string; email: string; verified: string | null }>("POST", `/accounts/${this.accountId}/email/routing/addresses`, { email });
+      return this.toDest(r);
+    } catch (e) {
+      // Already exists at account level (e.g. another user added it): reuse it.
+      const existing = await this.findDestinationByEmail(email).catch(() => null);
+      if (existing) return existing;
+      throw e;
+    }
+  }
+
+  async getDestination(id: string): Promise<DestinationInfo | null> {
+    try {
+      return this.toDest(await this.call("GET", `/accounts/${this.accountId}/email/routing/addresses/${id}`));
+    } catch (e) {
+      if (e instanceof CloudflareError && e.status === 404) return null;
+      throw e;
+    }
+  }
+
+  async findDestinationByEmail(email: string): Promise<DestinationInfo | null> {
+    for (let page = 1; page <= 20; page++) {
+      const list = await this.call<Array<{ id?: string; tag?: string; email: string; verified: string | null }>>(
+        "GET",
+        `/accounts/${this.accountId}/email/routing/addresses?per_page=50&page=${page}`,
+      );
+      const hit = list.find((d) => d.email.toLowerCase() === email.toLowerCase());
+      if (hit) return this.toDest(hit);
+      if (list.length < 50) break;
+    }
+    return null;
+  }
+
+  async deleteDestination(id: string): Promise<void> {
+    try {
+      await this.call("DELETE", `/accounts/${this.accountId}/email/routing/addresses/${id}`);
+    } catch (e) {
+      if (!(e instanceof CloudflareError && e.status === 404)) throw e;
+    }
+  }
+}
