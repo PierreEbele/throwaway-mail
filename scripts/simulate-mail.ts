@@ -40,7 +40,7 @@ async function main() {
       [INGEST_HEADERS.from]: from,
       [INGEST_HEADERS.to]: to,
     },
-    body,
+    body: new Uint8Array(body),
   });
   const text = await res.text();
   console.log(`${res.status} ${text}`);

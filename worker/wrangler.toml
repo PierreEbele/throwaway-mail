@@ -1,0 +1,20 @@
+# Cloudflare Email Worker for Throwaway Mail.
+# Deploy once:  cd worker && npm install && npx wrangler login && npx wrangler secret put INGEST_SECRET && npx wrangler deploy
+# The app then points the catch-all rule of every domain it manages at this Worker (WORKER_NAME in the app's .env).
+name = "throwaway-mail-ingest"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+workers_dev = false
+
+[vars]
+# Public URL of your app (no trailing slash).
+APP_URL = "https://mail-app.example.com"
+# Verified Cloudflare destination used when the app is unreachable, so no mail is lost. Leave empty to disable.
+FALLBACK_FORWARD = ""
+# Time to wait for the app before falling back.
+INGEST_TIMEOUT_MS = "5000"
+
+# Secret (not in this file):  npx wrangler secret put INGEST_SECRET   (same value as INGEST_SECRET in the app's .env)
+
+[observability]
+enabled = true

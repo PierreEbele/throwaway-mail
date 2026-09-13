@@ -112,7 +112,7 @@ export async function ingest(
       [INGEST_HEADERS.from]: from,
       [INGEST_HEADERS.to]: to,
     },
-    body,
+    body: new Uint8Array(body),
   });
   return { status: res.status, json: (await res.json()) as any };
 }
