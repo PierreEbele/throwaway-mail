@@ -5,6 +5,7 @@ import type { CloudflareClient } from "./cloudflare/index.js";
 import type { EventBus } from "./services/events.js";
 import type { ParserStrategy } from "./parser/index.js";
 import type { User } from "./db/schema.js";
+import type { OidcService } from "./auth/oidc.js";
 
 export interface Deps {
   config: Config;
@@ -14,8 +15,7 @@ export interface Deps {
   bus: EventBus;
   parserStrategies: ParserStrategy[];
   now: () => number;
-  /** One-time admin setup token (only while no user exists). */
-  setup: { token: string | null };
+  oidc: OidcService;
 }
 
 export interface SessionInfo {

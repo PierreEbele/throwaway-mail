@@ -19,7 +19,7 @@ export interface DestinationInfo {
 }
 
 export interface CloudflareClient {
-  readonly mode: "live" | "mock";
+  readonly mode: "live" | "mock" | "unconfigured";
   findZone(domain: string): Promise<ZoneInfo | null>;
   enableEmailRouting(zoneId: string, domain: string): Promise<void>;
   setCatchAllToWorker(zoneId: string, workerName: string): Promise<void>;
@@ -43,3 +43,4 @@ export class CloudflareError extends Error {
 
 export { LiveCloudflareClient } from "./live.js";
 export { MockCloudflareClient } from "./mock.js";
+export { UnconfiguredCloudflareClient } from "./unconfigured.js";

@@ -1,12 +1,15 @@
 import { sqliteTable, text, integer, real, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 
+/** Users exist only through SSO: created on first OpenID Connect login, role synced from IdP groups. */
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
-  email: text("email").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  oidcSub: text("oidc_sub").notNull().unique(),
+  email: text("email").notNull(),
+  name: text("name"),
   role: text("role", { enum: ["admin", "user"] }).notNull().default("user"),
   disabled: integer("disabled", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at").notNull(),
+  lastLoginAt: integer("last_login_at"),
 });
 
 export const sessions = sqliteTable(
@@ -20,18 +23,6 @@ export const sessions = sqliteTable(
   },
   (t) => [index("sessions_user_idx").on(t.userId)],
 );
-
-export const invites = sqliteTable("invites", {
-  id: text("id").primaryKey(),
-  tokenHash: text("token_hash").notNull().unique(),
-  email: text("email"),
-  role: text("role", { enum: ["admin", "user"] }).notNull().default("user"),
-  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: integer("created_at").notNull(),
-  expiresAt: integer("expires_at").notNull(),
-  usedAt: integer("used_at"),
-  usedBy: text("used_by").references(() => users.id, { onDelete: "set null" }),
-});
 
 export const apiKeys = sqliteTable(
   "api_keys",

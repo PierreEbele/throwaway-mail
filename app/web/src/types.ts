@@ -1,5 +1,5 @@
 export type Role = "admin" | "user";
-export interface User { id: string; email: string; role: Role; disabled: boolean; created_at: number }
+export interface User { id: string; email: string; name: string | null; role: Role; disabled: boolean; created_at: number; last_login_at: number | null }
 export type AddressStatus = "active" | "paused" | "archived";
 export interface Address {
   id: string; email: string; local_part: string; domain: string; domain_id: string;
@@ -31,5 +31,4 @@ export interface Domain {
 }
 export interface Destination { id: string; email: string; verified: boolean; verified_at: number | null; last_error: string | null; created_at: number }
 export interface ApiKey { id: string; name: string; prefix: string; created_at: number; last_used_at: number | null; revoked_at: number | null }
-export interface Invite { id: string; email: string | null; role: Role; created_at: number; expires_at: number; used_at: number | null; state: "pending" | "used" | "expired" }
 export interface AuditEntry { id: string; user_id: string | null; action: string; target: string | null; meta: unknown; ip: string | null; created_at: number }

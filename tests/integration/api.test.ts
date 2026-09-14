@@ -158,33 +158,29 @@ describe("auth", () => {
   it("keeps admin endpoints admin-only", async () => {
     const u = await inviteUser(t, admin, "user@example.org");
     expect((await u.get("/v1/admin/users")).status).toBe(403);
+    expect((await u.get("/v1/admin/audit")).status).toBe(403);
     expect((await u.post("/v1/domains", { name: "evil.test" })).status).toBe(403);
-    expect((await u.post("/v1/admin/invites", {})).status).toBe(403);
   });
 
-  it("logs in and out, rejects wrong passwords, disables users", async () => {
+  it("disabling a user ends their sessions and API keys", async () => {
     const u = await inviteUser(t, admin, "carol@example.org");
-    const fresh = new Client(t);
-    expect((await fresh.post("/v1/auth/login", { email: "carol@example.org", password: "wrong password!" })).status).toBe(401);
-    expect((await fresh.post("/v1/auth/login", { email: "carol@example.org", password: "another long password" })).status).toBe(200);
-    expect((await fresh.get("/v1/auth/me")).json.user.email).toBe("carol@example.org");
+    const key = (await u.post("/v1/keys", { name: "k" })).json.key;
+    const api = new Client(t);
+    api.bearer = key;
     const me = (await u.get("/v1/auth/me")).json.user;
-    await admin.patch(`/v1/admin/users/${me.id}`, { disabled: true });
-    expect((await fresh.get("/v1/auth/me")).status).toBe(401);
-    expect((await admin.get("/v1/admin/audit")).json.entries.some((e: any) => e.action === "user.updated")).toBe(true);
+    expect((await admin.patch(`/v1/admin/users/${me.id}`, { disabled: true })).status).toBe(200);
+    expect((await u.get("/v1/auth/me")).status).toBe(401);
+    expect((await api.get("/v1/addresses")).status).toBe(401);
+    expect((await admin.get("/v1/admin/audit")).json.entries.some((e: any) => e.action === "user.disabled")).toBe(true);
+    const self = (await admin.get("/v1/auth/me")).json.user;
+    expect((await admin.patch(`/v1/admin/users/${self.id}`, { disabled: true })).status).toBe(400);
   });
 
-  it("invites are single use", async () => {
-    const inv = await admin.post("/v1/admin/invites", {});
-    const c1 = new Client(t);
-    expect((await c1.post("/v1/auth/accept-invite", { token: inv.json.token, email: "d@example.org", password: "long enough password" })).status).toBe(201);
-    const c2 = new Client(t);
-    expect((await c2.post("/v1/auth/accept-invite", { token: inv.json.token, email: "e@example.org", password: "long enough password" })).status).toBe(404);
-  });
-
-  it("setup can only run once", async () => {
+  it("has no password, setup or invite endpoints (SSO only)", async () => {
     const c = new Client(t);
-    expect((await c.post("/v1/auth/setup", { token: "x", email: "z@example.org", password: "long enough password" })).status).toBe(409);
+    for (const p of ["/v1/auth/login", "/v1/auth/setup", "/v1/auth/accept-invite", "/v1/auth/password", "/v1/admin/invites"]) {
+      expect((await c.post(p, { email: "a@b.c", password: "x".repeat(12) })).status).toBe(404);
+    }
   });
 });
 

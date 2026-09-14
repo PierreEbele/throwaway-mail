@@ -23,13 +23,10 @@ const logger = createLogger(config.LOG_LEVEL, { service: "throwaway-mail" });
 const deps = buildDeps(config, logger);
 const app = createApp(deps);
 
-if (deps.setup.token) {
-  logger.warn("FIRST RUN: no users yet. Open the web UI and create the admin with this one-time setup token", {
-    setup_token: deps.setup.token,
-    url: `${config.APP_URL.replace(/\/$/, "")}/setup`,
-  });
-}
+if (!deps.oidc.enabled) logger.warn("Single sign-on is not configured (OIDC_ISSUER / OIDC_CLIENT_SECRET): nobody can log in");
+else logger.info("single sign-on", { issuer: config.OIDC_ISSUER, client_id: config.OIDC_CLIENT_ID, redirect_uri: config.oidcRedirectUri });
 if (deps.cf.mode === "mock") logger.warn("Cloudflare MOCK mode (CF_MOCK=1): no real Cloudflare calls are made");
+if (deps.cf.mode === "unconfigured") logger.warn("Cloudflare is not configured (CF_API_TOKEN / CF_ACCOUNT_ID): adding domains and destinations will fail");
 
 const retention = () => {
   try {

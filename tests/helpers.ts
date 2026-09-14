@@ -8,6 +8,10 @@ import { silentLogger } from "../app/server/logger.js";
 import { MockCloudflareClient } from "../app/server/cloudflare/index.js";
 import { ingestSignature, INGEST_HEADERS } from "../app/server/routes/ingest.js";
 import type { Deps } from "../app/server/context.js";
+import { eq } from "drizzle-orm";
+import { users } from "../app/server/db/schema.js";
+import { newId } from "../app/server/lib/crypto.js";
+import { createSession } from "../app/server/auth/tokens.js";
 
 export const FIXTURES = path.join(__dirname, "fixtures");
 export const SECRET = "test-ingest-secret-0123456789";
@@ -66,20 +70,27 @@ export class Client {
   del = (u: string) => this.req("DELETE", u);
 }
 
-export async function setupAdmin(t: TestApp, email = "admin@example.org") {
+/** Signs a user in directly (users normally come from SSO; the OIDC flow itself is covered in oidc.test.ts). */
+export function loginAs(t: TestApp, email: string, role: "admin" | "user" = "user") {
+  let user = t.deps.db.select().from(users).where(eq(users.email, email)).get();
+  if (!user) {
+    const row = { id: newId("usr"), oidcSub: `sub-${email}`, email, name: email.split("@")[0]!, role, createdAt: Date.now() };
+    t.deps.db.insert(users).values(row).run();
+    user = t.deps.db.select().from(users).where(eq(users.id, row.id)).get()!;
+  }
+  const s = createSession(t.deps, user.id);
   const c = new Client(t);
-  const r = await c.post("/v1/auth/setup", { token: t.deps.setup.token, email, password: "correct horse battery" });
-  if (r.status !== 201) throw new Error(`setup failed: ${JSON.stringify(r.json)}`);
+  c.cookie = `tm_session=${s.token}`;
+  c.csrf = s.csrfToken;
   return c;
 }
 
-export async function inviteUser(t: TestApp, admin: Client, email: string) {
-  const inv = await admin.post("/v1/admin/invites", { email });
-  const token = inv.json.token as string;
-  const c = new Client(t);
-  const r = await c.post("/v1/auth/accept-invite", { token, password: "another long password" });
-  if (r.status !== 201) throw new Error(`invite failed: ${JSON.stringify(r.json)}`);
-  return c;
+export async function setupAdmin(t: TestApp, email = "admin@example.org") {
+  return loginAs(t, email, "admin");
+}
+
+export async function inviteUser(t: TestApp, _admin: Client, email: string) {
+  return loginAs(t, email, "user");
 }
 
 export async function addDomain(admin: Client, name = "mail.example.test", unknown_policy = "reject") {

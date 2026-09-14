@@ -7,14 +7,19 @@ import { useToast } from "./components/ui";
 interface AuthState {
   user: User | null;
   loading: boolean;
-  needsSetup: boolean;
-  cloudflareMode: "live" | "mock" | null;
+  ssoEnabled: boolean;
+  ssoProvider: string;
+  cloudflareMode: "live" | "mock" | "unconfigured" | null;
 }
-const Ctx = createContext<AuthState>({ user: null, loading: true, needsSetup: false, cloudflareMode: null });
+const Ctx = createContext<AuthState>({ user: null, loading: true, ssoEnabled: false, ssoProvider: "SSO", cloudflareMode: null });
 export const useAuth = () => useContext(Ctx);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const status = useQuery({ queryKey: ["status"], queryFn: () => get<{ needs_setup: boolean; cloudflare_mode: "live" | "mock" }>("/v1/auth/status"), staleTime: 60_000 });
+  const status = useQuery({
+    queryKey: ["status"],
+    queryFn: () => get<{ sso: { enabled: boolean; provider: string }; cloudflare_mode: AuthState["cloudflareMode"] }>("/v1/auth/status"),
+    staleTime: 60_000,
+  });
   const me = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
@@ -34,7 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user: me.data ?? null,
         loading: me.isLoading || status.isLoading,
-        needsSetup: status.data?.needs_setup ?? false,
+        ssoEnabled: status.data?.sso.enabled ?? false,
+        ssoProvider: status.data?.sso.provider ?? "SSO",
         cloudflareMode: status.data?.cloudflare_mode ?? null,
       }}
     >

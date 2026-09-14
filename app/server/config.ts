@@ -28,8 +28,18 @@ const EnvSchema = z.object({
   LOGIN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().default(10),
   SESSION_TTL_DAYS: z.coerce.number().int().default(14),
   PARSER_LLM_FALLBACK: bool,
-  /** Optional fixed first-run token (otherwise a random one is printed in the logs). */
-  SETUP_TOKEN: z.string().min(16).optional(),
+  // Single sign-on (OpenID Connect) — the only way to log in.
+  OIDC_ISSUER: z.string().url().optional(),
+  OIDC_CLIENT_ID: z.string().default("throwaway-mail"),
+  OIDC_CLIENT_SECRET: z.string().optional(),
+  OIDC_SCOPES: z.string().default("openid profile email groups"),
+  /** Members of this IdP group become admins (synced at every login). */
+  OIDC_ADMIN_GROUP: z.string().default("admins"),
+  /** Optional comma-separated groups allowed to log in (empty = anyone the IdP lets through). */
+  OIDC_ALLOWED_GROUPS: z.string().default(""),
+  OIDC_PROVIDER_NAME: z.string().default("Authelia"),
+  /** Allow an http:// issuer (local development / tests only). */
+  OIDC_ALLOW_INSECURE: bool,
 });
 
 export type Config = ReturnType<typeof loadConfig>;
@@ -47,8 +57,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   if (isProd && !parsed.CF_MOCK && parsed.INGEST_SECRET === "dev-ingest-secret-change-me") {
     throw new Error("INGEST_SECRET must be set in production (only CF_MOCK=1 may run with the default)");
   }
-  if (!parsed.CF_MOCK && isProd && (!parsed.CF_API_TOKEN || !parsed.CF_ACCOUNT_ID)) {
-    throw new Error("CF_API_TOKEN and CF_ACCOUNT_ID are required unless CF_MOCK=1");
+  if (isProd && (!parsed.OIDC_ISSUER || !parsed.OIDC_CLIENT_SECRET)) {
+    throw new Error("OIDC_ISSUER and OIDC_CLIENT_SECRET are required: single sign-on is the only way to log in");
   }
   const cookieSecure =
     parsed.COOKIE_SECURE !== undefined
@@ -59,5 +69,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     isProd,
     cookieSecure,
     databasePath: parsed.DATABASE_PATH ?? path.join(parsed.DATA_DIR, "throwaway.db"),
+    oidcAllowedGroups: parsed.OIDC_ALLOWED_GROUPS.split(",").map((g) => g.trim()).filter(Boolean),
+    oidcRedirectUri: `${parsed.APP_URL.replace(/\/$/, "")}/v1/auth/oidc/callback`,
   };
 }

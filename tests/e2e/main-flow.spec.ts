@@ -3,17 +3,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { ingestSignature } from "../../app/server/routes/ingest.js";
 
-const PASSWORD = "e2e-admin-password-1";
-
-test("admin setup, domain, address lifecycle and live code", async ({ page, request }) => {
-  // First-run setup
+test("SSO sign-in, domain, address lifecycle and live code", async ({ page, request }) => {
+  // Single sign-on through the (fake) identity provider; "dory" is in the admins group
   await page.goto("/");
-  await expect(page).toHaveURL(/\/setup$/);
-  await page.getByLabel("Setup token").fill("e2e-setup-token-0123456789");
-  await page.getByLabel("Admin email").fill("admin@e2e.test");
-  await page.getByLabel(/^Password/).fill(PASSWORD);
-  await page.getByRole("button", { name: "Create admin" }).click();
+  await expect(page).toHaveURL(/\/login/);
+  await page.getByRole("link", { name: "Sign in with Authelia" }).click();
   await expect(page.getByRole("heading", { name: "Addresses" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Domains" })).toBeVisible(); // admin menu
 
   // Add a domain (mock Cloudflare) and see it become active
   await page.getByRole("link", { name: "Domains" }).click();

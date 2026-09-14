@@ -151,44 +151,20 @@ export function KeysPage() {
 }
 
 export function AccountPage() {
-  const { user } = useAuth();
-  const toast = useToast();
-  const [current, setCurrent] = useState("");
-  const [next, setNext] = useState("");
-  const change = useMutation({
-    mutationFn: () => post("/v1/auth/password", { current_password: current, new_password: next }),
-    onSuccess: () => {
-      setCurrent("");
-      setNext("");
-      toast("Password changed", "success");
-    },
-  });
+  const { user, ssoProvider } = useAuth();
   return (
     <>
       <PageHeader title="Account" />
-      <div className="card mb-6 p-5 text-sm">
-        <p>Signed in as <strong>{user?.email}</strong> <Badge value={user?.role ?? "user"} /></p>
-        <p className="mt-1 text-zinc-500">Member since {fullDate(user?.created_at)}</p>
+      <div className="card max-w-xl space-y-2 p-5 text-sm">
+        <p>
+          Signed in as <strong>{user?.name ?? user?.email}</strong> ({user?.email}) <Badge value={user?.role ?? "user"} />
+        </p>
+        <p className="text-zinc-500">Member since {fullDate(user?.created_at)} · last sign-in {fullDate(user?.last_login_at)}</p>
+        <p className="text-zinc-500">
+          Your identity, password and two-factor settings are managed by {ssoProvider}. Your role here follows your {ssoProvider} groups and is
+          refreshed at every sign-in.
+        </p>
       </div>
-      <form
-        className="card max-w-md space-y-4 p-5"
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          change.mutate();
-        }}
-      >
-        <h2 className="font-semibold">Change password</h2>
-        <div>
-          <label htmlFor="pw-current" className="label">Current password</label>
-          <input id="pw-current" type="password" autoComplete="current-password" required className="input" value={current} onChange={(e) => setCurrent(e.target.value)} />
-        </div>
-        <div>
-          <label htmlFor="pw-new" className="label">New password (min. 10 characters)</label>
-          <input id="pw-new" type="password" autoComplete="new-password" minLength={10} required className="input" value={next} onChange={(e) => setNext(e.target.value)} />
-        </div>
-        <ErrorText error={change.error} />
-        <button className="btn-primary" disabled={change.isPending}>Change password</button>
-      </form>
     </>
   );
 }

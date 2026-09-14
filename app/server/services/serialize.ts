@@ -1,7 +1,7 @@
 import type { Address, Destination, Domain, ExtractedItem, Message, User } from "../db/schema.js";
 
 export function userOut(u: User) {
-  return { id: u.id, email: u.email, role: u.role, disabled: u.disabled, created_at: u.createdAt };
+  return { id: u.id, email: u.email, name: u.name, role: u.role, disabled: u.disabled, created_at: u.createdAt, last_login_at: u.lastLoginAt };
 }
 
 export function domainOut(d: Domain, full: boolean) {

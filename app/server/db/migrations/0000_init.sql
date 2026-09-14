@@ -86,21 +86,6 @@ CREATE TABLE `extracted_items` (
 );
 --> statement-breakpoint
 CREATE INDEX `extracted_message_idx` ON `extracted_items` (`message_id`);--> statement-breakpoint
-CREATE TABLE `invites` (
-	`id` text PRIMARY KEY NOT NULL,
-	`token_hash` text NOT NULL,
-	`email` text,
-	`role` text DEFAULT 'user' NOT NULL,
-	`created_by` text,
-	`created_at` integer NOT NULL,
-	`expires_at` integer NOT NULL,
-	`used_at` integer,
-	`used_by` text,
-	FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null,
-	FOREIGN KEY (`used_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `invites_token_hash_unique` ON `invites` (`token_hash`);--> statement-breakpoint
 CREATE TABLE `messages` (
 	`id` text PRIMARY KEY NOT NULL,
 	`address_id` text NOT NULL,
@@ -142,11 +127,13 @@ CREATE TABLE `sessions` (
 CREATE INDEX `sessions_user_idx` ON `sessions` (`user_id`);--> statement-breakpoint
 CREATE TABLE `users` (
 	`id` text PRIMARY KEY NOT NULL,
+	`oidc_sub` text NOT NULL,
 	`email` text NOT NULL,
-	`password_hash` text NOT NULL,
+	`name` text,
 	`role` text DEFAULT 'user' NOT NULL,
 	`disabled` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL
+	`created_at` integer NOT NULL,
+	`last_login_at` integer
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`);
+CREATE UNIQUE INDEX `users_oidc_sub_unique` ON `users` (`oidc_sub`);

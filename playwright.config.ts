@@ -8,7 +8,14 @@ export default defineConfig({
   timeout: 60_000,
   retries: 0,
   use: { baseURL: `http://localhost:${PORT}`, trace: "retain-on-failure" },
-  webServer: {
+  webServer: [
+    {
+      command: "pnpm -s tsx scripts/fake-idp.ts",
+      url: "http://127.0.0.1:3298/.well-known/openid-configuration",
+      reuseExistingServer: false,
+      env: { FAKE_IDP_PORT: "3298", OIDC_CLIENT_ID: "throwaway-mail", OIDC_CLIENT_SECRET: "e2e-oidc-secret" },
+    },
+    {
     command: `node dist/server.js`,
     url: `http://localhost:${PORT}/healthz`,
     reuseExistingServer: false,
@@ -18,9 +25,12 @@ export default defineConfig({
       PORT: String(PORT),
       APP_URL: `http://localhost:${PORT}`,
       DATA_DIR: DATA,
-      SETUP_TOKEN: "e2e-setup-token-0123456789",
+      OIDC_ISSUER: "http://127.0.0.1:3298",
+      OIDC_CLIENT_SECRET: "e2e-oidc-secret",
+      OIDC_ALLOW_INSECURE: "1",
       INGEST_SECRET: "e2e-ingest-secret-0123456789",
       LOG_LEVEL: "warn",
     },
-  },
+    },
+  ],
 });

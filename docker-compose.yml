@@ -1,14 +1,25 @@
-# Throwaway Mail: app + Caddy (automatic TLS).
-# Configure via .env (see .env.example). Local try-out without Cloudflare:
-#   CF_MOCK=1 docker compose up --build      → https://localhost (Caddy's local CA)
+# Throwaway Mail.
+#   Behind an existing reverse proxy (e.g. host Caddy):  docker compose up -d
+#     → app on 127.0.0.1:${APP_PORT:-3310}
+#   Standalone with the bundled Caddy (automatic TLS):    docker compose --profile caddy up -d
 services:
   app:
     build: .
     image: throwaway-mail:latest
+    container_name: throwaway-mail
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       APP_URL: ${APP_URL:-https://${APP_DOMAIN:-localhost}}
       INGEST_SECRET: ${INGEST_SECRET:-dev-ingest-secret-change-me}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-throwaway-mail}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_ADMIN_GROUP: ${OIDC_ADMIN_GROUP:-admins}
+      OIDC_ALLOWED_GROUPS: ${OIDC_ALLOWED_GROUPS:-}
+      OIDC_PROVIDER_NAME: ${OIDC_PROVIDER_NAME:-Authelia}
+      OIDC_SCOPES: ${OIDC_SCOPES:-openid profile email groups}
       CF_MOCK: ${CF_MOCK:-0}
       CF_API_TOKEN: ${CF_API_TOKEN:-}
       CF_ACCOUNT_ID: ${CF_ACCOUNT_ID:-}
@@ -16,13 +27,13 @@ services:
       RETENTION_DAYS: ${RETENTION_DAYS:-30}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-240}
-      LOGIN_RATE_LIMIT_PER_MINUTE: ${LOGIN_RATE_LIMIT_PER_MINUTE:-10}
-      SETUP_TOKEN: ${SETUP_TOKEN:-}
+      LOGIN_RATE_LIMIT_PER_MINUTE: ${LOGIN_RATE_LIMIT_PER_MINUTE:-20}
       BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      TZ: ${TZ:-Europe/Paris}
     volumes:
       - data:/data
-    expose:
-      - "3000"
+    ports:
+      - "127.0.0.1:${APP_PORT:-3310}:3000"
     mem_limit: 384m
     stop_grace_period: 15s
     logging:
@@ -30,6 +41,7 @@ services:
       options: { max-size: "10m", max-file: "5" }
 
   caddy:
+    profiles: ["caddy"]
     image: caddy:2-alpine
     restart: unless-stopped
     depends_on:

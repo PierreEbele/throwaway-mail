@@ -50,7 +50,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <>
           <p className="mt-4 mb-1 px-3 text-xs font-semibold tracking-wide text-zinc-400 uppercase">Admin</p>
           <NavLink to="/admin/domains" className={linkCls}>Domains</NavLink>
-          <NavLink to="/admin/users" className={linkCls}>Users &amp; invites</NavLink>
+          <NavLink to="/admin/users" className={linkCls}>Users</NavLink>
           <NavLink to="/admin/audit" className={linkCls}>Audit log</NavLink>
         </>
       )}
@@ -81,6 +81,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
         <div className="space-y-3 px-3">
           {cloudflareMode === "mock" && <p className="badge bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">Cloudflare mock mode</p>}
+          {cloudflareMode === "unconfigured" && <p className="badge bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300">Cloudflare not configured</p>}
           <ThemeToggle />
           <div className="truncate text-xs text-zinc-500" title={user?.email}>{user?.email}</div>
           <button className="btn-secondary w-full" onClick={logout}>Log out</button>
