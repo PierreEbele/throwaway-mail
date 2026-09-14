@@ -50,6 +50,7 @@ describe("ingest routing", () => {
     const full = await admin.get(`/v1/messages/${r.json.message_id}`);
     expect(full.json.message.auth).toEqual({ spf: "pass", dkim: "pass", dmarc: "pass" });
     expect(full.json.message.html).not.toContain("<script");
+    expect(full.json.message.html).not.toMatch(/^Please verify your device/); // <title> text must not leak into the body
   });
   it("matches case-insensitively and ignores plus-tags", async () => {
     const [local, domain] = addr.email.split("@");

@@ -21,7 +21,7 @@ export function buildDeps(config: Config, logger: Logger, overrides: Partial<Dep
     bus: new EventBus(),
     parserStrategies: config.PARSER_LLM_FALLBACK ? [new LlmFallbackStrategy()] : [],
     now: () => Date.now(),
-    setup: { token: hasUsers ? null : randomToken(18) },
+    setup: { token: hasUsers ? null : (config.SETUP_TOKEN ?? randomToken(18)) },
     ...overrides,
   };
 }

@@ -28,6 +28,8 @@ const EnvSchema = z.object({
   LOGIN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().default(10),
   SESSION_TTL_DAYS: z.coerce.number().int().default(14),
   PARSER_LLM_FALLBACK: bool,
+  /** Optional fixed first-run token (otherwise a random one is printed in the logs). */
+  SETUP_TOKEN: z.string().min(16).optional(),
 });
 
 export type Config = ReturnType<typeof loadConfig>;

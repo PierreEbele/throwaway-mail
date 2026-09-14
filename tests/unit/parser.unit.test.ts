@@ -12,6 +12,11 @@ describe("code extraction", () => {
   it("rejects amounts", () => expect(code("Your code purchase total is $1299 and €4500")).toBeNull());
   it("rejects order numbers", () => expect(code("Order #482913 confirmed. Order number: 557812")).toBeNull());
   it("rejects zip codes", () => expect(code("Sent from 75011 Paris and Springfield, IL 62704")).toBeNull());
+  it("does not offer street numbers as alternatives", () => {
+    const r = parseMessage({ text: "Your verification code: 482910\nX Corp. 1355 Market Street, Suite 900\n10 rue de Rivoli, Paris" });
+    expect(r.code?.value).toBe("482910");
+    expect(r.alternatives.map((a) => a.value)).not.toContain("1355");
+  });
   it("ignores digits inside URLs and e-mails", () => expect(code("Visit https://x.com/a/123456 or mail 654321@x.com")).toBeNull());
   it("ignores hidden HTML preheaders", () => {
     const html = `<div style="display:none">code 111111</div><p>Your code is <b>222222</b></p>`;
@@ -63,5 +68,19 @@ describe("strategies", () => {
     const r = await runParser({ text: "nothing here" }, [s]);
     expect(r.code?.value).toBe("999000");
     expect(r.strategy).toBe("fake");
+  });
+});
+
+describe("display sanitiser", async () => {
+  const { sanitizeEmailHtml } = await import("../../app/server/lib/sanitize.js");
+  it("removes scripts, handlers and titles, blocks remote images, keeps data images", () => {
+    const out = sanitizeEmailHtml(
+      `<html><head><title>T</title></head><body><script>alert(1)</script><a href="javascript:alert(1)" onclick="x()">a</a><img src="https://tracker.example/p.gif"><img src="data:image/png;base64,AAAA"><form><input></form><iframe src="https://x"></iframe><p style="color:red">ok</p></body></html>`,
+    );
+    expect(out).not.toMatch(/script|onclick|javascript:|<form|<iframe|<input|>T</);
+    expect(out).toContain('data-blocked-src="https://tracker.example/p.gif"');
+    expect(out).toContain('src="data:image/png;base64,AAAA"');
+    expect(out).toContain('<p style="color:red">ok</p>');
+    expect(out).toContain('rel="noopener noreferrer nofollow"');
   });
 });

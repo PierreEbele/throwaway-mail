@@ -1,4 +1,4 @@
-import { STRONG_KEYWORDS, WEAK_KEYWORDS, ORDER_CONTEXT_RE, PHONE_CONTEXT_RE, UNIT_AFTER_RE, UPPERCASE_STOPWORDS } from "./keywords.js";
+import { STRONG_KEYWORDS, WEAK_KEYWORDS, ORDER_CONTEXT_RE, PHONE_CONTEXT_RE, UNIT_AFTER_RE, UPPERCASE_STOPWORDS, STREET_AFTER_RE } from "./keywords.js";
 
 export interface CodeCandidate {
   value: string; // normalised (separators removed)
@@ -196,6 +196,7 @@ export function extractCodes(input: CodeInput): CodeCandidate[] {
     if (ORDER_CONTEXT_RE.test(before.slice(-40))) score -= 50;
     if (PHONE_CONTEXT_RE.test(before.slice(-40))) score -= 40;
     if (UNIT_AFTER_RE.test(after)) score -= 40;
+    if (rm.kind === "digits" && STREET_AFTER_RE.test(after)) score -= 40;
     if (rm.value.length === 5 && rm.kind === "digits") {
       if (/^\s+[A-ZÀ-Ý][a-zà-ÿ'-]+/.test(after) || /\b[A-Z]{2}\s$/.test(before) || /^\s+cedex/i.test(after)) score -= 40;
     }

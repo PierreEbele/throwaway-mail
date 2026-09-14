@@ -1,0 +1,194 @@
+import { useState, type FormEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { del, get, post } from "../api";
+import type { ApiKey } from "../types";
+import { useAuth } from "../auth";
+import { Badge, CopyButton, EmptyState, ErrorText, PageHeader, Spinner, confirmAction, useToast } from "../components/ui";
+import { useDestinations } from "./Addresses";
+import { fullDate, timeAgo } from "../util";
+
+export function DestinationsPage() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const dests = useDestinations();
+  const [email, setEmail] = useState("");
+  const inv = () => qc.invalidateQueries({ queryKey: ["destinations"] });
+  const add = useMutation({
+    mutationFn: () => post("/v1/destinations", { email }),
+    onSuccess: () => {
+      setEmail("");
+      inv();
+      toast("Cloudflare sent a verification e-mail to that address", "success");
+    },
+  });
+  const action = useMutation({
+    mutationFn: ({ id, op }: { id: string; op: "refresh" | "resend" | "delete" }) => (op === "delete" ? del(`/v1/destinations/${id}`) : post(`/v1/destinations/${id}/${op}`)),
+    onSuccess: (_r, v) => {
+      inv();
+      if (v.op === "resend") toast("Verification e-mail sent again", "success");
+    },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+  return (
+    <>
+      <PageHeader title="Destinations" subtitle="Personal mailboxes that sites can forward to. Cloudflare must verify each one (click the link in the e-mail it sends)." />
+      <form
+        className="card mb-6 flex flex-wrap items-end gap-3 p-4"
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          add.mutate();
+        }}
+      >
+        <div className="min-w-64 flex-1">
+          <label htmlFor="dest-email" className="label">Add a mailbox</label>
+          <input id="dest-email" type="email" required className="input" placeholder="me@personal.example" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <button className="btn-primary" disabled={add.isPending}>Add &amp; send verification</button>
+        <div className="w-full"><ErrorText error={add.error} /></div>
+      </form>
+      {dests.isLoading && <Spinner />}
+      {dests.data?.length === 0 && <EmptyState title="No destinations yet" />}
+      {!!dests.data?.length && (
+        <ul className="card divide-y divide-zinc-200 dark:divide-zinc-800">
+          {dests.data.map((d) => (
+            <li key={d.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm">{d.email}</span>
+                  <Badge value={d.verified ? "verified" : "unverified"} />
+                </div>
+                <p className="text-xs text-zinc-500">{d.verified ? `Verified ${timeAgo(d.verified_at)}` : "Waiting for you to click the Cloudflare verification link"}</p>
+                {d.last_error && <p className="text-xs text-red-600">{d.last_error}</p>}
+              </div>
+              {!d.verified && (
+                <>
+                  <button className="btn-secondary" onClick={() => action.mutate({ id: d.id, op: "refresh" })}>Check status</button>
+                  <button className="btn-secondary" onClick={() => action.mutate({ id: d.id, op: "resend" })}>Resend</button>
+                </>
+              )}
+              <button className="btn-ghost text-red-600" onClick={() => confirmAction(`Remove ${d.email}?`) && action.mutate({ id: d.id, op: "delete" })}>Remove</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+export function KeysPage() {
+  const qc = useQueryClient();
+  const keys = useQuery({ queryKey: ["keys"], queryFn: () => get<{ keys: ApiKey[] }>("/v1/keys").then((r) => r.keys) });
+  const [name, setName] = useState("");
+  const [created, setCreated] = useState<string | null>(null);
+  const create = useMutation({
+    mutationFn: () => post<{ key: string }>("/v1/keys", { name }),
+    onSuccess: (r) => {
+      setCreated(r.key);
+      setName("");
+      qc.invalidateQueries({ queryKey: ["keys"] });
+    },
+  });
+  const revoke = useMutation({ mutationFn: (id: string) => del(`/v1/keys/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: ["keys"] }) });
+  const origin = location.origin;
+  return (
+    <>
+      <PageHeader title="API keys" subtitle="Use a key as a Bearer token. Keys are stored hashed; the full key is shown only once." />
+      <form
+        className="card mb-4 flex flex-wrap items-end gap-3 p-4"
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          create.mutate();
+        }}
+      >
+        <div className="min-w-64 flex-1">
+          <label htmlFor="key-name" className="label">Key name</label>
+          <input id="key-name" required className="input" placeholder="e.g. signup-bot" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <button className="btn-primary" disabled={create.isPending}>Create key</button>
+        <div className="w-full"><ErrorText error={create.error} /></div>
+      </form>
+      {created && (
+        <div className="card mb-6 border-emerald-300 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950/40" role="alert">
+          <p className="text-sm font-medium">Copy your new key now. It will not be shown again.</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <code className="rounded bg-white px-2 py-1 font-mono text-sm break-all dark:bg-zinc-900" data-testid="new-key">{created}</code>
+            <CopyButton text={created} />
+            <button className="btn-ghost" onClick={() => setCreated(null)}>Done</button>
+          </div>
+          <pre className="mt-3 overflow-auto rounded bg-zinc-900 p-3 text-xs text-zinc-100">{`curl -s -H "Authorization: Bearer ${created}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"site_name":"Example"}' ${origin}/v1/addresses`}</pre>
+        </div>
+      )}
+      {keys.isLoading && <Spinner />}
+      {keys.data?.length === 0 && <EmptyState title="No API keys" />}
+      {!!keys.data?.length && (
+        <div className="card overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs text-zinc-500 uppercase">
+              <tr><th className="px-4 py-2">Name</th><th className="px-4 py-2">Prefix</th><th className="px-4 py-2">Created</th><th className="px-4 py-2">Last used</th><th className="px-4 py-2"><span className="sr-only">Actions</span></th></tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              {keys.data.map((k) => (
+                <tr key={k.id} className={k.revoked_at ? "opacity-50" : ""}>
+                  <td className="px-4 py-2">{k.name}</td>
+                  <td className="px-4 py-2 font-mono">{k.prefix}…</td>
+                  <td className="px-4 py-2">{fullDate(k.created_at)}</td>
+                  <td className="px-4 py-2">{timeAgo(k.last_used_at)}</td>
+                  <td className="px-4 py-2 text-right">
+                    {k.revoked_at ? <Badge value="archived">revoked</Badge> : (
+                      <button className="btn-ghost text-red-600" onClick={() => confirmAction(`Revoke "${k.name}"? Programs using it will stop working.`) && revoke.mutate(k.id)}>Revoke</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
+
+export function AccountPage() {
+  const { user } = useAuth();
+  const toast = useToast();
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const change = useMutation({
+    mutationFn: () => post("/v1/auth/password", { current_password: current, new_password: next }),
+    onSuccess: () => {
+      setCurrent("");
+      setNext("");
+      toast("Password changed", "success");
+    },
+  });
+  return (
+    <>
+      <PageHeader title="Account" />
+      <div className="card mb-6 p-5 text-sm">
+        <p>Signed in as <strong>{user?.email}</strong> <Badge value={user?.role ?? "user"} /></p>
+        <p className="mt-1 text-zinc-500">Member since {fullDate(user?.created_at)}</p>
+      </div>
+      <form
+        className="card max-w-md space-y-4 p-5"
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          change.mutate();
+        }}
+      >
+        <h2 className="font-semibold">Change password</h2>
+        <div>
+          <label htmlFor="pw-current" className="label">Current password</label>
+          <input id="pw-current" type="password" autoComplete="current-password" required className="input" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor="pw-new" className="label">New password (min. 10 characters)</label>
+          <input id="pw-new" type="password" autoComplete="new-password" minLength={10} required className="input" value={next} onChange={(e) => setNext(e.target.value)} />
+        </div>
+        <ErrorText error={change.error} />
+        <button className="btn-primary" disabled={change.isPending}>Change password</button>
+      </form>
+    </>
+  );
+}

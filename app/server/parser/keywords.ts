@@ -35,3 +35,7 @@ export const UPPERCASE_STOPWORDS = new Set([
   "BUTTON", "CLICK", "HERE", "VALID", "EXPIRES", "MINUTES", "SAMSUNG", "OUTLOOK", "OFFICE", "WINDOWS", "XBOX", "TWITCH",
   "SLACK", "NOTION", "ADOBE", "DROPBOX", "UBER", "AIRBNB", "STRIPE", "SHOPIFY", "LEBONCOIN", "DOCTOLIB", "AMELI", "CAF",
 ]);
+
+/** "1355 Market Street", "24 rue des Jeûneurs", "410 Terry Avenue" … */
+export const STREET_AFTER_RE =
+  /^\s+(?:(?:[A-Z][\wà-ÿ.'-]*\s+){0,3}(?:street|st\.?|avenue|ave\.?|road|rd\.?|boulevard|blvd\.?|way|drive|dr\.?|lane|ln\.?|place|plaza|parkway|square|suite|floor)\b|(?:rue|avenue|av\.|boulevard|bd|quai|place|allée|chemin|impasse|route|cours)\b)/i;

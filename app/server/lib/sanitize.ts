@@ -10,6 +10,7 @@ export function sanitizeEmailHtml(html: string): string {
       "img", "style", "center", "font", "span", "div", "table", "thead", "tbody", "tfoot", "tr", "td", "th", "colgroup", "col", "h1", "h2", "h3", "h4", "h5", "h6", "u", "s", "small", "big", "hr", "br",
     ]),
     allowVulnerableTags: true, // <style> is allowed; it cannot run script and remote url() is blocked by CSP
+    nonTextTags: ["script", "textarea", "option", "noscript", "title", "head"],
     allowedAttributes: {
       "*": ["style", "class", "align", "valign", "width", "height", "bgcolor", "color", "dir", "lang", "title", "border", "cellpadding", "cellspacing", "colspan", "rowspan", "face", "size"],
       a: ["href", "name", "target", "rel"],
