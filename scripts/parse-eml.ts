@@ -13,4 +13,7 @@ async function main() {
     console.log(JSON.stringify(parseMessage({ subject: e.subject, text: e.text, html: e.html }), null, 2));
   }
 }
-main();
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

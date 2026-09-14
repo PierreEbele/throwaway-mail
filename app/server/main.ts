@@ -5,7 +5,20 @@ import { buildDeps } from "./build-deps.js";
 import { createApp } from "./app.js";
 import { runRetention } from "./services/retention.js";
 
-const config = loadConfig();
+// Local (non-Docker) runs may keep settings in .env.
+try {
+  process.loadEnvFile(".env");
+} catch {
+  /* no .env file */
+}
+
+let config: ReturnType<typeof loadConfig>;
+try {
+  config = loadConfig();
+} catch (e) {
+  console.error((e as Error).message);
+  process.exit(1);
+}
 const logger = createLogger(config.LOG_LEVEL, { service: "throwaway-mail" });
 const deps = buildDeps(config, logger);
 const app = createApp(deps);

@@ -35,10 +35,17 @@ const EnvSchema = z.object({
 export type Config = ReturnType<typeof loadConfig>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
-  const parsed = EnvSchema.parse(env);
+  // Docker Compose passes unset optional variables as "": treat them as unset.
+  const cleaned = Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined && v !== ""));
+  const result = EnvSchema.safeParse(cleaned);
+  if (!result.success) {
+    const lines = result.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");
+    throw new Error(`Invalid configuration:\n${lines}`);
+  }
+  const parsed = result.data;
   const isProd = parsed.NODE_ENV === "production";
-  if (isProd && parsed.INGEST_SECRET === "dev-ingest-secret-change-me") {
-    throw new Error("INGEST_SECRET must be set in production");
+  if (isProd && !parsed.CF_MOCK && parsed.INGEST_SECRET === "dev-ingest-secret-change-me") {
+    throw new Error("INGEST_SECRET must be set in production (only CF_MOCK=1 may run with the default)");
   }
   if (!parsed.CF_MOCK && isProd && (!parsed.CF_API_TOKEN || !parsed.CF_ACCOUNT_ID)) {
     throw new Error("CF_API_TOKEN and CF_ACCOUNT_ID are required unless CF_MOCK=1");

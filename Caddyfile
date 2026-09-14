@@ -1,0 +1,15 @@
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	# Raw MIME up to 25 MB + headroom
+	request_body {
+		max_size 26MB
+	}
+
+	reverse_proxy app:3000 {
+		# Stream SSE and long-poll responses immediately
+		flush_interval -1
+	}
+
+	header -Server
+}
