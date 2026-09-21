@@ -15,7 +15,7 @@ Sender → MX (Cloudflare) → Email Routing catch-all → Email Worker
 
 No SMTP server, no port 25, no outbound mail on the VPS. Cloudflare receives and forwards; the app stores, parses and decides.
 
-**Features:** invite-only users with admin/user roles · domains shared and managed by the admin from the UI (the app configures Cloudflare) · one address per site, with readable random local parts · automatic extraction of verification codes and magic links (English and French) · long-poll `GET /v1/addresses/:id/code` · per-site forwarding toggle and destination · live inbox (SSE) · sandboxed HTML viewer with remote images blocked · API keys · OpenAPI docs at `/docs` · retention job · backups.
+**Features:** single sign-on only (OpenID Connect, e.g. Authelia), with roles from IdP groups · domains shared and managed by the admin from the UI (the app configures Cloudflare) · one address per site, with readable random local parts · automatic extraction of verification codes and magic links (English and French) · long-poll `GET /v1/addresses/:id/code` · per-site forwarding toggle and destination · live inbox (SSE) · sandboxed HTML viewer with remote images blocked · API keys · OpenAPI docs at `/docs` · retention job · backups.
 
 ---
 
@@ -25,7 +25,7 @@ No SMTP server, no port 25, no outbound mail on the VPS. Cloudflare receives and
 2. [VPS setup](#2-vps-setup)
 3. [Cloudflare: token scopes and DNS](#3-cloudflare-token-scopes-and-dns)
 4. [Deploy the Email Worker](#4-deploy-the-email-worker)
-5. [First admin](#5-first-admin)
+5. [Single sign-on (Authelia)](#5-single-sign-on-authelia)
 6. [Add a domain](#6-add-a-domain)
 7. [Add a destination (personal mailbox)](#7-add-a-destination-personal-mailbox)
 8. [API examples](#8-api-examples-curl)
@@ -37,21 +37,21 @@ No SMTP server, no port 25, no outbound mail on the VPS. Cloudflare receives and
 
 ## 1. Quick local try-out
 
-Runs everything with a mocked Cloudflare: domains turn active instantly, destinations become verified when you press **Check status**.
+Runs everything locally with a mocked Cloudflare and a fake OpenID provider that signs you in as an admin without a password. Domains turn active instantly, and destinations become verified when you press **Check status**.
 
 ```bash
-CF_MOCK=1 docker compose up -d --build
-docker compose logs app | grep setup_token
+pnpm install && pnpm build
+pnpm fake-oidc &                       # fake IdP on http://127.0.0.1:3298 (user "dory", group admins)
+CF_MOCK=1 OIDC_ISSUER=http://127.0.0.1:3298 OIDC_CLIENT_SECRET=dev-oidc-secret OIDC_ALLOW_INSECURE=1 pnpm start
 ```
 
-Open https://localhost (Caddy's local certificate, accept the browser warning), go to `/setup`, paste the token. Then add a domain (any name), create an address and send it a test mail:
+Open http://localhost:3000, press **Sign in**, add a domain (any name), create an address and send it a test mail:
 
 ```bash
-pnpm install
-NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm simulate --url https://localhost --to <address> tests/fixtures/github-device-verification.eml
+pnpm simulate --to <address> tests/fixtures/github-device-verification.eml
 ```
 
-> **Compose and buildx:** recent Docker Compose versions need buildx ≥ 0.17 for `--build`. With an older buildx, build the image with `docker build -t throwaway-mail:latest .`, then run `docker compose up -d --no-build`.
+To act as a non-admin, open `http://127.0.0.1:3298/_as?user=alice` before signing in. The fake provider is for development only.
 
 ## 2. VPS setup
 
@@ -62,10 +62,25 @@ Any small Linux VPS (1 vCPU, 1 GB RAM is plenty: the app uses about 40 MB and Ca
 sudo apt-get update && sudo apt-get install -y docker.io docker-compose-plugin git
 sudo git clone <your repo> /opt/throwaway-mail && cd /opt/throwaway-mail
 sudo cp .env.example .env && sudo nano .env      # see below
-sudo docker compose up -d --build
+sudo docker compose --profile caddy up -d --build     # bundled Caddy with automatic TLS
 ```
 
-In `.env` set at least `APP_DOMAIN`, `INGEST_SECRET` (`openssl rand -hex 32`), `CF_API_TOKEN` and `CF_ACCOUNT_ID`.
+In `.env` set at least `APP_DOMAIN`, `INGEST_SECRET` (`openssl rand -hex 32`), the `OIDC_*` settings (section 5), and later `CF_API_TOKEN` / `CF_ACCOUNT_ID`. The app starts without Cloudflare credentials; domain and destination actions then show a clear error.
+
+**Behind an existing reverse proxy** (e.g. Caddy on the host): run `docker compose up -d` without the profile. The app listens on `127.0.0.1:${APP_PORT:-3310}`. A host Caddy block:
+
+```
+jetable.example.com {
+	request_body {
+		max_size 26MB
+	}
+	reverse_proxy 127.0.0.1:3310 {
+		flush_interval -1      # SSE and long-poll
+	}
+}
+```
+
+Do **not** put Authelia's `forward_auth` in front of the app: `/ingest` (Cloudflare Worker, HMAC-signed) and the API (Bearer keys) must reach it without an Authelia cookie. The app enforces SSO itself for everything else.
 
 Firewall: open TCP 80 and 443 (and UDP 443 for HTTP/3). Nothing else is needed: no mail ports.
 
@@ -76,6 +91,8 @@ Updating:
 ```bash
 cd /opt/throwaway-mail && git pull && docker compose up -d --build
 ```
+
+If `docker compose build` complains about buildx, build with `docker build -t throwaway-mail:latest .` and start with `--no-build`.
 
 Logs are JSON lines: `docker compose logs -f app`. Health: `https://APP_DOMAIN/healthz`.
 
@@ -116,17 +133,41 @@ npx wrangler deploy
 - `FALLBACK_FORWARD` should be an address already verified as a Cloudflare destination. When the app is unreachable, errors, or does not answer within 5 seconds, mail goes there. If it is empty, the Worker rejects with a temporary error so the sender gets a bounce instead of silent loss.
 - Watch it live with `npx wrangler tail`.
 
-## 5. First admin
+## 5. Single sign-on (Authelia)
 
-On first start, with no users yet, the app prints a one-time setup token:
+Login is SSO only: there are no local passwords, setup tokens or invites. A user is created at their first sign-in. Members of `OIDC_ADMIN_GROUP` (default `admins`) are admins, and the role is re-synced at every sign-in. `OIDC_ALLOWED_GROUPS` can restrict who may sign in; otherwise Authelia's `authorization_policy` decides. Admins can disable a user in **Admin → Users**, which also signs them out and stops their API keys.
 
-```bash
-docker compose logs app | grep setup_token
-```
+1. Generate a client secret and its digest:
 
-Open `https://APP_DOMAIN/setup`, paste the token, choose the admin e-mail and password. The token stops working once the admin exists. For automated installs you can fix it in advance with `SETUP_TOKEN` (16+ characters).
+   ```bash
+   SECRET=$(openssl rand -base64 48 | tr -d '/+=\n' | cut -c1-64)
+   docker run --rm authelia/authelia:latest authelia crypto hash generate pbkdf2 --variant sha512 --password "$SECRET"
+   ```
 
-Other users: **Admin → Users & invites → Create invite link**, and send them the link (valid 7 days, single use, optionally locked to an e-mail).
+2. Add the client to Authelia's `configuration.yml` under `identity_providers.oidc.clients`, then restart Authelia:
+
+   ```yaml
+   - client_id: 'throwaway-mail'
+     client_name: 'Throwaway Mail'
+     client_secret: '$pbkdf2-sha512$...'          # the digest
+     public: false
+     authorization_policy: 'two_factor'           # or one of your policies
+     consent_mode: 'implicit'
+     require_pkce: true
+     pkce_challenge_method: 'S256'
+     redirect_uris:
+       - 'https://jetable.example.com/v1/auth/oidc/callback'
+     scopes: ['openid', 'profile', 'email', 'groups']
+     response_types: ['code']
+     grant_types: ['authorization_code']
+     userinfo_signed_response_alg: 'none'
+     id_token_signed_response_alg: 'RS256'
+     token_endpoint_auth_method: 'client_secret_basic'
+   ```
+
+3. In the app's `.env`: `OIDC_ISSUER=https://auth.example.com`, `OIDC_CLIENT_ID=throwaway-mail`, `OIDC_CLIENT_SECRET=$SECRET`. The redirect URI is always `APP_URL` + `/v1/auth/oidc/callback`.
+
+Any OpenID Connect provider works the same way (Keycloak, Authentik, Zitadel…); set `OIDC_PROVIDER_NAME` for the button label.
 
 ## 6. Add a domain
 
@@ -231,6 +272,7 @@ Node 22+, pnpm.
 ```bash
 pnpm install
 cp .env.example .env       # set CF_MOCK=1 for local work
+pnpm fake-oidc &           # fake SSO provider (set OIDC_ISSUER=http://127.0.0.1:3298, OIDC_CLIENT_SECRET=dev-oidc-secret, OIDC_ALLOW_INSECURE=1)
 pnpm dev                   # API on :3000 (tsx watch)
 pnpm dev:web               # UI on :5173, proxies /v1 to :3000
 pnpm simulate --to <address> tests/fixtures/google-verification-code.eml
@@ -264,17 +306,22 @@ Adding a parser fixture: drop an `.eml` in `tests/fixtures` and add its expected
 | Variable | Default | Meaning |
 |---|---|---|
 | `APP_DOMAIN` | `localhost` | Hostname Caddy serves (Compose only) |
-| `APP_URL` | `https://$APP_DOMAIN` | Public URL, used in invite links and OpenAPI |
+| `APP_URL` | `https://$APP_DOMAIN` | Public URL, used for the SSO redirect URI and OpenAPI |
 | `INGEST_SECRET` | dev value | HMAC secret shared with the Worker (required in production unless `CF_MOCK=1`) |
-| `CF_API_TOKEN`, `CF_ACCOUNT_ID` | | Cloudflare credentials (required unless `CF_MOCK=1`) |
+| `CF_API_TOKEN`, `CF_ACCOUNT_ID` | | Cloudflare credentials (domain and destination actions fail clearly without them) |
 | `WORKER_NAME` | `throwaway-mail-ingest` | Worker the catch-all rules point to |
 | `CF_MOCK` | `0` | `1` = fake Cloudflare |
 | `RETENTION_DAYS` | `30` | Message retention, `0` = forever |
 | `MAX_INGEST_BYTES` | 25 MB | Larger mails get 413 (the Worker then uses its fallback) |
 | `RATE_LIMIT_PER_MINUTE` | `240` | Per API key / user / IP |
-| `LOGIN_RATE_LIMIT_PER_MINUTE` | `10` | Per IP on login, setup and invite acceptance |
+| `LOGIN_RATE_LIMIT_PER_MINUTE` | `20` | Per IP on SSO login and callback |
 | `SESSION_TTL_DAYS` | `14` | Browser session lifetime |
-| `SETUP_TOKEN` | random | Fixed first-run token |
+| `OIDC_ISSUER`, `OIDC_CLIENT_SECRET` | | SSO provider and client secret (required in production) |
+| `OIDC_CLIENT_ID` | `throwaway-mail` | SSO client id |
+| `OIDC_ADMIN_GROUP` | `admins` | IdP group mapped to the admin role |
+| `OIDC_ALLOWED_GROUPS` | empty | Comma-separated groups allowed to sign in |
+| `OIDC_PROVIDER_NAME` | `Authelia` | Label of the sign-in button |
+| `APP_PORT` | `3310` | Host port (127.0.0.1) when behind your own proxy |
 | `LOG_LEVEL` | `info` | Codes and bodies are never logged above `debug` |
 | `BACKUP_KEEP_DAYS` | `14` | Backup rotation |
 | `PARSER_LLM_FALLBACK` | `0` | Enables the (stub) LLM fallback hook |
