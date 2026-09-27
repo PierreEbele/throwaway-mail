@@ -1,4 +1,4 @@
-import type { CloudflareClient, DestinationInfo, DnsRecord, ZoneInfo } from "./index.js";
+import type { CatchAllRule, CloudflareClient, DestinationInfo, DnsRecord, ZoneInfo } from "./index.js";
 import { CloudflareError } from "./index.js";
 
 const API = "https://api.cloudflare.com/client/v4";
@@ -67,11 +67,26 @@ export class LiveCloudflareClient implements CloudflareClient {
   }
 
   async setCatchAllToWorker(zoneId: string, workerName: string): Promise<void> {
+    await this.setCatchAll(zoneId, { enabled: true, actions: [{ type: "worker", value: [workerName] }] }, "Throwaway Mail catch-all");
+  }
+
+  async getCatchAll(zoneId: string): Promise<CatchAllRule | null> {
+    try {
+      const r = await this.call<{ enabled?: boolean; actions?: Array<{ type: string; value?: string[] }> }>("GET", `/zones/${zoneId}/email/routing/rules/catch_all`);
+      if (!r) return null;
+      return { enabled: !!r.enabled, actions: r.actions ?? [] };
+    } catch (e) {
+      if (e instanceof CloudflareError && e.status === 404) return null;
+      throw e;
+    }
+  }
+
+  async setCatchAll(zoneId: string, rule: CatchAllRule, name = "Catch-all"): Promise<void> {
     await this.call("PUT", `/zones/${zoneId}/email/routing/rules/catch_all`, {
-      name: "Throwaway Mail catch-all",
-      enabled: true,
+      name,
+      enabled: rule.enabled,
       matchers: [{ type: "all" }],
-      actions: [{ type: "worker", value: [workerName] }],
+      actions: rule.actions,
     });
   }
 

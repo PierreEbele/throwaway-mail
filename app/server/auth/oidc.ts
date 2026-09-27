@@ -11,6 +11,7 @@ export interface SsoIdentity {
 }
 
 interface Pending {
+  redirectUri: string;
   verifier: string;
   nonce: string;
   returnTo: string;
@@ -65,17 +66,24 @@ export class OidcService {
     for (const [k, p] of this.pending) if (now - p.createdAt > PENDING_TTL_MS) this.pending.delete(k);
   }
 
+  /** The callback URL on the origin the user is browsing (must be one of the configured app origins). */
+  redirectUriFor(host: string | undefined): string {
+    const origin = this.config.appOrigins.find((o) => host && new URL(o).host === host.toLowerCase()) ?? this.config.appOrigins[0]!;
+    return `${origin}/v1/auth/oidc/callback`;
+  }
+
   /** Returns the IdP authorization URL and the state to bind to the browser. */
-  async start(returnTo: string): Promise<{ url: string; state: string }> {
+  async start(returnTo: string, host?: string): Promise<{ url: string; state: string }> {
     const cfg = await this.discover();
     const now = Date.now();
     this.sweep(now);
     const verifier = client.randomPKCECodeVerifier();
     const state = client.randomState();
     const nonce = client.randomNonce();
-    this.pending.set(state, { verifier, nonce, returnTo: safeReturnTo(returnTo), createdAt: now });
+    const redirectUri = this.redirectUriFor(host);
+    this.pending.set(state, { redirectUri, verifier, nonce, returnTo: safeReturnTo(returnTo), createdAt: now });
     const url = client.buildAuthorizationUrl(cfg, {
-      redirect_uri: this.config.oidcRedirectUri,
+      redirect_uri: redirectUri,
       scope: this.config.OIDC_SCOPES,
       response_type: "code",
       code_challenge: await client.calculatePKCECodeChallenge(verifier),
@@ -96,7 +104,7 @@ export class OidcService {
     }
     this.pending.delete(state);
     // Use the registered redirect URI as the base (the app sits behind a reverse proxy).
-    const current = new URL(this.config.oidcRedirectUri);
+    const current = new URL(p.redirectUri);
     current.search = callbackUrl.search;
     let tokens: Awaited<ReturnType<typeof client.authorizationCodeGrant>>;
     try {

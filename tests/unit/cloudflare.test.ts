@@ -36,6 +36,18 @@ describe("live Cloudflare client", () => {
     expect(calls.every((c) => c.auth === "Bearer tok")).toBe(true);
   });
 
+  it("reads the current catch-all and can put a previous one back", async () => {
+    const { f, calls } = fakeApi((m, p) => {
+      if (p === "/zones/z1/email/routing/rules/catch_all" && m === "GET") return { result: { enabled: true, actions: [{ type: "forward", value: ["me@x.com"] }], matchers: [{ type: "all" }] } };
+      if (p === "/zones/z1/email/routing/rules/catch_all" && m === "PUT") return { result: {} };
+    });
+    const cf = new LiveCloudflareClient("t", "a", f);
+    const rule = await cf.getCatchAll("z1");
+    expect(rule).toEqual({ enabled: true, actions: [{ type: "forward", value: ["me@x.com"] }] });
+    await cf.setCatchAll("z1", rule!);
+    expect(calls.at(-1)!.body).toMatchObject({ enabled: true, matchers: [{ type: "all" }], actions: [{ type: "forward", value: ["me@x.com"] }] });
+  });
+
   it("reports missing DNS records in both API shapes", async () => {
     const newShape = fakeApi(() => ({ result: { errors: [{ code: "mx.missing", missing: { type: "MX", name: "a.com", content: "route1.mx.cloudflare.net", priority: 1 } }], record: [] } }));
     expect(await new LiveCloudflareClient("t", "a", newShape.f).missingDnsRecords("z", "a.com")).toHaveLength(1);

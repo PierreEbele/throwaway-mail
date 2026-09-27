@@ -12,6 +12,7 @@ services:
       - no-new-privileges:true
     environment:
       APP_URL: ${APP_URL:-https://${APP_DOMAIN:-localhost}}
+      APP_EXTRA_URLS: ${APP_EXTRA_URLS:-}
       INGEST_SECRET: ${INGEST_SECRET:-dev-ingest-secret-change-me}
       OIDC_ISSUER: ${OIDC_ISSUER:-}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-throwaway-mail}

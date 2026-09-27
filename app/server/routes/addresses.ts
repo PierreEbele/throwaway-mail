@@ -149,7 +149,7 @@ export function registerAddresses(r: ApiRouter) {
     (c, { query }) => {
       const d = c.get("deps");
       const user = c.get("user")!;
-      const conds: SQL[] = [eq(addresses.userId, user.id)];
+      const conds: SQL[] = [eq(addresses.userId, user.id), eq(addresses.isUnassigned, false)];
       if (query.status && query.status !== "all") conds.push(eq(addresses.status, query.status));
       else if (!query.status) conds.push(ne(addresses.status, "archived"));
       if (query.domain) conds.push(eq(domains.name, query.domain.toLowerCase()));

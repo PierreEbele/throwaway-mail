@@ -180,6 +180,10 @@ Any OpenID Connect provider works the same way (Keycloak, Authentik, Zitadel…)
 
 Status is **active** when all is in place, **pending** with a list of missing DNS records, or **error** with Cloudflare's message. Fix the problem and press **Re-check**.
 
+**Domains that already use Email Routing.** If the zone already has a catch-all that forwards to a mailbox, the app remembers it before pointing the catch-all at the Worker. Mail to addresses the app doesn't know keeps being forwarded to that mailbox, and also appears under **To sort**. There you can register each address as a site (its past mail moves with it, forwarding stays on), block it, or ignore it. **Stop forwarding** on the domain switches to the policy below. Removing the domain from the app puts the old catch-all back. Your existing literal routing rules are never touched and still win over the catch-all. A catch-all that already sends to another Worker is never overwritten.
+
+Every zone whose catch-all points to the Worker must be added in the app. Mail for a domain the app doesn't know is rejected.
+
 *Unknown addresses* policy per domain:
 
 - `reject` (default): mail to addresses that do not exist is rejected.
@@ -306,7 +310,8 @@ Adding a parser fixture: drop an `.eml` in `tests/fixtures` and add its expected
 | Variable | Default | Meaning |
 |---|---|---|
 | `APP_DOMAIN` | `localhost` | Hostname Caddy serves (Compose only) |
-| `APP_URL` | `https://$APP_DOMAIN` | Public URL, used for the SSO redirect URI and OpenAPI |
+| `APP_URL` | `https://$APP_DOMAIN` | Primary public URL (SSO redirect URI, OpenAPI) |
+| `APP_EXTRA_URLS` | empty | Other public URLs of the same app; register `<url>/v1/auth/oidc/callback` for each in the IdP |
 | `INGEST_SECRET` | dev value | HMAC secret shared with the Worker (required in production unless `CF_MOCK=1`) |
 | `CF_API_TOKEN`, `CF_ACCOUNT_ID` | | Cloudflare credentials (domain and destination actions fail clearly without them) |
 | `WORKER_NAME` | `throwaway-mail-ingest` | Worker the catch-all rules point to |

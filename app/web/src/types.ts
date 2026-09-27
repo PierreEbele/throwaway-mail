@@ -27,7 +27,8 @@ export interface CodeResult {
 export interface DnsRecord { type: string; name: string; content: string; priority?: number }
 export interface Domain {
   id: string; name: string; status: "pending" | "active" | "error"; unknown_policy: "reject" | "inbox" | "auto_create";
-  cf_zone_id?: string | null; status_detail?: string | null; dns_missing?: DnsRecord[]; created_at?: number; last_checked_at?: number | null;
+  cf_zone_id?: string | null; status_detail?: string | null;
+  previous_catch_all?: { enabled: boolean; actions: Array<{ type: string; value?: string[] }> } | null; catchall_forward_to?: string | null; dns_missing?: DnsRecord[]; created_at?: number; last_checked_at?: number | null;
 }
 export interface Destination { id: string; email: string; verified: boolean; verified_at: number | null; last_error: string | null; created_at: number }
 export interface ApiKey { id: string; name: string; prefix: string; created_at: number; last_used_at: number | null; revoked_at: number | null }

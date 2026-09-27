@@ -19,6 +19,7 @@ import { registerDomains } from "./routes/domains.js";
 import { registerDestinations } from "./routes/destinations.js";
 import { registerKeys } from "./routes/keys.js";
 import { registerEvents } from "./routes/events.js";
+import { registerReview } from "./routes/review.js";
 
 const APP_CSP = {
   defaultSrc: ["'self'"],
@@ -87,6 +88,7 @@ export function createApp(deps: Deps) {
   registerDestinations(api);
   registerKeys(api);
   registerEvents(api);
+  registerReview(api);
   registerAdmin(api);
   app.all("/v1/*", (c) => c.json({ error: { code: "not_found", message: "Route not found" } }, 404));
 

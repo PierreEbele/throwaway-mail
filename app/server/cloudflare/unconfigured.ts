@@ -10,6 +10,8 @@ export class UnconfiguredCloudflareClient implements CloudflareClient {
   findZone = async () => this.fail();
   enableEmailRouting = async () => this.fail();
   setCatchAllToWorker = async () => this.fail();
+  getCatchAll = async () => this.fail();
+  setCatchAll = async () => this.fail();
   missingDnsRecords = async () => this.fail();
   createDestination = async () => this.fail();
   getDestination = async () => this.fail();

@@ -47,6 +47,10 @@ export const domains = sqliteTable("domains", {
   statusDetail: text("status_detail"),
   dnsMissingJson: text("dns_missing_json"),
   unknownPolicy: text("unknown_policy", { enum: ["reject", "inbox", "auto_create"] }).notNull().default("reject"),
+  /** Catch-all rule that existed in Cloudflare before the app took it over (JSON), restored when the domain is removed. */
+  previousCatchAllJson: text("previous_catch_all_json"),
+  /** While set, mail to unknown addresses keeps being forwarded here (the old catch-all) and is queued for review. */
+  catchallForwardTo: text("catchall_forward_to"),
   createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: integer("created_at").notNull(),
   lastCheckedAt: integer("last_checked_at"),

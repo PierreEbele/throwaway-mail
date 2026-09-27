@@ -63,6 +63,8 @@ export function LiveEvents() {
       qc.invalidateQueries({ queryKey: ["address", e.address_id] });
       qc.invalidateQueries({ queryKey: ["messages", e.address_id] });
       qc.invalidateQueries({ queryKey: ["code", e.address_id] });
+      qc.invalidateQueries({ queryKey: ["review"] });
+      qc.invalidateQueries({ queryKey: ["review-count"] });
       toast(`New mail${e.has_code ? " with a code" : ""}: ${e.subject ?? "(no subject)"}`, "success");
     };
     const onAddress = (ev: MessageEvent) => {

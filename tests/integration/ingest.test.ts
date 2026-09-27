@@ -79,9 +79,9 @@ describe("ingest routing", () => {
     await admin.patch(`/v1/domains/${dom.id}`, { unknown_policy: "inbox" });
     const r = await ingest(t, "nobody@mail.example.test", simpleEml({ text: "x" }));
     expect(r.json.action).toBe("store_only");
-    const list = await admin.get("/v1/addresses");
-    const box = list.json.addresses.find((a: any) => a.is_unassigned);
-    expect(box.message_count).toBe(1);
+    expect((await admin.get("/v1/addresses")).json.addresses.some((a: any) => a.is_unassigned)).toBe(false); // hidden from the list
+    const review = await admin.get("/v1/review");
+    expect(review.json.items).toMatchObject([{ recipient: "nobody@mail.example.test", count: 1, forwarded_to: null }]);
   });
   it("applies the auto_create policy", async () => {
     const dom = (await admin.get("/v1/domains")).json.domains[0];

@@ -71,7 +71,7 @@ export function registerAuth(r: ApiRouter) {
       limit(c);
       const d = c.get("deps");
       try {
-        const { url, state } = await d.oidc.start(query.return_to ?? "/");
+        const { url, state } = await d.oidc.start(query.return_to ?? "/", c.req.header("host"));
         setCookie(c, STATE_COOKIE, state, { httpOnly: true, secure: d.config.cookieSecure, sameSite: "Lax", path: "/v1/auth/oidc", maxAge: 600 });
         return c.redirect(url, 302);
       } catch (e) {

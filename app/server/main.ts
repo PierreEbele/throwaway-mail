@@ -24,7 +24,7 @@ const deps = buildDeps(config, logger);
 const app = createApp(deps);
 
 if (!deps.oidc.enabled) logger.warn("Single sign-on is not configured (OIDC_ISSUER / OIDC_CLIENT_SECRET): nobody can log in");
-else logger.info("single sign-on", { issuer: config.OIDC_ISSUER, client_id: config.OIDC_CLIENT_ID, redirect_uri: config.oidcRedirectUri });
+else logger.info("single sign-on", { issuer: config.OIDC_ISSUER, client_id: config.OIDC_CLIENT_ID, redirect_uris: config.appOrigins.map((o) => `${o}/v1/auth/oidc/callback`) });
 if (deps.cf.mode === "mock") logger.warn("Cloudflare MOCK mode (CF_MOCK=1): no real Cloudflare calls are made");
 if (deps.cf.mode === "unconfigured") logger.warn("Cloudflare is not configured (CF_API_TOKEN / CF_ACCOUNT_ID): adding domains and destinations will fail");
 

@@ -104,6 +104,13 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
 
   const sender = normalizeRecipient(input.envelopeFrom);
   let address = deps.db.select().from(addresses).where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, rcpt.local))).get() ?? null;
+  // Domain whose previous catch-all is preserved: unknown addresses keep going to the old destination
+  // and are queued in the owner's "To sort" box so they can be registered as sites.
+  let preservedForward: string | null = null;
+  if (!address && domain.catchallForwardTo) {
+    address = resolveUnknown(deps, { ...domain, unknownPolicy: "inbox" }, rcpt.local, null);
+    preservedForward = domain.catchallForwardTo;
+  }
   if (!address) {
     address = resolveUnknown(deps, domain, rcpt.local, sender?.domain ?? null);
     if (!address) {
@@ -132,7 +139,7 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
   }
 
   const parsed = await runParser({ subject: email.subject, text: email.text, html: email.html }, deps.parserStrategies);
-  const forwardTo = forwardTarget(deps, address);
+  const forwardTo = preservedForward ?? forwardTarget(deps, address);
   const now = deps.now();
   const id = newId("msg");
   const headers = email.headers.map((h) => ({ key: h.key, value: h.value.slice(0, 2000) })).slice(0, 200);

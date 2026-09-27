@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { post } from "../api";
 import { useAuth } from "../auth";
+import { useReviewCount } from "../pages/Review";
 
 function ThemeToggle() {
   const [pref, setPref] = useState(localStorage.getItem("theme") ?? "system");
@@ -31,6 +32,7 @@ const linkCls = ({ isActive }: { isActive: boolean }) =>
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user, cloudflareMode } = useAuth();
+  const review = useReviewCount(!!user);
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const nav = useNavigate();
@@ -43,6 +45,13 @@ export function Layout({ children }: { children: ReactNode }) {
   const links = (
     <nav aria-label="Main" className="flex flex-col gap-1" onClick={() => setOpen(false)}>
       <NavLink to="/" end className={linkCls}>Addresses</NavLink>
+      {(review.data?.count ?? 0) > 0 && (
+        <NavLink to="/review" className={linkCls}>
+          <span className="flex items-center justify-between">
+            To sort <span className="badge bg-indigo-600 text-white" aria-label={`${review.data!.count} to sort`}>{review.data!.count}</span>
+          </span>
+        </NavLink>
+      )}
       <NavLink to="/destinations" className={linkCls}>Destinations</NavLink>
       <NavLink to="/keys" className={linkCls}>API keys</NavLink>
       <NavLink to="/account" className={linkCls}>Account</NavLink>

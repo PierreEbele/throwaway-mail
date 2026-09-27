@@ -12,6 +12,8 @@ export function domainOut(d: Domain, full: boolean) {
     cf_zone_id: d.cfZoneId,
     status_detail: d.statusDetail,
     dns_missing: d.dnsMissingJson ? JSON.parse(d.dnsMissingJson) : [],
+    previous_catch_all: d.previousCatchAllJson ? JSON.parse(d.previousCatchAllJson) : null,
+    catchall_forward_to: d.catchallForwardTo,
     created_at: d.createdAt,
     last_checked_at: d.lastCheckedAt,
   };

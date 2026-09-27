@@ -14,8 +14,8 @@ function app(extra: Record<string, string> = {}) {
 }
 
 /** Drives the browser side of the flow: app → IdP → app callback. Returns the final redirect and the client. */
-async function ssoLogin(t: TestApp, returnTo = "/", tamperState = false) {
-  const start = await t.app.request(`/v1/auth/oidc/login?return_to=${encodeURIComponent(returnTo)}`);
+async function ssoLogin(t: TestApp, returnTo = "/", tamperState = false, host?: string) {
+  const start = await t.app.request(`/v1/auth/oidc/login?return_to=${encodeURIComponent(returnTo)}`, host ? { headers: { host } } : {});
   expect(start.status).toBe(302);
   const stateCookie = start.headers.get("set-cookie")!.split(";")[0]!;
   const authorize = await fetch(start.headers.get("location")!, { redirect: "manual" });
@@ -85,6 +85,18 @@ describe("single sign-on (OpenID Connect)", () => {
     idp.denyNext("access_denied");
     const r = await ssoLogin(t);
     expect(r.location).toMatch(/^\/login\?error=access_denied/);
+  });
+
+  it("sends each public hostname back to its own callback URL", async () => {
+    const t = app({ APP_URL: "https://mail.one.test", APP_EXTRA_URLS: "https://mail.two.test" });
+    idp.setUser(FAKE_USERS.dory!);
+    const viaTwo = await t.app.request("/v1/auth/oidc/login", { headers: { host: "mail.two.test" } });
+    expect(new URL(viaTwo.headers.get("location")!).searchParams.get("redirect_uri")).toBe("https://mail.two.test/v1/auth/oidc/callback");
+    const viaEvil = await t.app.request("/v1/auth/oidc/login", { headers: { host: "evil.test" } });
+    expect(new URL(viaEvil.headers.get("location")!).searchParams.get("redirect_uri")).toBe("https://mail.one.test/v1/auth/oidc/callback");
+    const r = await ssoLogin(t, "/", false, "mail.two.test");
+    expect(r.status).toBe(302);
+    expect(r.client.cookie).toMatch(/^tm_session=/);
   });
 
   it("never redirects off-site after login", async () => {

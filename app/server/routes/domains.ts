@@ -1,4 +1,4 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { ApiRouter } from "../lib/http.js";
 import { clientIp } from "../lib/http.js";
@@ -7,7 +7,7 @@ import { newId } from "../lib/crypto.js";
 import { DOMAIN_RE } from "../lib/email.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { audit } from "../services/audit.js";
-import { setupDomain } from "../services/domains.js";
+import { restoreCatchAll, setupDomain } from "../services/domains.js";
 import { domainOut } from "../services/serialize.js";
 
 export function registerDomains(r: ApiRouter) {
@@ -49,13 +49,24 @@ export function registerDomains(r: ApiRouter) {
       summary: "Change the unknown-recipient policy",
       tags: ["domains"],
       auth: "admin",
-      body: z.object({ unknown_policy: z.enum(["reject", "inbox", "auto_create"]) }),
+      description:
+        "forward_unknown=false stops forwarding unknown addresses to the preserved catch-all destination (unknown_policy then applies); true resumes it.",
+      body: z.object({ unknown_policy: z.enum(["reject", "inbox", "auto_create"]).optional(), forward_unknown: z.boolean().optional() }),
     },
     (c, { body }) => {
       const d = c.get("deps");
       const id = c.req.param("id")!;
-      const res = d.db.update(domains).set({ unknownPolicy: body.unknown_policy }).where(eq(domains.id, id)).run();
-      if (!res.changes) throw notFound("Domain");
+      const dom = d.db.select().from(domains).where(eq(domains.id, id)).get();
+      if (!dom) throw notFound("Domain");
+      const set: Partial<typeof dom> = {};
+      if (body.unknown_policy) set.unknownPolicy = body.unknown_policy;
+      if (body.forward_unknown !== undefined) {
+        const previous = dom.previousCatchAllJson ? (JSON.parse(dom.previousCatchAllJson) as { actions: Array<{ type: string; value?: string[] }> }) : null;
+        const fwd = previous?.actions.find((a) => a.type === "forward")?.value?.[0] ?? null;
+        if (body.forward_unknown && !fwd) throw badRequest("This domain had no forwarding catch-all before the app");
+        set.catchallForwardTo = body.forward_unknown ? fwd : null;
+      }
+      if (Object.keys(set).length) d.db.update(domains).set(set).where(eq(domains.id, id)).run();
       audit(d, c.get("user")!.id, "domain.policy_changed", id, body, clientIp(c));
       return c.json({ domain: domainOut(d.db.select().from(domains).where(eq(domains.id, id)).get()!, true) });
     },
@@ -70,15 +81,34 @@ export function registerDomains(r: ApiRouter) {
     return c.json({ domain: domainOut(result, true) });
   });
 
-  r.add({ method: "delete", path: "/v1/domains/:id", summary: "Remove a domain that has no addresses", tags: ["domains"], auth: "admin" }, (c) => {
-    const d = c.get("deps");
-    const id = c.req.param("id")!;
-    const dom = d.db.select().from(domains).where(eq(domains.id, id)).get();
-    if (!dom) throw notFound("Domain");
-    const n = d.db.select({ n: sql<number>`count(*)` }).from(addresses).where(eq(addresses.domainId, id)).get()!.n;
-    if (n > 0) throw badRequest(`Domain still has ${n} address(es); delete them first`);
-    d.db.delete(domains).where(eq(domains.id, id)).run();
-    audit(d, c.get("user")!.id, "domain.deleted", id, { name: dom.name }, clientIp(c));
-    return c.json({ ok: true });
-  });
+  r.add(
+    {
+      method: "delete",
+      path: "/v1/domains/:id",
+      summary: "Remove a domain that has no addresses (restores the catch-all it had before the app)",
+      tags: ["domains"],
+      auth: "admin",
+    },
+    async (c) => {
+      const d = c.get("deps");
+      const id = c.req.param("id")!;
+      const dom = d.db.select().from(domains).where(eq(domains.id, id)).get();
+      if (!dom) throw notFound("Domain");
+      const n = d.db
+        .select({ n: sql<number>`count(*)` })
+        .from(addresses)
+        .where(and(eq(addresses.domainId, id), eq(addresses.isUnassigned, false)))
+        .get()!.n;
+      if (n > 0) throw badRequest(`Domain still has ${n} address(es); delete them first`);
+      let restored = false;
+      try {
+        restored = await restoreCatchAll(d, dom);
+      } catch (e) {
+        throw badRequest(`Could not restore the previous catch-all in Cloudflare, domain kept: ${(e as Error).message}`);
+      }
+      d.db.delete(domains).where(eq(domains.id, id)).run();
+      audit(d, c.get("user")!.id, "domain.deleted", id, { name: dom.name, catch_all_restored: restored }, clientIp(c));
+      return c.json({ ok: true, catch_all_restored: restored });
+    },
+  );
 }

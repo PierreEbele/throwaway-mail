@@ -39,6 +39,11 @@ export function DomainsPage() {
     onError: (e) => toast((e as Error).message, "error"),
   });
   const setPolicyM = useMutation({ mutationFn: ({ id, p }: { id: string; p: string }) => patch(`/v1/domains/${id}`, { unknown_policy: p }), onSuccess: inv });
+  const setForwardUnknown = useMutation({
+    mutationFn: ({ id, on }: { id: string; on: boolean }) => patch(`/v1/domains/${id}`, { forward_unknown: on }),
+    onSuccess: inv,
+    onError: (e) => toast((e as Error).message, "error"),
+  });
   const remove = useMutation({ mutationFn: (id: string) => del(`/v1/domains/${id}`), onSuccess: inv, onError: (e) => toast((e as Error).message, "error") });
 
   return (
@@ -84,6 +89,28 @@ export function DomainsPage() {
                 <button className="btn-ghost text-red-600" onClick={() => confirmAction(`Remove ${d.name}? Only possible when it has no addresses. Cloudflare settings are left untouched.`) && remove.mutate(d.id)}>Remove</button>
               </div>
             </div>
+            {d.previous_catch_all && (() => {
+              const oldFwd = d.previous_catch_all.actions.find((a) => a.type === "forward")?.value?.[0];
+              return (
+                <div className="mt-2 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+                  <p>
+                    Catch-all before the app: <strong>{d.previous_catch_all.actions.map((a) => `${a.type}${a.value ? " → " + a.value.join(", ") : ""}`).join("; ")}</strong>.
+                    {" "}It is restored if you remove the domain here.
+                  </p>
+                  {oldFwd && (
+                    <p className="mt-1 flex flex-wrap items-center gap-2">
+                      {d.catchall_forward_to ? (
+                        <>Unknown addresses are still forwarded to {d.catchall_forward_to} and listed under “To sort”.
+                          <button className="btn-ghost" onClick={() => confirmAction(`Stop forwarding unknown addresses to ${oldFwd}? The "${d.unknown_policy}" policy will apply instead.`) && setForwardUnknown.mutate({ id: d.id, on: false })}>Stop forwarding</button></>
+                      ) : (
+                        <>Unknown addresses follow the “{d.unknown_policy}” policy.
+                          <button className="btn-ghost" onClick={() => setForwardUnknown.mutate({ id: d.id, on: true })}>Forward them to {oldFwd} again</button></>
+                      )}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             {d.status_detail && <p className={`mt-2 text-sm ${d.status === "error" ? "text-red-600 dark:text-red-400" : "text-zinc-600 dark:text-zinc-400"}`}>{d.status_detail}</p>}
             {!!d.dns_missing?.length && (
               <div className="mt-3 overflow-x-auto">

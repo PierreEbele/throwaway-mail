@@ -11,6 +11,8 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().default(3000),
   HOST: z.string().default("0.0.0.0"),
   APP_URL: z.string().url().default("http://localhost:3000"),
+  /** Other public URLs serving the same app (comma-separated), e.g. a second domain. */
+  APP_EXTRA_URLS: z.string().default(""),
   DATA_DIR: z.string().default("./data"),
   DATABASE_PATH: z.string().optional(),
   MIGRATIONS_DIR: z.string().default("./app/server/db/migrations"),
@@ -71,5 +73,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     databasePath: parsed.DATABASE_PATH ?? path.join(parsed.DATA_DIR, "throwaway.db"),
     oidcAllowedGroups: parsed.OIDC_ALLOWED_GROUPS.split(",").map((g) => g.trim()).filter(Boolean),
     oidcRedirectUri: `${parsed.APP_URL.replace(/\/$/, "")}/v1/auth/oidc/callback`,
+    /** Every public origin of the app; the first one is the primary (APP_URL). */
+    appOrigins: [parsed.APP_URL, ...parsed.APP_EXTRA_URLS.split(",")]
+      .map((u) => u.trim())
+      .filter(Boolean)
+      .map((u) => new URL(u).origin),
   };
 }
