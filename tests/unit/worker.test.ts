@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { handleEmail, type EmailMessageLike, type Env } from "../../worker/src/index.js";
+import { fallbackFor, handleEmail, type EmailMessageLike, type Env } from "../../worker/src/index.js";
 import { ingestSignature } from "../../app/server/routes/ingest.js";
 import { addDomain, makeTestApp, setupAdmin, simpleEml } from "../helpers.js";
 
@@ -88,5 +88,26 @@ describe("email worker", () => {
     const m = fakeMessage("a@b.test", "x");
     expect(await handleEmail(m, { ...env, FALLBACK_FORWARD: "" }, down)).toBe("temp_rejected");
     expect(m.rejected).toMatch(/Temporary/);
+  });
+});
+
+describe("per-domain fallback", () => {
+  const spec = "example.com=alice@x.test, example.org=bob@x.test, *=admin@x.test";
+  it("routes by recipient domain, sub-domains included", () => {
+    expect(fallbackFor(spec, "a@example.com")).toBe("alice@x.test");
+    expect(fallbackFor(spec, "a@mail.example.com")).toBe("alice@x.test");
+    expect(fallbackFor(spec, "A@EXAMPLE.ORG")).toBe("bob@x.test");
+    expect(fallbackFor(spec, "a@other.test")).toBe("admin@x.test");
+    expect(fallbackFor("example.com=alice@x.test", "a@other.test")).toBeNull();
+    expect(fallbackFor("single@x.test", "a@whatever.test")).toBe("single@x.test");
+    expect(fallbackFor("", "a@b.c")).toBeNull();
+  });
+  it("is used when the app is down", async () => {
+    const down = (async () => {
+      throw new Error("down");
+    }) as unknown as typeof fetch;
+    const m = fakeMessage("x@example.org", "x");
+    expect(await handleEmail(m, { ...env, FALLBACK_FORWARD: spec }, down)).toBe("fallback_forwarded");
+    expect(m.forwardedTo).toBe("bob@x.test");
   });
 });

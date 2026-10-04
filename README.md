@@ -105,14 +105,14 @@ Create an API token (*My Profile → API Tokens → Create custom token*) with:
 | Scope | Permission | Used for |
 |---|---|---|
 | Zone → Zone | Read | find the zone of a domain |
-| Zone → Email Routing Rules | Edit | enable Email Routing, set the catch-all rule to the Worker |
+| Zone → Zone Settings | Read | read Email Routing status and required DNS records (**Edit** only if the app must enable Email Routing on a zone that doesn't have it yet) |
+| Zone → Email Routing Rules | Edit | read and set the catch-all rule |
 | Zone → DNS | Read | report missing MX/SPF records |
 | Account → Email Routing Addresses | Edit | create destinations (sends the verification mail), read their state |
-| Account → Workers Scripts | Read | optional, not used by the app at runtime |
 
 Zone resources: *All zones* (or only your mail domains). Account resources: your account. `CF_ACCOUNT_ID` is shown on the dashboard overview page.
 
-If enabling Email Routing fails with a permission error (Cloudflare has changed which permission covers that call over time), enable Email Routing once from the dashboard (*Email → Email Routing → Get started*) and press **Re-check**; the app then only sets the catch-all rule.
+If the zone has no Email Routing yet and the token only has Zone Settings: Read, enable Email Routing once from the dashboard (*Email → Email Routing → Get started*) and press **Re-check**; the app then only sets the catch-all rule.
 
 The DNS records that Email Routing needs (three MX records plus an SPF TXT record) are added by Cloudflare when Email Routing is enabled. The domain page in the app lists any that are missing.
 
@@ -130,7 +130,7 @@ npx wrangler deploy
 ```
 
 - The Worker name (`name` in `wrangler.toml`, default `throwaway-mail-ingest`) must equal `WORKER_NAME` in `.env`.
-- `FALLBACK_FORWARD` should be an address already verified as a Cloudflare destination. When the app is unreachable, errors, or does not answer within 5 seconds, mail goes there. If it is empty, the Worker rejects with a temporary error so the sender gets a bounce instead of silent loss.
+- `FALLBACK_FORWARD` should be an address already verified as a Cloudflare destination, or one per domain: `example.com=a@x.com,other.org=b@y.com,*=default@z.com`. When the app is unreachable, errors, or does not answer within 5 seconds, mail goes there. If it is empty, the Worker rejects with a temporary error so the sender gets a bounce instead of silent loss.
 - Watch it live with `npx wrangler tail`.
 
 ## 5. Single sign-on (Authelia)

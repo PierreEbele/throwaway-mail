@@ -88,10 +88,30 @@ export async function handleEmail(message: EmailMessageLike, env: Env, fetchImpl
   }
 }
 
+/**
+ * FALLBACK_FORWARD is either one address ("me@x.com") or a per-domain list
+ * ("example.com=a@x.com,example.org=b@y.com,*=default@z.com"); a domain entry also covers its sub-domains.
+ */
+export function fallbackFor(spec: string | undefined, rcpt: string): string | null {
+  if (!spec?.trim()) return null;
+  if (!spec.includes("=")) return spec.trim();
+  const domain = (rcpt.split("@")[1] ?? "").toLowerCase().replace(/>$/, "");
+  let star: string | null = null;
+  let best: { d: string; to: string } | null = null;
+  for (const part of spec.split(",")) {
+    const [d, to] = part.split("=").map((x) => x?.trim().toLowerCase());
+    if (!d || !to) continue;
+    if (d === "*") star = to;
+    else if ((domain === d || domain.endsWith("." + d)) && (!best || d.length > best.d.length)) best = { d, to };
+  }
+  return best?.to ?? star;
+}
+
 async function fallback(message: EmailMessageLike, env: Env): Promise<Outcome> {
-  if (env.FALLBACK_FORWARD) {
+  const target = fallbackFor(env.FALLBACK_FORWARD, message.to);
+  if (target) {
     try {
-      await message.forward(env.FALLBACK_FORWARD);
+      await message.forward(target);
       return "fallback_forwarded";
     } catch (err) {
       console.error(JSON.stringify({ msg: "fallback forward failed", err: String(err) }));
