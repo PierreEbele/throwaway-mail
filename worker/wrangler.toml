@@ -11,7 +11,7 @@ workers_dev = false
 APP_URL = "https://mail.example.com"
 # Verified Cloudflare destination(s) used when the app is unreachable, so no mail is lost.
 # One address, or per domain: "example.com=a@x.com,other.org=b@y.com,*=default@z.com". Empty disables it.
-FALLBACK_FORWARD = "example.com=alice@example.com,example.org=bob@example.com"
+FALLBACK_FORWARD = "example.com=alice@example.com,example.dev=alice@example.com,example.org=bob@example.com"
 # Time to wait for the app before falling back.
 INGEST_TIMEOUT_MS = "5000"
 
