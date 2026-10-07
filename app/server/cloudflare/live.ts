@@ -90,17 +90,28 @@ export class LiveCloudflareClient implements CloudflareClient {
     });
   }
 
-  async missingDnsRecords(zoneId: string, domain: string): Promise<DnsRecord[]> {
-    const res = await this.call<unknown>("GET", `/zones/${zoneId}/email/routing/dns?subdomain=${encodeURIComponent(domain)}`);
+  async missingDnsRecords(zoneId: string, domain: string, zoneName: string): Promise<DnsRecord[]> {
+    // The `subdomain` parameter is only accepted for a real sub-domain of the zone, never for the apex.
+    const q = domain !== zoneName ? `?subdomain=${encodeURIComponent(domain)}` : "";
+    const res = await this.call<unknown>("GET", `/zones/${zoneId}/email/routing/dns${q}`);
     // Newer API: { errors: [{ code, missing: {type,name,content,priority} }], record: [...] }; older API: array of required records.
     if (res && typeof res === "object" && !Array.isArray(res) && "errors" in res) {
       const errs = (res as { errors?: Array<{ missing?: DnsRecord }> }).errors ?? [];
       return errs.map((e) => e.missing).filter((m): m is DnsRecord => !!m);
     }
     const required = (Array.isArray(res) ? res : ((res as { record?: DnsRecord[] })?.record ?? [])) as DnsRecord[];
-    const existing = await this.call<DnsRecord[]>("GET", `/zones/${zoneId}/dns_records?per_page=100&name=${encodeURIComponent(domain)}`);
-    const norm = (s: string) => s.replace(/^"|"$/g, "").replace(/\.$/, "").toLowerCase();
-    return required.filter((r) => !existing.some((e) => e.type === r.type && norm(e.content) === norm(r.content)));
+    const norm = (v: string) => v.replace(/^"|"$/g, "").replace(/\.$/, "").toLowerCase();
+    const missing: DnsRecord[] = [];
+    // Look each record up by its own name (e.g. the DKIM record lives on cf2024-1._domainkey.<domain>).
+    const cache = new Map<string, DnsRecord[]>();
+    for (const r of required) {
+      const key = `${r.type} ${r.name}`;
+      if (!cache.has(key)) {
+        cache.set(key, await this.call<DnsRecord[]>("GET", `/zones/${zoneId}/dns_records?per_page=100&type=${encodeURIComponent(r.type)}&name=${encodeURIComponent(r.name)}`));
+      }
+      if (!cache.get(key)!.some((e) => norm(e.content) === norm(r.content))) missing.push(r);
+    }
+    return missing;
   }
 
   private toDest(r: { id?: string; tag?: string; email: string; verified: string | null }): DestinationInfo {

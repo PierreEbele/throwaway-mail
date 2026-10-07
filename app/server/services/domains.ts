@@ -29,7 +29,7 @@ export async function setupDomain(deps: Deps, domain: Domain): Promise<Domain> {
         return deps.db.select().from(domains).where(eq(domains.id, domain.id)).get()!;
       }
       Object.assign(update, takeover.update);
-      const missing = await deps.cf.missingDnsRecords(zone.id, domain.name);
+      const missing = await deps.cf.missingDnsRecords(zone.id, domain.name, zone.name);
       update.dnsMissingJson = JSON.stringify(missing);
       if (missing.length) {
         update.status = "pending";

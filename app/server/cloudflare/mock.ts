@@ -50,7 +50,7 @@ export class MockCloudflareClient implements CloudflareClient {
     z.catchAll = rule;
     z.catchAllWorker = rule.actions.find((a) => a.type === "worker")?.value?.[0];
   }
-  async missingDnsRecords(_zoneId: string, domain: string): Promise<DnsRecord[]> {
+  async missingDnsRecords(_zoneId: string, domain: string, _zoneName: string): Promise<DnsRecord[]> {
     if (!domain.includes("nodns")) return [];
     return [
       { type: "MX", name: domain, content: "route1.mx.cloudflare.net", priority: 13 },

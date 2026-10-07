@@ -50,13 +50,36 @@ describe("live Cloudflare client", () => {
 
   it("reports missing DNS records in both API shapes", async () => {
     const newShape = fakeApi(() => ({ result: { errors: [{ code: "mx.missing", missing: { type: "MX", name: "a.com", content: "route1.mx.cloudflare.net", priority: 1 } }], record: [] } }));
-    expect(await new LiveCloudflareClient("t", "a", newShape.f).missingDnsRecords("z", "a.com")).toHaveLength(1);
+    expect(await new LiveCloudflareClient("t", "a", newShape.f).missingDnsRecords("z", "a.com", "a.com")).toHaveLength(1);
+    // Older shape, as returned for example.dev: MX + SPF on the apex, DKIM on its own name
+    const existing: Record<string, unknown[]> = {
+      "MX a.com": [{ type: "MX", name: "a.com", content: "route1.mx.cloudflare.net" }],
+      "TXT cf2024-1._domainkey.a.com": [{ type: "TXT", name: "cf2024-1._domainkey.a.com", content: '"v=DKIM1; p=abc"' }],
+      "TXT a.com": [],
+    };
     const oldShape = fakeApi((_m, p) => {
-      if (p.startsWith("/zones/z/email/routing/dns")) return { result: [{ type: "MX", name: "a.com", content: "route1.mx.cloudflare.net" }, { type: "TXT", name: "a.com", content: "v=spf1 include:_spf.mx.cloudflare.net ~all" }] };
-      if (p.startsWith("/zones/z/dns_records")) return { result: [{ type: "MX", name: "a.com", content: "route1.mx.cloudflare.net." }] };
+      if (p.startsWith("/zones/z/email/routing/dns"))
+        return {
+          result: [
+            { type: "MX", name: "a.com", content: "route1.mx.cloudflare.net." },
+            { type: "TXT", name: "cf2024-1._domainkey.a.com", content: '"v=DKIM1; p=abc"' },
+            { type: "TXT", name: "a.com", content: '"v=spf1 include:_spf.mx.cloudflare.net ~all"' },
+          ],
+        };
+      if (p.startsWith("/zones/z/dns_records")) {
+        const q = new URLSearchParams(p.split("?")[1]);
+        return { result: existing[`${q.get("type")} ${q.get("name")}`] ?? [] };
+      }
     });
-    const missing = await new LiveCloudflareClient("t", "a", oldShape.f).missingDnsRecords("z", "a.com");
-    expect(missing.map((r) => r.type)).toEqual(["TXT"]);
+    const missing = await new LiveCloudflareClient("t", "a", oldShape.f).missingDnsRecords("z", "a.com", "a.com");
+    expect(missing.map((r) => `${r.type} ${r.name}`)).toEqual(["TXT a.com"]);
+    expect(oldShape.calls[0]!.path).toBe("/zones/z/email/routing/dns"); // no subdomain parameter for the apex
+  });
+
+  it("passes the subdomain parameter only for a real sub-domain", async () => {
+    const { f, calls } = fakeApi(() => ({ result: { errors: [], record: [] } }));
+    await new LiveCloudflareClient("t", "a", f).missingDnsRecords("z", "mail.a.com", "a.com");
+    expect(calls[0]!.path).toBe("/zones/z/email/routing/dns?subdomain=mail.a.com");
   });
 
   it("reuses an existing account-level destination", async () => {

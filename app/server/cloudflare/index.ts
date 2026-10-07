@@ -33,7 +33,7 @@ export interface CloudflareClient {
   /** Put a catch-all rule back (used to restore the previous one). */
   setCatchAll(zoneId: string, rule: CatchAllRule): Promise<void>;
   /** DNS records Email Routing needs that are not present (empty = all good). */
-  missingDnsRecords(zoneId: string, domain: string): Promise<DnsRecord[]>;
+  missingDnsRecords(zoneId: string, domain: string, zoneName: string): Promise<DnsRecord[]>;
   createDestination(email: string): Promise<DestinationInfo>;
   getDestination(id: string): Promise<DestinationInfo | null>;
   findDestinationByEmail(email: string): Promise<DestinationInfo | null>;
