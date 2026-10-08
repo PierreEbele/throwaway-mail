@@ -100,7 +100,8 @@ export class LiveCloudflareClient implements CloudflareClient {
       return errs.map((e) => e.missing).filter((m): m is DnsRecord => !!m);
     }
     const required = (Array.isArray(res) ? res : ((res as { record?: DnsRecord[] })?.record ?? [])) as DnsRecord[];
-    const norm = (v: string) => v.replace(/^"|"$/g, "").replace(/\.$/, "").toLowerCase();
+    // Long TXT values (DKIM) are stored as several quoted chunks: "abc" "def" == "abcdef".
+    const norm = (v: string) => v.trim().replace(/"\s*"/g, "").replace(/^"|"$/g, "").replace(/\.$/, "").toLowerCase();
     const missing: DnsRecord[] = [];
     // Look each record up by its own name (e.g. the DKIM record lives on cf2024-1._domainkey.<domain>).
     const cache = new Map<string, DnsRecord[]>();

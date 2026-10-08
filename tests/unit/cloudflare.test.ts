@@ -54,7 +54,8 @@ describe("live Cloudflare client", () => {
     // Older shape, as returned for example.dev: MX + SPF on the apex, DKIM on its own name
     const existing: Record<string, unknown[]> = {
       "MX a.com": [{ type: "MX", name: "a.com", content: "route1.mx.cloudflare.net" }],
-      "TXT cf2024-1._domainkey.a.com": [{ type: "TXT", name: "cf2024-1._domainkey.a.com", content: '"v=DKIM1; p=abc"' }],
+      // stored split in two quoted chunks, as Cloudflare does for long DKIM keys
+      "TXT cf2024-1._domainkey.a.com": [{ type: "TXT", name: "cf2024-1._domainkey.a.com", content: '"v=DKIM1; p=ab" "c"' }],
       "TXT a.com": [],
     };
     const oldShape = fakeApi((_m, p) => {
