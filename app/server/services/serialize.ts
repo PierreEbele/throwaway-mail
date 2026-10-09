@@ -4,11 +4,12 @@ export function userOut(u: User) {
   return { id: u.id, email: u.email, name: u.name, role: u.role, disabled: u.disabled, created_at: u.createdAt, last_login_at: u.lastLoginAt };
 }
 
-export function domainOut(d: Domain, full: boolean) {
+export function domainOut(d: Domain, full: boolean, owner?: { id: string; name: string | null; email: string } | null) {
   const base = { id: d.id, name: d.name, status: d.status, unknown_policy: d.unknownPolicy };
   if (!full) return base;
   return {
     ...base,
+    owner: owner ? { id: owner.id, name: owner.name, email: owner.email } : null,
     cf_zone_id: d.cfZoneId,
     status_detail: d.statusDetail,
     dns_missing: d.dnsMissingJson ? JSON.parse(d.dnsMissingJson) : [],
@@ -68,6 +69,7 @@ export function messageSummaryOut(m: Message, items: ExtractedItem[]) {
     subject: m.subject,
     received_at: m.receivedAt,
     read_at: m.readAt,
+    archived_at: m.archivedAt,
     forwarded: m.forwarded,
     preview,
     code: ex.code?.value ?? null,

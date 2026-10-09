@@ -113,6 +113,7 @@ export const messages = sqliteTable(
     dkim: text("dkim"),
     dmarc: text("dmarc"),
     readAt: integer("read_at"),
+    archivedAt: integer("archived_at"),
     forwarded: integer("forwarded", { mode: "boolean" }).notNull().default(false),
     forwardTo: text("forward_to"),
   },

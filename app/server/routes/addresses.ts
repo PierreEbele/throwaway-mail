@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, like, lt, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, like, lt, ne, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import type { Ctx, ApiRouter } from "../lib/http.js";
 import { parseTimestamp } from "../lib/http.js";
@@ -24,7 +24,11 @@ function counts(deps: Deps, ids: string[]) {
   const map = new Map<string, { unread: number; total: number }>();
   if (!ids.length) return map;
   const rows = deps.db
-    .select({ id: messages.addressId, total: sql<number>`count(*)`, unread: sql<number>`sum(case when ${messages.readAt} is null then 1 else 0 end)` })
+    .select({
+      id: messages.addressId,
+      total: sql<number>`count(*)`,
+      unread: sql<number>`sum(case when ${messages.readAt} is null and ${messages.archivedAt} is null then 1 else 0 end)`,
+    })
     .from(messages)
     .where(inArray(messages.addressId, ids))
     .groupBy(messages.addressId)
@@ -240,13 +244,20 @@ export function registerAddresses(r: ApiRouter) {
       summary: "List messages received by an address (newest first)",
       tags: ["messages"],
       auth: "user",
-      query: z.object({ limit: z.coerce.number().int().min(1).max(200).default(50), before: z.coerce.number().int().optional() }),
+      description: "archived=false (default) lists the inbox, archived=true the archive, archived=all both.",
+      query: z.object({
+        limit: z.coerce.number().int().min(1).max(200).default(50),
+        before: z.coerce.number().int().optional(),
+        archived: z.enum(["false", "true", "all"]).default("false"),
+      }),
     },
     (c, { query }) => {
       const d = c.get("deps");
       const user = c.get("user")!;
       const { a } = ownedAddress(d, user, c.req.param("id")!);
       const conds: SQL[] = [eq(messages.addressId, a.id), eq(messages.userId, user.id)];
+      if (query.archived === "false") conds.push(isNull(messages.archivedAt));
+      if (query.archived === "true") conds.push(isNotNull(messages.archivedAt));
       if (query.before) conds.push(lt(messages.receivedAt, query.before));
       const rows = d.db.select().from(messages).where(and(...conds)).orderBy(desc(messages.receivedAt)).limit(query.limit).all();
       const items = itemsFor(d, rows.map((m) => m.id));
@@ -268,11 +279,24 @@ export function registerAddresses(r: ApiRouter) {
   });
 
   r.add(
-    { method: "patch", path: "/v1/messages/:id", summary: "Mark a message read/unread", tags: ["messages"], auth: "user", body: z.object({ read: z.boolean() }) },
+    {
+      method: "patch",
+      path: "/v1/messages/:id",
+      summary: "Mark a message read/unread, archive or unarchive it",
+      tags: ["messages"],
+      auth: "user",
+      body: z.object({ read: z.boolean().optional(), archived: z.boolean().optional() }),
+    },
     (c, { body }) => {
       const d = c.get("deps");
       const m = ownedMessage(c);
-      d.db.update(messages).set({ readAt: body.read ? (m.readAt ?? d.now()) : null }).where(eq(messages.id, m.id)).run();
+      const set: { readAt?: number | null; archivedAt?: number | null } = {};
+      if (body.read !== undefined) set.readAt = body.read ? (m.readAt ?? d.now()) : null;
+      if (body.archived !== undefined) {
+        set.archivedAt = body.archived ? (m.archivedAt ?? d.now()) : null;
+        if (body.archived) set.readAt = m.readAt ?? d.now();
+      }
+      if (Object.keys(set).length) d.db.update(messages).set(set).where(eq(messages.id, m.id)).run();
       d.bus.publish(m.userId, { type: "address.updated", address_id: m.addressId });
       return c.json({ ok: true });
     },
@@ -285,6 +309,46 @@ export function registerAddresses(r: ApiRouter) {
     d.bus.publish(m.userId, { type: "address.updated", address_id: m.addressId });
     return c.json({ ok: true });
   });
+
+  r.add(
+    {
+      method: "post",
+      path: "/v1/addresses/:id/messages/bulk",
+      summary: "Act on several messages of an address at once",
+      description: "Either `ids` or `scope` (inbox = not archived, archived, read = read and not archived, all).",
+      tags: ["messages"],
+      auth: "user",
+      body: z
+        .object({
+          action: z.enum(["read", "archive", "unarchive", "delete"]),
+          ids: z.array(z.string()).max(1000).optional(),
+          scope: z.enum(["inbox", "archived", "read", "all"]).optional(),
+        })
+        .refine((b) => !!b.ids !== !!b.scope, "Give either ids or scope"),
+    },
+    (c, { body }) => {
+      const d = c.get("deps");
+      const user = c.get("user")!;
+      const { a } = ownedAddress(d, user, c.req.param("id")!);
+      const conds: SQL[] = [eq(messages.addressId, a.id), eq(messages.userId, user.id)];
+      if (body.ids) conds.push(inArray(messages.id, body.ids.length ? body.ids : ["-"]));
+      if (body.scope === "inbox") conds.push(isNull(messages.archivedAt));
+      if (body.scope === "archived") conds.push(isNotNull(messages.archivedAt));
+      if (body.scope === "read") conds.push(isNull(messages.archivedAt), isNotNull(messages.readAt));
+      const where = and(...conds);
+      const now = d.now();
+      const res =
+        body.action === "delete"
+          ? d.db.delete(messages).where(where).run()
+          : body.action === "read"
+            ? d.db.update(messages).set({ readAt: now }).where(and(where, isNull(messages.readAt))).run()
+            : body.action === "archive"
+              ? d.db.update(messages).set({ archivedAt: now, readAt: sql`coalesce(${messages.readAt}, ${now})` }).where(and(where, isNull(messages.archivedAt))).run()
+              : d.db.update(messages).set({ archivedAt: null }).where(where).run();
+      d.bus.publish(user.id, { type: "address.updated", address_id: a.id });
+      return c.json({ ok: true, affected: res.changes });
+    },
+  );
 
   r.add(
     {

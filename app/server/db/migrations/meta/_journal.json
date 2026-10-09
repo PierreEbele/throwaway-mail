@@ -15,6 +15,13 @@
       "when": 1793536047904,
       "tag": "0001_preserve_catch_all",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793538611022,
+      "tag": "0002_message_archive",
+      "breakpoints": true
     }
   ]
 }

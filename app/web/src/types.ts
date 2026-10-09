@@ -10,7 +10,7 @@ export interface Address {
 }
 export interface MessageSummary {
   id: string; address_id: string; from: string | null; from_name: string | null; subject: string | null;
-  received_at: number; read_at: number | null; forwarded: boolean; preview: string; code: string | null; has_links: boolean;
+  received_at: number; read_at: number | null; archived_at: number | null; forwarded: boolean; preview: string; code: string | null; has_links: boolean;
 }
 export interface ExtractedCode { value: string; confidence: number; method: string; raw: string | null }
 export interface ExtractedLink { url: string; label: string | null; confidence: number; method: string }
@@ -28,6 +28,7 @@ export interface DnsRecord { type: string; name: string; content: string; priori
 export interface Domain {
   id: string; name: string; status: "pending" | "active" | "error"; unknown_policy: "reject" | "inbox" | "auto_create";
   cf_zone_id?: string | null; status_detail?: string | null;
+  owner?: { id: string; name: string | null; email: string } | null;
   previous_catch_all?: { enabled: boolean; actions: Array<{ type: string; value?: string[] }> } | null; catchall_forward_to?: string | null; dns_missing?: DnsRecord[]; created_at?: number; last_checked_at?: number | null;
 }
 export interface Destination { id: string; email: string; verified: boolean; verified_at: number | null; last_error: string | null; created_at: number }

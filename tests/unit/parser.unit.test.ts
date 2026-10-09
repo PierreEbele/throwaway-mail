@@ -84,3 +84,24 @@ describe("display sanitiser", async () => {
     expect(out).toContain('rel="noopener noreferrer nofollow"');
   });
 });
+
+describe("authentication results", async () => {
+  const { authResult } = await import("../../app/server/services/ingest.js");
+  // Exactly what Cloudflare wrote for the test mail on 2026-11-01
+  const cf = [
+    {
+      key: "authentication-results",
+      value:
+        "mx.cloudflare.net;\tdkim=pass header.d=gmail.com header.s=20260707 header.b=AbCdEf12;\tdmarc=pass header.from=gmail.com policy.dmarc=none;\tspf=none (mx.cloudflare.net: no SPF records found for postmaster@mail-yw1-x1135.google.com) smtp.helo=mail-yw1-x1135.google.com;\tspf=pass (mx.cloudflare.net: domain of you@example.com designates 2607:f8b0:4864:20::1135 as permitted sender) smtp.mailfrom=you@example.com;\tarc=pass",
+    },
+  ];
+  it("uses the MAIL FROM SPF result, not the HELO one", () => {
+    expect(authResult(cf, "spf")).toBe("pass");
+    expect(authResult(cf, "dkim")).toBe("pass");
+    expect(authResult(cf, "dmarc")).toBe("pass");
+  });
+  it("still reads a single SPF clause", () => {
+    expect(authResult([{ key: "authentication-results", value: "mx; spf=softfail smtp.helo=x" }], "spf")).toBe("softfail");
+    expect(authResult([], "spf")).toBeNull();
+  });
+});

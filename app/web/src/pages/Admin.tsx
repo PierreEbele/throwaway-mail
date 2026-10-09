@@ -19,11 +19,21 @@ export function DomainsPage() {
   const domains = useDomains();
   const [name, setName] = useState("");
   const [policy, setPolicy] = useState<Domain["unknown_policy"]>("reject");
+  const [ownerId, setOwnerId] = useState("");
+  const usersQ = useQuery({ queryKey: ["admin-users"], queryFn: () => get<{ users: User[] }>("/v1/admin/users").then((r) => r.users) });
+  const setOwner = useMutation({
+    mutationFn: ({ id, owner }: { id: string; owner: string }) => patch(`/v1/domains/${id}`, { owner_id: owner }),
+    onSuccess: () => {
+      inv();
+      toast("Owner changed: the domain's To sort box moved with it", "success");
+    },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
   const inv = () => {
     qc.invalidateQueries({ queryKey: ["domains"] });
   };
   const add = useMutation({
-    mutationFn: () => post<{ domain: Domain }>("/v1/domains", { name, unknown_policy: policy }),
+    mutationFn: () => post<{ domain: Domain }>("/v1/domains", { name, unknown_policy: policy, owner_id: ownerId || undefined }),
     onSuccess: (r) => {
       setName("");
       inv();
@@ -50,7 +60,7 @@ export function DomainsPage() {
     <>
       <PageHeader title="Domains" subtitle="Shared by all users. Adding a domain enables Cloudflare Email Routing and points its catch-all rule at the Worker." />
       <form
-        className="card mb-6 grid gap-3 p-4 sm:grid-cols-[2fr_1fr_auto] sm:items-end"
+        className="card mb-6 grid gap-3 p-4 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-end"
         onSubmit={(e: FormEvent) => {
           e.preventDefault();
           add.mutate();
@@ -66,9 +76,16 @@ export function DomainsPage() {
             {Object.keys(POLICY_HELP).map((k) => <option key={k} value={k}>{k}</option>)}
           </select>
         </div>
+        <div>
+          <label htmlFor="dom-owner" className="label">Owner</label>
+          <select id="dom-owner" className="input" value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
+            <option value="">Me</option>
+            {usersQ.data?.map((u) => <option key={u.id} value={u.id}>{u.name ?? u.email}</option>)}
+          </select>
+        </div>
         <button className="btn-primary" disabled={add.isPending}>{add.isPending ? "Configuring Cloudflare…" : "Add domain"}</button>
-        <p className="text-xs text-zinc-500 sm:col-span-3">Unknown addresses: {POLICY_HELP[policy]}.</p>
-        <div className="sm:col-span-3"><ErrorText error={add.error} /></div>
+        <p className="text-xs text-zinc-500 sm:col-span-4">Unknown addresses: {POLICY_HELP[policy]}. The owner receives the domain's “To sort” box.</p>
+        <div className="sm:col-span-4"><ErrorText error={add.error} /></div>
       </form>
       {domains.isLoading && <Spinner />}
       {domains.data?.length === 0 && <EmptyState title="No domains yet">Add the first domain above. Its DNS must already be on Cloudflare.</EmptyState>}
@@ -81,6 +98,19 @@ export function DomainsPage() {
                 <Badge value={d.status} />
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <label className="sr-only" htmlFor={`own-${d.id}`}>Owner of {d.name}</label>
+                <select
+                  id={`own-${d.id}`}
+                  className="input w-auto"
+                  value={d.owner?.id ?? ""}
+                  onChange={(e) => {
+                    const u = usersQ.data?.find((x) => x.id === e.target.value);
+                    if (u && confirmAction(`Give ${d.name} to ${u.name ?? u.email}? Its "To sort" box and the mail in it move to them.`)) setOwner.mutate({ id: d.id, owner: u.id });
+                  }}
+                >
+                  {!d.owner && <option value="">no owner</option>}
+                  {usersQ.data?.map((u) => <option key={u.id} value={u.id}>owner: {u.name ?? u.email}</option>)}
+                </select>
                 <label className="sr-only" htmlFor={`pol-${d.id}`}>Unknown address policy for {d.name}</label>
                 <select id={`pol-${d.id}`} className="input w-auto" value={d.unknown_policy} onChange={(e) => setPolicyM.mutate({ id: d.id, p: e.target.value })}>
                   {Object.keys(POLICY_HELP).map((k) => <option key={k} value={k}>unknown: {k}</option>)}

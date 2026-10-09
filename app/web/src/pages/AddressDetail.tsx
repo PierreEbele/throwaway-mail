@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { del, get, patch } from "../api";
+import { del, get, patch, post } from "../api";
 import type { Address, CodeResult, MessageFull, MessageSummary } from "../types";
 import { Badge, CopyButton, EmptyState, ErrorText, Modal, Spinner, Toggle, confirmAction, useToast } from "../components/ui";
 import { useDestinations } from "./Addresses";
@@ -13,8 +13,32 @@ function emailDoc(html: string) {
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${IFRAME_CSP}"><base target="_blank"><style>body{margin:0;padding:12px;font-family:system-ui,sans-serif;color:#111;background:#fff;word-wrap:break-word}img{max-width:100%;height:auto}</style></head><body>${html}</body></html>`;
 }
 
-function MessageView({ id }: { id: string }) {
+function MessageView({ id, onGone }: { id: string; onGone: () => void }) {
   const qc = useQueryClient();
+  const toast = useToast();
+  const refresh = (addressId: string) => {
+    qc.invalidateQueries({ queryKey: ["messages", addressId] });
+    qc.invalidateQueries({ queryKey: ["message", id] });
+    qc.invalidateQueries({ queryKey: ["address", addressId] });
+    qc.invalidateQueries({ queryKey: ["addresses"] });
+    qc.invalidateQueries({ queryKey: ["code", addressId] });
+  };
+  const archive = useMutation({
+    mutationFn: (archived: boolean) => patch(`/v1/messages/${id}`, { archived }),
+    onSuccess: (_r, archived) => {
+      refresh(msg.data!.address_id);
+      toast(archived ? "Message archived" : "Message moved back to the inbox", "success");
+      onGone();
+    },
+  });
+  const remove = useMutation({
+    mutationFn: () => del(`/v1/messages/${id}`),
+    onSuccess: () => {
+      refresh(msg.data!.address_id);
+      toast("Message deleted", "success");
+      onGone();
+    },
+  });
   const msg = useQuery({ queryKey: ["message", id], queryFn: () => get<{ message: MessageFull }>(`/v1/messages/${id}`).then((r) => r.message) });
   const [mode, setMode] = useState<"html" | "text" | "headers">("html");
   const m = msg.data;
@@ -29,13 +53,33 @@ function MessageView({ id }: { id: string }) {
   useEffect(() => {
     if (m && !m.html) setMode("text");
   }, [m]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (!m || tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || e.metaKey || e.ctrlKey) return;
+      if (e.key === "e") archive.mutate(!m.archived_at);
+      if (e.key === "Delete" && window.confirm("Delete this message? This cannot be undone.")) remove.mutate();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [m, archive, remove]);
   if (msg.isLoading) return <Spinner />;
   if (msg.error || !m) return <ErrorText error={msg.error} />;
   const blocked = m.html?.includes("data-blocked-src");
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="text-lg font-semibold break-words">{m.subject ?? "(no subject)"}</h3>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h3 className="text-lg font-semibold break-words">{m.subject ?? "(no subject)"}</h3>
+          <div className="flex gap-1">
+            <button className="btn-secondary" onClick={() => archive.mutate(!m.archived_at)} title="Shortcut: e">
+              {m.archived_at ? "Move to inbox" : "Archive"}
+            </button>
+            <button className="btn-ghost text-red-600" onClick={() => confirmAction("Delete this message? This cannot be undone.") && remove.mutate()} title="Shortcut: Delete">
+              Delete
+            </button>
+          </div>
+        </div>
         <p className="text-sm text-zinc-500">
           From {m.from_name ? `${m.from_name} <${m.from}>` : m.from} · {fullDate(m.received_at)}
           {m.forwarded && <> · forwarded to {m.forward_to}</>}
@@ -153,7 +197,22 @@ export function AddressDetailPage() {
   const nav = useNavigate();
   const toast = useToast();
   const address = useQuery({ queryKey: ["address", id], queryFn: () => get<{ address: Address }>(`/v1/addresses/${id}`).then((r) => r.address) });
-  const messages = useQuery({ queryKey: ["messages", id], queryFn: () => get<{ messages: MessageSummary[] }>(`/v1/addresses/${id}/messages?limit=100`).then((r) => r.messages) });
+  const [box, setBox] = useState<"inbox" | "archive">("inbox");
+  const messages = useQuery({
+    queryKey: ["messages", id, box],
+    queryFn: () => get<{ messages: MessageSummary[] }>(`/v1/addresses/${id}/messages?limit=200&archived=${box === "archive"}`).then((r) => r.messages),
+  });
+  const bulk = useMutation({
+    mutationFn: (b: { action: string; scope: string }) => post<{ affected: number }>(`/v1/addresses/${id}/messages/bulk`, b),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["messages", id] });
+      qc.invalidateQueries({ queryKey: ["address", id] });
+      qc.invalidateQueries({ queryKey: ["addresses"] });
+      toast(`${r.affected} message(s) updated`, "success");
+      setSelected(null);
+    },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
   const code = useQuery({ queryKey: ["code", id], queryFn: () => get<CodeResult | null>(`/v1/addresses/${id}/code`) });
   const dests = useDestinations();
   const [selected, setSelected] = useState<string | null>(null);
@@ -243,7 +302,9 @@ export function AddressDetailPage() {
               )}
             </div>
           ) : (
-            <p className="mt-3 text-sm text-zinc-500">No code received yet. This card updates live when a mail arrives.</p>
+            <p className="mt-3 text-sm text-zinc-500">
+              {code.data ? "The latest mail has no code (only links, below). Older codes are in the inbox." : "No code received yet. This card updates live when a mail arrives."}
+            </p>
           )}
           {code.data && code.data.links.length > 0 && (
             <div className="mt-4">
@@ -295,9 +356,51 @@ export function AddressDetailPage() {
 
       <section aria-labelledby="inbox" className="grid gap-4 lg:grid-cols-5">
         <div className="lg:col-span-2">
-          <h2 id="inbox" className="mb-2 text-sm font-semibold tracking-wide text-zinc-500 uppercase">Inbox ({a.message_count})</h2>
+          <h2 id="inbox" className="sr-only">Messages</h2>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div role="tablist" aria-label="Mailbox" className="flex gap-1">
+              {(["inbox", "archive"] as const).map((b) => (
+                <button
+                  key={b}
+                  role="tab"
+                  aria-selected={box === b}
+                  className={`rounded-md px-3 py-1 text-sm ${box === b ? "bg-indigo-600 text-white" : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"}`}
+                  onClick={() => {
+                    setBox(b);
+                    setSelected(null);
+                  }}
+                >
+                  {b === "inbox" ? "Inbox" : "Archive"}
+                </button>
+              ))}
+            </div>
+            {!!messages.data?.length && (
+              <div className="flex gap-1">
+                {box === "inbox" ? (
+                  <>
+                    <button className="btn-ghost px-2 text-xs" onClick={() => bulk.mutate({ action: "read", scope: "inbox" })}>Mark all read</button>
+                    <button className="btn-ghost px-2 text-xs" onClick={() => bulk.mutate({ action: "archive", scope: "inbox" })}>Archive all</button>
+                  </>
+                ) : (
+                  <button
+                    className="btn-ghost px-2 text-xs text-red-600"
+                    onClick={() => confirmAction(`Delete the ${messages.data!.length} archived message(s)? This cannot be undone.`) && bulk.mutate({ action: "delete", scope: "archived" })}
+                  >
+                    Delete all archived
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           {messages.isLoading && <Spinner />}
-          {messages.data?.length === 0 && <EmptyState title="No mail yet">Use <span className="font-mono">{a.email}</span> on {a.site_name}.</EmptyState>}
+          {messages.data?.length === 0 &&
+            (box === "inbox" ? (
+              <EmptyState title={a.message_count ? "Inbox empty" : "No mail yet"}>
+                {a.message_count ? "Archived mail is under Archive." : <>Use <span className="font-mono">{a.email}</span> on {a.site_name}.</>}
+              </EmptyState>
+            ) : (
+              <EmptyState title="Archive empty" />
+            ))}
           <ul className="card max-h-[70vh] divide-y divide-zinc-200 overflow-auto dark:divide-zinc-800">
             {messages.data?.map((m) => (
               <li key={m.id}>
@@ -321,7 +424,13 @@ export function AddressDetailPage() {
             ))}
           </ul>
         </div>
-        <div className="card p-4 lg:col-span-3">{selected ? <MessageView id={selected} /> : <p className="text-sm text-zinc-500">Select a message to read it.</p>}</div>
+        <div className="card p-4 lg:col-span-3">
+          {selected ? (
+            <MessageView key={selected} id={selected} onGone={() => setSelected(null)} />
+          ) : (
+            <p className="text-sm text-zinc-500">Select a message to read it. Shortcuts: e archive, Delete delete.</p>
+          )}
+        </div>
       </section>
       <EditSiteDialog address={a} open={editing} onClose={() => setEditing(false)} />
     </div>
