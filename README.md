@@ -32,6 +32,7 @@ No SMTP server, no port 25, no outbound mail on the VPS. Cloudflare receives and
 9. [Backup and restore](#9-backup-and-restore)
 10. [Development](#10-development)
 11. [Configuration reference](#11-configuration-reference)
+12. [Firefox extension](#12-firefox-extension-fable--throwaway-mail)
 
 ---
 
@@ -333,3 +334,21 @@ Adding a parser fixture: drop an `.eml` in `tests/fixtures` and add its expected
 | `DATA_DIR` / `DATABASE_PATH` | `./data` / `$DATA_DIR/throwaway.db` | Storage |
 
 Design choices and assumptions are recorded in [DECISIONS.md](DECISIONS.md).
+
+## 12. Firefox extension (Fable × Throwaway Mail)
+
+`extension/` is a fork of Fable 1.7.0 (MIT, by Numeriane), a fake-identity form filler. The fork keeps everything Fable does and adds:
+
+- **Real disposable addresses.** With a server and API key configured, *Remplir le formulaire* first creates an address for the open site (`site_name` = host name, label `Fable · <fake name>`) and fills it instead of the `@example.com` address. One address per site and profile; it is reused if you fill again on the same host.
+- **Verification code.** The popup then shows a *Code de vérification* panel: *Attendre le code* long-polls `GET /v1/addresses/:id/code` (up to 2 × 55 s, the popup must stay open), then *Copier* or *Coller dans la page* (an `autocomplete="one-time-code"` field, the focused field, a field named like code/otp, or one-digit boxes). Mails with only a confirmation link show the link. Nothing is ever submitted.
+- Without configuration it behaves exactly like Fable (badge `LOCAL`).
+
+Setup:
+
+1. In the app: *API keys → Create*, name it `firefox`.
+2. Build: `./scripts/pack-extension.sh` → `dist/fable-throwaway-<version>.xpi`.
+3. Firefox: `about:debugging#/runtime/this-firefox` → *Load Temporary Add-on* → pick `extension/manifest.json` (removed at restart). For a permanent install, sign it as *unlisted* on addons.mozilla.org (`web-ext sign --channel unlisted`), or use Firefox Developer Edition with `xpinstall.signatures.required=false`.
+4. Extension settings (*Réglages Throwaway Mail* in the popup footer): server `https://mail.example.com`, paste the key, *Tester la connexion*, pick the domain, *Enregistrer*. Firefox asks for access to that server only.
+
+The key is stored in the extension's local storage and only sent to the configured server. The API is reached directly with the Bearer key (no Authelia); Firefox extensions with host permission are not subject to CORS, so the server needs no change.
+

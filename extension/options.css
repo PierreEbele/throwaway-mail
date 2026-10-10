@@ -1,0 +1,8 @@
+body.options{width:auto;max-width:520px;max-height:none;display:block;overflow:visible;padding:16px 20px}
+.options h1{font-size:20px;margin:0 0 6px}
+.options form{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.options label{font-size:11px;color:#52685d;margin-top:6px}
+.options input,.options select{padding:8px 9px;border:1px solid #dce3d7;border-radius:7px;background:white;color:var(--ink);font:12px system-ui,sans-serif}
+.options .actions{margin-top:12px}
+.options #clear{align-self:flex-start;margin-top:6px}
+.options code{font-size:11px}

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>Fable × Throwaway Mail — Réglages</title><link rel="stylesheet" href="popup.css"><link rel="stylesheet" href="options.css"></head>
+<body class="options">
+  <h1>Throwaway Mail</h1>
+  <p class="hint">Avec un serveur configuré, « Remplir le formulaire » crée une vraie adresse jetable pour le site ouvert, au lieu d’une adresse <code>@example.com</code>. Le code de vérification reçu s’affiche ensuite dans la popup.</p>
+  <form id="form">
+    <label for="server">Adresse du serveur</label>
+    <input id="server" type="url" placeholder="https://mail.example.com" required>
+    <label for="api-key">Clé API <span class="hint">(Throwaway Mail → Clés API → Créer)</span></label>
+    <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="tm_…">
+    <label for="domain">Domaine des adresses</label>
+    <select id="domain"><option value="">Par défaut du serveur</option></select>
+    <div class="actions"><button id="test" class="secondary" type="button">Tester la connexion</button><button class="primary" type="submit">Enregistrer</button></div>
+    <button id="clear" class="copy" type="button">Désactiver (effacer la clé)</button>
+  </form>
+  <p id="status" role="status" aria-live="polite"></p>
+  <script src="throwaway.js"></script><script src="options.js"></script>
+</body></html>
