@@ -20,6 +20,7 @@ import { registerDestinations } from "./routes/destinations.js";
 import { registerKeys } from "./routes/keys.js";
 import { registerEvents } from "./routes/events.js";
 import { registerReview } from "./routes/review.js";
+import { registerCompat } from "./routes/compat.js";
 
 const APP_CSP = {
   defaultSrc: ["'self'"],
@@ -91,6 +92,9 @@ export function createApp(deps: Deps) {
   registerReview(api);
   registerAdmin(api);
   app.all("/v1/*", (c) => c.json({ error: { code: "not_found", message: "Route not found" } }, 404));
+
+  // SimpleLogin / addy.io compatible endpoints for the Bitwarden username generator
+  registerCompat(app, limiter);
 
   const doc = api.openapi(
     { title: "Throwaway Mail API", version: "1.0.0", description: "Disposable addresses, inbound mail, parsed verification codes. Authenticate with `Authorization: Bearer tm_…`." },

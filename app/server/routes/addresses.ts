@@ -68,6 +68,58 @@ function itemsFor(deps: Deps, ids: string[]) {
   return map;
 }
 
+export interface NewAddress {
+  domain?: string;
+  site_name: string;
+  site_url?: string | null;
+  local_part?: string;
+  label?: string;
+  forward?: boolean;
+  destination_id?: string;
+  expires_at?: number | null;
+  expires_in_days?: number;
+}
+
+/** Creates an address for `user`. Shared by `POST /v1/addresses` and the alias-service compatibility API. */
+export function createAddress(d: Deps, user: User, body: NewAddress): { a: Address; domain: string } {
+  const domain = body.domain
+    ? d.db.select().from(domains).where(or(eq(domains.name, body.domain), eq(domains.id, body.domain))).get()
+    : d.db.select().from(domains).where(eq(domains.status, "active")).orderBy(asc(domains.createdAt)).get();
+  if (!domain) throw badRequest(body.domain ? `Unknown domain ${body.domain}` : "No active domain is configured yet");
+  if (domain.status !== "active") throw badRequest(`Domain ${domain.name} is not active yet`);
+  if (body.local_part !== undefined && !LOCAL_PART_RE.test(body.local_part)) {
+    throw badRequest("local_part may contain a-z, 0-9, '.', '_' and '-', must start and end with a letter or digit (max 64)");
+  }
+  checkDestination(d, user, body.destination_id);
+  const now = d.now();
+  const expiresAt = body.expires_at ?? (body.expires_in_days ? now + body.expires_in_days * 86400_000 : null);
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const localPart = body.local_part ?? readableLocalPart();
+    const row = {
+      id: newId("adr"),
+      userId: user.id,
+      domainId: domain.id,
+      localPart,
+      siteName: body.site_name,
+      siteUrl: body.site_url ?? null,
+      label: body.label ?? null,
+      forwardEnabled: body.forward ?? false,
+      destinationId: body.destination_id ?? null,
+      expiresAt,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const res = d.db.insert(addresses).values(row).onConflictDoNothing().run();
+    if (res.changes === 1) {
+      const a = d.db.select().from(addresses).where(eq(addresses.id, row.id)).get()!;
+      d.bus.publish(user.id, { type: "address.created", address_id: a.id });
+      return { a, domain: domain.name };
+    }
+    if (body.local_part) throw conflict(`${body.local_part}@${domain.name} is already taken`);
+  }
+  throw conflict("Could not allocate a unique address, try again");
+}
+
 export function registerAddresses(r: ApiRouter) {
   r.add(
     {
@@ -92,44 +144,9 @@ export function registerAddresses(r: ApiRouter) {
     },
     (c, { body }) => {
       const d = c.get("deps");
-      const user = c.get("user")!;
-      const domain = body.domain
-        ? d.db.select().from(domains).where(or(eq(domains.name, body.domain), eq(domains.id, body.domain))).get()
-        : d.db.select().from(domains).where(eq(domains.status, "active")).orderBy(asc(domains.createdAt)).get();
-      if (!domain) throw badRequest(body.domain ? `Unknown domain ${body.domain}` : "No active domain is configured yet");
-      if (domain.status !== "active") throw badRequest(`Domain ${domain.name} is not active yet`);
-      if (body.local_part !== undefined && !LOCAL_PART_RE.test(body.local_part)) {
-        throw badRequest("local_part may contain a-z, 0-9, '.', '_' and '-', must start and end with a letter or digit (max 64)");
-      }
-      checkDestination(d, user, body.destination_id);
-      const now = d.now();
-      const expiresAt = body.expires_at ?? (body.expires_in_days ? now + body.expires_in_days * 86400_000 : null);
-      for (let attempt = 0; attempt < 12; attempt++) {
-        const localPart = body.local_part ?? readableLocalPart();
-        const row = {
-          id: newId("adr"),
-          userId: user.id,
-          domainId: domain.id,
-          localPart,
-          siteName: body.site_name,
-          siteUrl: body.site_url ?? null,
-          label: body.label ?? null,
-          forwardEnabled: body.forward ?? false,
-          destinationId: body.destination_id ?? null,
-          expiresAt,
-          createdAt: now,
-          updatedAt: now,
-        };
-        const res = d.db.insert(addresses).values(row).onConflictDoNothing().run();
-        if (res.changes === 1) {
-          const a = d.db.select().from(addresses).where(eq(addresses.id, row.id)).get()!;
-          d.bus.publish(user.id, { type: "address.created", address_id: a.id });
-          const o = out(d, a, domain.name);
-          return c.json({ id: a.id, email: o.email, address: o }, 201);
-        }
-        if (body.local_part) throw conflict(`${body.local_part}@${domain.name} is already taken`);
-      }
-      throw conflict("Could not allocate a unique address, try again");
+      const { a, domain } = createAddress(d, c.get("user")!, body);
+      const o = out(d, a, domain);
+      return c.json({ id: a.id, email: o.email, address: o }, 201);
     },
   );
 
