@@ -18,10 +18,18 @@ async function formConfig() {
   const server = Throwaway.normalizeServer($("server").value);
   const apiKey = $("api-key").value.trim();
   if (!apiKey) throw new Error("Collez une clé API.");
-  const granted = await browser.permissions.request({ origins: [server + "/*"] });
+  const granted = await browser.permissions.request({ origins: [server + "/*", "<all_urls>"] });
   if (!granted) throw new Error("Permission d’accès au serveur refusée.");
   return { server, apiKey, domain: $("domain").value };
 }
+
+const TOGGLES = { "auto-prompt": "autoPrompt", "auto-code": "autoCode", "always-new": "alwaysNew" };
+const toggles = () => Object.fromEntries(Object.entries(TOGGLES).map(([id, key]) => [key, $(id).checked]));
+for (const id of Object.keys(TOGGLES)) $(id).addEventListener("change", async () => {
+  await browser.storage.local.set(toggles());
+  if ($("auto-prompt").checked || $("auto-code").checked) await browser.permissions.request({ origins: ["<all_urls>"] }).catch(() => {});
+  status("Automatismes enregistrés.");
+});
 
 $("test").addEventListener("click", async () => {
   try {
@@ -38,7 +46,7 @@ $("form").addEventListener("submit", async event => {
   try {
     const cfg = await formConfig();
     await Throwaway.request("/v1/auth/me", { cfg });
-    await browser.storage.local.set({ tmServer: cfg.server, tmApiKey: cfg.apiKey, tmDomain: cfg.domain });
+    await browser.storage.local.set({ tmServer: cfg.server, tmApiKey: cfg.apiKey, tmDomain: cfg.domain, ...toggles() });
     status("Enregistré. Les prochains remplissages utiliseront Throwaway Mail.");
   } catch (e) { status(e.status === 401 ? "Clé API invalide ou révoquée : rien n’a été enregistré." : `Échec : ${e.message}`, true); }
 });
@@ -50,6 +58,8 @@ $("clear").addEventListener("click", async () => {
 });
 
 (async () => {
+  const flags = await browser.storage.local.get(Object.values(TOGGLES));
+  for (const [id, key] of Object.entries(TOGGLES)) $(id).checked = flags[key] !== false;
   const cfg = await Throwaway.config();
   $("server").value = cfg.server || "https://mail.example.com";
   $("api-key").value = cfg.apiKey;

@@ -20,6 +20,7 @@ function showPanel(name) {
     $(key + "-panel").hidden = key !== name;
     $("tab-" + key).setAttribute("aria-pressed", String(key === name));
   }
+  $("profile-actions").hidden = name !== "profile";
   document.querySelector("main").scrollTop = 0;
 }
 $("tab-profile").addEventListener("click", () => showPanel("profile"));
@@ -84,7 +85,7 @@ function status(message, error = false) {
 function syncControls() {
   for (const id of ["generate-card", "card-mode", "card-bank", "card-network", "card-overwrite", "undo-card"]) $(id).disabled = busy;
   for (const id of ["fill-card", "copy-card", "copy-card-number"]) $(id).disabled = busy || !testCard;
-  $("fill").disabled = busy || !profile || selectedFields.size === 0;
+  $("fill").disabled = busy || selectedFields.size === 0;
   $("generate").disabled = busy;
   $("copy").disabled = busy || !profile;
   $("reveal-password").disabled = busy || !profile;
@@ -136,7 +137,7 @@ for (const [key, label] of Object.entries(fieldLabels)) {
 function render() {
   for (const [id, key] of Object.entries({ "full-name": "fullName", "first-name": "firstName", "last-name": "lastName", address: "address", city: "city", "postal-code": "postalCode", country: "country", email: "email", phone: "phone" })) $(id).textContent = profile[key];
   $("avatar").textContent = profile.firstName[0] + profile.lastName[0];
-  $("edition").textContent = `PROFIL ${String(revision).padStart(2, "0")}`;
+  $("edition").textContent = `Identité n° ${revision} · ${profile.country}`;
   $("password").value = profile.password;
   $("birth-date").textContent = profile.birthDate.split("-").reverse().join("/");
   $("password").type = "password";
@@ -185,10 +186,11 @@ async function activeTabId() {
   return tab.id;
 }
 $("fill").addEventListener("click", async () => {
-  if (!profile || !selectedFields.size || busy) return;
+  if (!selectedFields.size || busy) return;
   busy = true; syncControls();
   status("Recherche des champs du formulaire…");
   try {
+    if (!(await ensureIdentity())) return;
     if (!(await ensureAlias())) return;
     const tabId = await activeTabId();
     await browser.scripting.executeScript({ target: { tabId }, files: ["filler.js"] });
@@ -199,6 +201,7 @@ $("fill").addEventListener("click", async () => {
     });
     const report = results[0]?.result;
     if (!report) throw new Error("NO_RESULT");
+    if (report.filled && profile.throwaway) void handOffCode(tabId);
     const passwordNote = (report.passwordIssue === "preserved" ? " Mots de passe conservés ensemble pour éviter une confirmation différente." : report.passwordIssue === "constraints" ? " Mot de passe incompatible avec les contraintes du site : aucun des deux champs modifié." : report.passwordIssue === "registration" ? " Mot de passe ignoré : inscription non identifiée." : "") + (report.birthIssue === "preserved" ? " Date de naissance existante conservée ensemble." : report.birthIssue === "constraints" ? " Date de naissance incompatible avec les contraintes du site : ses champs sont conservés." : "");
     if (report.filled) {
       status(`${report.filled} champ${report.filled > 1 ? "s" : ""} rempli${report.filled > 1 ? "s" : ""}.${report.preserved ? ` ${report.preserved} déjà renseigné(s), conservé(s).` : ""}${report.rejected ? ` ${report.rejected} valeur(s) incompatible(s).` : ""}${passwordNote} Aucun envoi déclenché par Fable.`);
@@ -266,6 +269,7 @@ function tmStatus(message, error = false) {
 async function tmRender() {
   const on = await Throwaway.enabled().catch(() => false);
   $("tm-badge").replaceChildren(document.createElement("i"), on ? " THROWAWAY" : " LOCAL");
+  $("tm-badge").classList.toggle("on", on);
   $("tm-badge").title = on ? "Adresses e-mail réelles via Throwaway Mail" : "Adresses @example.com, rien ne quitte le navigateur";
   const alias = profile?.throwaway;
   $("tm-email-note").hidden = !on;
@@ -310,6 +314,30 @@ async function ensureAlias() {
     return false;
   }
 }
+// Nouvelle identité pour chaque nouveau site (réglage « alwaysNew », activé par défaut).
+async function ensureIdentity() {
+  const { alwaysNew } = await browser.storage.local.get("alwaysNew");
+  const url = await activeTabUrl();
+  const host = /^https?:/.test(url) ? new URL(url).hostname : "";
+  const sameSite = profile?.throwaway?.host === host;
+  if (profile && (alwaysNew === false || sameSite)) return true;
+  if (profile && lockedFields.size === fieldKeys.length) return true;
+  const keptAlias = lockedFields.has("email") ? profile?.throwaway : undefined;
+  profile = FableGenerator.generate($("country-mode").value, profile, [...lockedFields]); revision++;
+  if (keptAlias) profile.throwaway = keptAlias;
+  tmCode = null; render(); void tmRender();
+  await browser.storage.local.set({ profile, revision });
+  return true;
+}
+// Après un remplissage : le script de page attend le code et le colle tout seul,
+// même si la popup se ferme ou si le site change de page.
+async function handOffCode(tabId) {
+  const { autoCode } = await browser.storage.local.get("autoCode");
+  if (autoCode === false || !profile?.throwaway) return;
+  await browser.runtime.sendMessage({ type: "pending-set", host: profile.throwaway.host, alias: profile.throwaway }).catch(() => {});
+  await browser.tabs.sendMessage(tabId, { type: "watch-code" }).catch(() => {});
+  tmStatus("Le code sera collé automatiquement dans la page dès son arrivée.");
+}
 async function tmPoll(wait) {
   const alias = profile?.throwaway;
   if (!alias) return;
@@ -321,6 +349,7 @@ async function tmPoll(wait) {
     for (let i = 0; i < (wait ? 2 : 1) && !found; i++) found = await Throwaway.waitForCode(alias.id, since, wait);
     if (found) {
       tmCode = found;
+      if (found.code && wait) setTimeout(() => $("tm-paste").click(), 0);
       tmStatus(found.code ? `Reçu de ${found.from || "?"}${found.subject ? ` · « ${found.subject} »` : ""}.` : "E-mail reçu sans code : lien de confirmation disponible.");
     } else if (wait) tmStatus("Rien reçu pour l’instant. Réessayez après avoir demandé le code au site.");
   } catch (e) { tmStatus(`Throwaway Mail injoignable : ${e.message}`, true); }

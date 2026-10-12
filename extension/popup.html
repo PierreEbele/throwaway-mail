@@ -2,58 +2,74 @@
 <html lang="fr">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Fable × Throwaway Mail</title><link rel="stylesheet" href="popup.css"></head>
 <body>
-  <header><img src="icons/fable.svg" width="38" height="38" alt=""><div><h1>fable<span>.</span></h1><p>Un profil inventé. En un instant.</p></div><span class="local" id="tm-badge"><i></i> LOCAL</span></header>
-  <nav class="tabs" aria-label="Type de données"><button id="tab-profile" type="button" aria-pressed="true" aria-controls="profile-panel">Profil & mot de passe</button><button id="tab-card" type="button" aria-pressed="false" aria-controls="card-panel">Carte de test</button></nav>
+  <header>
+    <span class="mark" aria-hidden="true">F</span>
+    <strong class="brand">Fable</strong>
+    <span class="pill" id="tm-badge"><i></i> LOCAL</span>
+    <a id="tm-settings" class="icon-link" href="#" title="Réglages" aria-label="Réglages">⚙</a>
+  </header>
+  <nav class="tabs" aria-label="Type de données"><button id="tab-profile" type="button" aria-pressed="true" aria-controls="profile-panel">Identité</button><button id="tab-card" type="button" aria-pressed="false" aria-controls="card-panel">Carte de test</button></nav>
   <main>
     <section id="profile-panel" aria-label="Profil fictif">
-    <div class="settings"><label for="country-mode">Pays du prochain profil</label><select id="country-mode"><option value="random">Aléatoire</option><option value="FR">France</option><option value="GB">Royaume-Uni</option><option value="US">États-Unis</option></select></div>
-    <p id="country-hint" class="hint" hidden></p>
-    <div class="intro"><span class="eyebrow">VOTRE IDENTITÉ DE TEST</span><span id="edition">—</span></div>
-    <section class="profile" aria-label="Informations générées">
-      <div class="identity"><div class="avatar" id="avatar" aria-hidden="true">F</div><div><h2 id="full-name">Créez votre premier profil</h2><p>Personnage fictif · Prénom international</p></div></div>
-      <dl>
-        <div class="pair"><div><dt>Prénom</dt><dd id="first-name">—</dd></div><div><dt>Nom</dt><dd id="last-name">—</dd></div></div>
-        <div><dt>Adresse postale</dt><dd id="address">—</dd></div>
-        <div class="pair"><div><dt>Ville</dt><dd id="city">—</dd></div><div><dt>Code postal</dt><dd id="postal-code">—</dd></div></div>
-        <div class="pair"><div><dt>Pays</dt><dd id="country">—</dd></div><div><dt>Téléphone</dt><dd id="phone">—</dd></div></div>
-        <div><dt>E-mail <span id="tm-email-note" class="tm-note" hidden></span></dt><dd id="email">—</dd></div>
-        <div><dt>Date de naissance fictive</dt><dd id="birth-date">—</dd></div>
-        <div><dt>Mot de passe de test</dt><dd class="password-row"><input id="password" type="password" readonly autocomplete="off" aria-label="Mot de passe généré"><button id="reveal-password" type="button" aria-pressed="false" aria-controls="password" disabled>Afficher</button></dd></div>
-      </dl>
-    </section>
-    <details id="options"><summary>Personnaliser <span id="options-count">10/10 champs · 0 verrou</span></summary><p class="hint">« Remplir » choisit les champs de la page. « Verrouiller » garde la valeur quand vous générez. Le mot de passe inclut sa confirmation ; la naissance inclut jour, mois et année.</p><div class="option-head"><span>Information</span><span>Remplir</span><span>Verrouiller</span></div><div id="field-options"></div></details>
-    <div class="actions"><button id="generate" class="secondary" type="button"><span aria-hidden="true">↻</span> Générer</button><button id="fill" class="primary" type="button" disabled>Remplir le formulaire <span aria-hidden="true">↗</span></button></div>
-    <div class="tools"><label class="overwrite"><input type="checkbox" id="overwrite"> Remplacer les champs déjà remplis</label><div class="utility-actions"><button id="undo" class="copy" type="button" title="Annuler le dernier remplissage sur cette page">Annuler</button><button id="copy" class="copy" type="button" disabled>Copier le profil</button></div></div>
-    <p id="status" role="status" aria-live="polite">Cliquez sur Générer pour commencer.</p>
-    <section id="tm-panel" class="tm-panel" aria-label="Code de vérification" hidden>
-      <div class="tm-head"><span class="eyebrow">CODE DE VÉRIFICATION</span><span id="tm-address" class="tm-address"></span></div>
-      <p id="tm-code" class="tm-code">—</p>
-      <div class="tm-actions"><button id="tm-wait" class="secondary" type="button">Attendre le code</button><button id="tm-copy" class="secondary" type="button" disabled>Copier</button><button id="tm-paste" class="primary" type="button" disabled>Coller dans la page <span aria-hidden="true">↗</span></button></div>
-      <p id="tm-link" class="hint" hidden></p>
-      <p id="tm-status" class="hint" role="status" aria-live="polite"></p>
-    </section>
-    <p class="notice">Coordonnées de démonstration : e-mail et téléphone non joignables, adresse et code postal inventés.</p>
-    </section>
-    <section id="card-panel" aria-label="Carte de test" hidden>
-      <p id="card-mode-heading" class="eyebrow card-heading">FRANCE · SANDBOX STRIPE</p>
-      <div class="settings"><label for="card-mode">Type de numéro</label><select id="card-mode"><option value="stripe">Test officiel Stripe</option><option value="bank-bin">Synthétique · BIN bancaire</option></select></div>
-      <div class="settings"><label for="card-bank">Banque simulée</label><select id="card-bank"><option value="random">Aléatoire</option></select></div>
-      <div class="settings"><label for="card-network">Réseau de test</label><select id="card-network"><option value="random">Aléatoire</option><option value="visa">CB / Visa</option><option value="mastercard">CB / Mastercard</option></select></div>
-      <div class="test-card">
-        <div class="card-top"><span id="card-bank-name">Banque française simulée</span><span class="test-badge">TEST</span></div>
-        <p id="card-number">•••• •••• •••• ••••</p>
-        <p id="card-network-name">Cartes Bancaires · Démonstration</p>
-        <div class="card-bottom"><div><span>TITULAIRE FICTIF</span><strong id="card-holder">—</strong></div><div><span>EXPIRE</span><strong id="card-expiry">—</strong></div><div><span>CVC</span><strong id="card-cvc">—</strong></div></div>
+      <section class="identity-card" aria-label="Informations générées">
+        <div class="identity">
+          <div class="avatar" id="avatar" aria-hidden="true">?</div>
+          <div class="who"><h2 id="full-name">Aucune identité</h2><span id="edition" class="meta">—</span></div>
+          <label class="country" for="country-mode"><span class="sr">Pays</span><select id="country-mode"><option value="random">Au hasard</option><option value="FR">France</option><option value="GB">Royaume-Uni</option><option value="US">États-Unis</option></select></label>
+        </div>
+        <p id="country-hint" class="hint" hidden></p>
+        <dl>
+          <div class="wide"><dt>E-mail <span id="tm-email-note" class="tag" hidden></span></dt><dd id="email" class="mono">—</dd></div>
+          <div><dt>Prénom</dt><dd id="first-name">—</dd></div>
+          <div><dt>Nom</dt><dd id="last-name">—</dd></div>
+          <div class="wide"><dt>Adresse</dt><dd id="address">—</dd></div>
+          <div><dt>Ville</dt><dd id="city">—</dd></div>
+          <div><dt>Code postal</dt><dd id="postal-code" class="mono">—</dd></div>
+          <div><dt>Pays</dt><dd id="country">—</dd></div>
+          <div><dt>Téléphone</dt><dd id="phone" class="mono">—</dd></div>
+          <div><dt>Naissance</dt><dd id="birth-date" class="mono">—</dd></div>
+          <div><dt>Mot de passe</dt><dd class="password-row"><input id="password" class="mono" type="password" readonly autocomplete="off" aria-label="Mot de passe généré"><button id="reveal-password" class="link" type="button" aria-pressed="false" aria-controls="password" disabled>Afficher</button></dd></div>
+        </dl>
+      </section>
+
+      <section id="tm-panel" class="code-card" aria-label="Code de vérification" hidden>
+        <div class="code-head"><span class="label">Code de vérification</span><span id="tm-address" class="meta mono"></span></div>
+        <p id="tm-code" class="code">—</p>
+        <div class="row"><button id="tm-wait" class="ghost" type="button">Attendre le code</button><button id="tm-copy" class="ghost" type="button" disabled>Copier</button><button id="tm-paste" class="primary" type="button" disabled>Coller</button></div>
+        <p id="tm-link" class="hint" hidden></p>
+        <p id="tm-status" class="hint" role="status" aria-live="polite"></p>
+      </section>
+
+      <details id="options"><summary>Champs à remplir <span id="options-count" class="meta">10/10 champs · 0 verrou</span></summary><p class="hint">« Remplir » choisit les champs de la page. « Fixé » garde la valeur quand vous générez.</p><div class="option-head"><span>Information</span><span>Remplir</span><span>Valeur</span></div><div id="field-options"></div></details>
+
+      <div class="toolbar">
+        <label class="check"><input type="checkbox" id="overwrite"> Remplacer l’existant</label>
+        <span class="spacer"></span>
+        <button id="undo" class="link" type="button" title="Annuler le dernier remplissage sur cette page">Annuler</button>
+        <button id="copy" class="link" type="button" disabled>Copier</button>
       </div>
-      <p id="card-explanation" class="card-explanation">Numéros officiels de test Stripe, fixes selon le réseau. Le choix de banque est un libellé simulé : ces cartes ne sont pas émises par les banques indiquées et ne permettent aucun paiement réel.</p>
+      <p id="status" class="status" role="status" aria-live="polite">Générez une identité ou remplissez directement.</p>
+    </section>
+
+    <section id="card-panel" aria-label="Carte de test" hidden>
+      <p id="card-mode-heading" class="label">FRANCE · SANDBOX STRIPE</p>
+      <div class="field"><label for="card-mode">Type de numéro</label><select id="card-mode"><option value="stripe">Test officiel Stripe</option><option value="bank-bin">Synthétique · BIN bancaire</option></select></div>
+      <div class="field"><label for="card-bank">Banque simulée</label><select id="card-bank"><option value="random">Aléatoire</option></select></div>
+      <div class="field"><label for="card-network">Réseau</label><select id="card-network"><option value="random">Aléatoire</option><option value="visa">CB / Visa</option><option value="mastercard">CB / Mastercard</option></select></div>
+      <div class="test-card">
+        <div class="card-top"><span id="card-bank-name">Banque simulée</span><span class="tag">TEST</span></div>
+        <p id="card-number" class="mono">•••• •••• •••• ••••</p>
+        <p id="card-network-name" class="meta">—</p>
+        <div class="card-bottom"><div><span>Titulaire</span><strong id="card-holder">—</strong></div><div><span>Expire</span><strong id="card-expiry" class="mono">—</strong></div><div><span>CVC</span><strong id="card-cvc" class="mono">—</strong></div></div>
+      </div>
+      <p id="card-explanation" class="hint">Numéros officiels de test Stripe. La banque est un libellé simulé : aucun paiement réel possible.</p>
       <p id="card-bin-info" class="hint" hidden></p>
-      <div class="card-main-actions"><button id="generate-card" class="secondary" type="button">↻ Générer</button><button id="fill-card" class="primary" type="button" disabled>Remplir la carte de test <span aria-hidden="true">↗</span></button></div>
-      <label class="overwrite card-overwrite"><input id="card-overwrite" type="checkbox"> Remplacer les champs déjà remplis</label>
-      <div class="card-copy-actions"><button id="copy-card-number" class="secondary" type="button" disabled>Copier le numéro</button><button id="copy-card" class="secondary" type="button" disabled>Copier la carte</button><button id="undo-card" class="secondary" type="button">Annuler</button></div>
-      <p id="card-status" role="status" aria-live="polite">Générez une carte pour votre environnement de test.</p>
-      <p class="notice">Utilisez le mode Stripe pour son sandbox ; les BIN bancaires servent aux maquettes de formulaires. Remplissage à la demande, sans clic ni soumission par Fable. Les champs intégrés d’un autre domaine peuvent être inaccessibles.</p>
+      <div class="toolbar"><label class="check"><input id="card-overwrite" type="checkbox"> Remplacer l’existant</label><span class="spacer"></span><button id="copy-card-number" class="link" type="button" disabled>Copier n°</button><button id="copy-card" class="link" type="button" disabled>Copier tout</button><button id="undo-card" class="link" type="button">Annuler</button></div>
+      <p id="card-status" class="status" role="status" aria-live="polite">Générez une carte pour votre environnement de test.</p>
+      <div class="actions"><button id="generate-card" class="ghost" type="button">Générer</button><button id="fill-card" class="primary" type="button" disabled>Remplir la carte</button></div>
     </section>
   </main>
-  <footer><div class="footer-meta"><span><span aria-hidden="true">◈</span> Aucun envoi automatique.</span><span class="credit">Fork de Fable par <strong>Numeriane</strong> (MIT)</span> <a id="tm-settings" href="#">Réglages Throwaway Mail</a></div><a id="support" class="support" href="https://ko-fi.com/numeriane" target="_blank" rel="noopener noreferrer" title="Don facultatif sur Ko-fi — nouvel onglet"><span aria-hidden="true">♡</span> Soutenir Fable <span aria-hidden="true">↗</span></a></footer>
+  <footer class="actions" id="profile-actions"><button id="generate" class="ghost" type="button">Nouvelle identité</button><button id="fill" class="primary" type="button" disabled>Remplir le formulaire</button></footer>
+  <p class="credit">Fork de Fable par Numeriane · MIT · aucun envoi automatique</p>
   <script src="generator.js"></script><script src="throwaway.js"></script><script src="popup.js"></script>
 </body></html>

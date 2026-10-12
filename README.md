@@ -342,6 +342,10 @@ Design choices and assumptions are recorded in [DECISIONS.md](DECISIONS.md).
 
 - **Real disposable addresses.** With a server and API key configured, *Remplir le formulaire* first creates an address for the open site (`site_name` = host name, label `Fable · <fake name>`) and fills it instead of the `@example.com` address. One address per site and profile; it is reused if you fill again on the same host.
 - **Verification code.** The popup then shows a *Code de vérification* panel: *Attendre le code* long-polls `GET /v1/addresses/:id/code` (up to 2 × 55 s, the popup must stay open), then *Copier* or *Coller dans la page* (an `autocomplete="one-time-code"` field, the focused field, a field named like code/otp, or one-digit boxes). Mails with only a confirmation link show the link. Nothing is ever submitted.
+- **Automatic prompt.** On a page that looks like a sign-up form (new-password field, two password fields, or an e-mail field with sign-up wording), a small card offers *Générer et remplir*: a fresh identity, a new address for that site, filled in one click. *Ne plus proposer sur ce site* remembers the host.
+- **Code pasted automatically.** After a fill with a disposable address, the page waits for the mail (through the background script, 20 s long polls, up to 15 min) and pastes the code into the code field as soon as it arrives, even after the site moves to its "enter the code" page.
+- **New identity for every new site** by default; filling again on the same site keeps the same identity.
+- The three behaviours can be turned off in the extension settings.
 - Without configuration it behaves exactly like Fable (badge `LOCAL`).
 
 Setup:
