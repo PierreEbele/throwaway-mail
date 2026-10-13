@@ -7,8 +7,7 @@ import { AuthProvider, LiveEvents, useAuth } from "./auth";
 import { ToastProvider, Spinner } from "./components/ui";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/AuthPages";
-import { AddressesPage } from "./pages/Addresses";
-import { AddressDetailPage } from "./pages/AddressDetail";
+import { MailboxPage } from "./pages/Mailbox";
 import { AccountPage, DestinationsPage, KeysPage } from "./pages/Settings";
 import { AuditPage, DomainsPage, UsersPage } from "./pages/Admin";
 import { ReviewPage } from "./pages/Review";
@@ -20,13 +19,13 @@ const qc = new QueryClient({
   },
 });
 
-function Protected({ children, admin }: { children: ReactNode; admin?: boolean }) {
+function Protected({ children, admin, bare }: { children: ReactNode; admin?: boolean; bare?: boolean }) {
   const { user, loading } = useAuth();
   const loc = useLocation();
   if (loading) return <Spinner />;
   if (!user) return <Navigate to={`/login?return_to=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
   if (admin && user.role !== "admin") return <Navigate to="/" replace />;
-  return <Layout>{children}</Layout>;
+  return <Layout bare={bare}>{children}</Layout>;
 }
 
 function PublicOnly({ children }: { children: ReactNode }) {
@@ -40,8 +39,8 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
-      <Route path="/" element={<Protected><AddressesPage /></Protected>} />
-      <Route path="/addresses/:id" element={<Protected><AddressDetailPage /></Protected>} />
+      <Route path="/" element={<Protected bare><MailboxPage /></Protected>} />
+      <Route path="/addresses/:id" element={<Protected bare><MailboxPage /></Protected>} />
       <Route path="/review" element={<Protected><ReviewPage /></Protected>} />
       <Route path="/destinations" element={<Protected><DestinationsPage /></Protected>} />
       <Route path="/keys" element={<Protected><KeysPage /></Protected>} />

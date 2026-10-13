@@ -21,6 +21,7 @@ import { registerKeys } from "./routes/keys.js";
 import { registerEvents } from "./routes/events.js";
 import { registerReview } from "./routes/review.js";
 import { registerCompat } from "./routes/compat.js";
+import { registerCategories } from "./routes/categories.js";
 
 const APP_CSP = {
   defaultSrc: ["'self'"],
@@ -90,6 +91,7 @@ export function createApp(deps: Deps) {
   registerKeys(api);
   registerEvents(api);
   registerReview(api);
+  registerCategories(api);
   registerAdmin(api);
   app.all("/v1/*", (c) => c.json({ error: { code: "not_found", message: "Route not found" } }, 404));
 

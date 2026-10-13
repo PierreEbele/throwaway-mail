@@ -55,7 +55,7 @@ function Item({ item }: { item: ReviewItem }) {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0">
           <span className="font-mono font-medium break-all">{item.recipient}</span>
-          {item.unread > 0 && <span className="badge ml-2 bg-indigo-600 text-white">{item.unread} new</span>}
+          {item.unread > 0 && <span className="badge ml-2 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">{item.unread} new</span>}
         </div>
         <span className="text-xs text-zinc-500">
           {item.count} mail{item.count > 1 ? "s" : ""} · last {timeAgo(item.last_received_at)}
@@ -96,7 +96,7 @@ function Item({ item }: { item: ReviewItem }) {
           </div>
           {item.forwarded_to && (
             <label className="flex items-center gap-2 text-sm sm:col-span-3">
-              <input type="checkbox" checked={forward} onChange={(e) => setForward(e.target.checked)} className="size-4 accent-indigo-600" />
+              <input type="checkbox" checked={forward} onChange={(e) => setForward(e.target.checked)} className="size-4 accent-zinc-900" />
               Keep forwarding this site's mail to {item.forwarded_to}
             </label>
           )}

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, patch, post } from "../api";
 import type { Address, CodeResult, MessageFull, MessageSummary } from "../types";
 import { Badge, CopyButton, EmptyState, ErrorText, Modal, Spinner, Toggle, confirmAction, useToast } from "../components/ui";
 import { useDestinations } from "./Addresses";
 import { fullDate, hostOf, timeAgo } from "../util";
+import { DOT, PinIcon, useCategories } from "./Mailbox";
 
 const IFRAME_CSP = "default-src 'none'; img-src data: cid:; style-src 'unsafe-inline'; font-src data:";
 
@@ -93,7 +94,7 @@ function MessageView({ id, onGone }: { id: string; onGone: () => void }) {
         </p>
       </div>
       {m.extracted.code && (
-        <div className="flex items-center gap-3 rounded-md bg-indigo-50 p-3 dark:bg-indigo-950/40">
+        <div className="flex items-center gap-3 rounded-md bg-zinc-100 p-3 dark:bg-zinc-800">
           <span className="font-mono text-2xl font-bold tracking-widest">{m.extracted.code.value}</span>
           <CopyButton text={m.extracted.code.value} />
           <span className="text-xs text-zinc-500">confidence {Math.round(m.extracted.code.confidence * 100)}%</span>
@@ -106,7 +107,7 @@ function MessageView({ id, onGone }: { id: string; onGone: () => void }) {
             role="tab"
             aria-selected={mode === t}
             disabled={t === "html" && !m.html}
-            className={`-mb-px border-b-2 px-3 py-1.5 text-sm disabled:opacity-40 ${mode === t ? "border-indigo-600 font-medium" : "border-transparent text-zinc-500"}`}
+            className={`-mb-px border-b-2 px-3 py-1.5 text-sm disabled:opacity-40 ${mode === t ? "border-zinc-900 font-medium dark:border-zinc-100" : "border-transparent text-zinc-500"}`}
             onClick={() => setMode(t)}
           >
             {t === "html" ? "HTML" : t === "text" ? "Text" : "Headers"}
@@ -217,12 +218,17 @@ export function AddressDetailPage() {
   const dests = useDestinations();
   const [selected, setSelected] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const categories = useCategories();
+  const [sp] = useSearchParams();
+  const back = sp.toString() ? `/?${sp.toString()}` : "/";
 
   const update = useMutation({
     mutationFn: (body: Record<string, unknown>) => patch<{ address: Address }>(`/v1/addresses/${id}`, body),
     onSuccess: (r) => {
       qc.setQueryData(["address", id], r.address);
       qc.invalidateQueries({ queryKey: ["addresses"] });
+      qc.invalidateQueries({ queryKey: ["categories"] });
+      qc.invalidateQueries({ queryKey: ["stale"] });
     },
     onError: (e) => toast((e as Error).message, "error"),
   });
@@ -231,7 +237,7 @@ export function AddressDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["addresses"] });
       toast("Address deleted", "success");
-      nav("/");
+      nav(back);
     },
   });
 
@@ -245,14 +251,14 @@ export function AddressDetailPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">← All addresses</Link>
+        <Link to={back} className="text-sm text-zinc-500 hover:text-zinc-900 md:hidden dark:hover:text-zinc-100">← Back</Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
               {a.site_name} {a.status !== "active" && <Badge value={a.status} />}
             </h1>
             {a.site_url && (
-              <a href={a.site_url} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+              <a href={a.site_url} target="_blank" rel="noopener noreferrer" className="text-sm text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-100">
                 {hostOf(a.site_url)} ↗
               </a>
             )}
@@ -262,7 +268,32 @@ export function AddressDetailPage() {
               <CopyButton text={a.email} label="Copy address" />
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              className={`btn-secondary px-2 ${a.pinned ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-500"}`}
+              onClick={() => update.mutate({ pinned: !a.pinned })}
+              aria-pressed={a.pinned}
+              title={a.pinned ? "Unpin" : "Pin to the top"}
+            >
+              <PinIcon filled={a.pinned} /> {a.pinned ? "Pinned" : "Pin"}
+            </button>
+            <label className="sr-only" htmlFor="addr-category">Category</label>
+            <span className="relative inline-flex items-center">
+              {a.category_id && categories.data?.find((c) => c.id === a.category_id) && (
+                <span className={`pointer-events-none absolute left-2.5 size-2 rounded-full ${DOT[categories.data.find((c) => c.id === a.category_id)!.color]}`} />
+              )}
+              <select
+                id="addr-category"
+                className={`input w-auto py-1.5 ${a.category_id ? "pl-6" : ""}`}
+                value={a.category_id ?? ""}
+                onChange={(e) => update.mutate({ category_id: e.target.value || null })}
+              >
+                <option value="">No category</option>
+                {(categories.data ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </span>
             <button className="btn-secondary" onClick={() => setEditing(true)}>Edit site</button>
             {a.status === "active" ? (
               <button className="btn-secondary" onClick={() => update.mutate({ status: "paused" })}>Pause</button>
@@ -281,8 +312,8 @@ export function AddressDetailPage() {
         {a.status !== "active" && <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">This address is {a.status}: new mail is rejected.</p>}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <section className="card p-5 lg:col-span-2" aria-labelledby="latest-code">
+      <div className="grid gap-4 2xl:grid-cols-3">
+        <section className="card p-5 2xl:col-span-2" aria-labelledby="latest-code">
           <h2 id="latest-code" className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">Latest code</h2>
           {code.isLoading ? (
             <Spinner />
@@ -312,7 +343,7 @@ export function AddressDetailPage() {
               <ul className="mt-1 space-y-1">
                 {code.data.links.map((l) => (
                   <li key={l.url} className="flex items-center gap-2 text-sm">
-                    <a href={l.url} target="_blank" rel="noopener noreferrer nofollow" className="truncate text-indigo-600 hover:underline dark:text-indigo-400" title={l.url}>
+                    <a href={l.url} target="_blank" rel="noopener noreferrer nofollow" className="truncate text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-100" title={l.url}>
                       {l.label || l.url}
                     </a>
                     <CopyButton text={l.url} label="Copy link" className="btn-ghost px-2 py-0.5 text-xs" />
@@ -354,8 +385,8 @@ export function AddressDetailPage() {
         </section>
       </div>
 
-      <section aria-labelledby="inbox" className="grid gap-4 lg:grid-cols-5">
-        <div className="lg:col-span-2">
+      <section aria-labelledby="inbox" className="grid gap-4 xl:grid-cols-5">
+        <div className="xl:col-span-2">
           <h2 id="inbox" className="sr-only">Messages</h2>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div role="tablist" aria-label="Mailbox" className="flex gap-1">
@@ -364,7 +395,7 @@ export function AddressDetailPage() {
                   key={b}
                   role="tab"
                   aria-selected={box === b}
-                  className={`rounded-md px-3 py-1 text-sm ${box === b ? "bg-indigo-600 text-white" : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"}`}
+                  className={`rounded-md px-3 py-1 text-sm ${box === b ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900" : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"}`}
                   onClick={() => {
                     setBox(b);
                     setSelected(null);
@@ -405,7 +436,7 @@ export function AddressDetailPage() {
             {messages.data?.map((m) => (
               <li key={m.id}>
                 <button
-                  className={`block w-full px-4 py-3 text-left hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-indigo-500 dark:hover:bg-zinc-800/50 ${selected === m.id ? "bg-indigo-50 dark:bg-indigo-950/40" : ""}`}
+                  className={`block w-full px-4 py-3 text-left hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-zinc-100 dark:hover:bg-zinc-800/50 ${selected === m.id ? "bg-zinc-100 dark:bg-zinc-800" : ""}`}
                   onClick={() => setSelected(m.id)}
                   aria-current={selected === m.id}
                 >
@@ -415,7 +446,7 @@ export function AddressDetailPage() {
                   </div>
                   <div className={`truncate text-sm ${m.read_at ? "text-zinc-600 dark:text-zinc-400" : "font-medium"}`}>{m.subject ?? "(no subject)"}</div>
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-zinc-500">
-                    {m.code && <code className="rounded bg-indigo-100 px-1.5 font-semibold text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-200">{m.code}</code>}
+                    {m.code && <code className="rounded bg-zinc-900 px-1.5 font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">{m.code}</code>}
                     {m.forwarded && <span>↪ forwarded</span>}
                     <span className="truncate">{m.preview}</span>
                   </div>
@@ -424,7 +455,7 @@ export function AddressDetailPage() {
             ))}
           </ul>
         </div>
-        <div className="card p-4 lg:col-span-3">
+        <div className="card p-4 xl:col-span-3">
           {selected ? (
             <MessageView key={selected} id={selected} onGone={() => setSelected(null)} />
           ) : (

@@ -1,9 +1,11 @@
 import { useState, type ReactNode } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { post } from "../api";
 import { useAuth } from "../auth";
 import { useReviewCount } from "../pages/Review";
+import { CategoryDialog, DOT, PinIcon, folderHref, useCategories } from "../pages/Mailbox";
+import type { Category } from "../types";
 
 function ThemeToggle() {
   const [pref, setPref] = useState(localStorage.getItem("theme") ?? "system");
@@ -14,90 +16,174 @@ function ThemeToggle() {
     document.documentElement.classList.toggle("dark", dark);
   };
   return (
-    <label className="flex items-center gap-2 text-xs text-zinc-500">
-      <span>Theme</span>
-      <select className="input w-auto py-1 text-xs" value={pref} onChange={(e) => apply(e.target.value)} aria-label="Color theme">
-        <option value="system">System</option>
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
-      </select>
-    </label>
+    <select className="input w-auto py-0.5 text-xs" value={pref} onChange={(e) => apply(e.target.value)} aria-label="Color theme">
+      <option value="system">Auto</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+    </select>
   );
 }
 
-const linkCls = ({ isActive }: { isActive: boolean }) =>
-  `block rounded-md px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-indigo-500 ${
-    isActive ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300" : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+const itemCls = (active: boolean) =>
+  `group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-zinc-100 ${
+    active ? "bg-zinc-200/70 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50" : "text-zinc-600 hover:bg-zinc-200/40 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
   }`;
+const navCls = ({ isActive }: { isActive: boolean }) => itemCls(isActive);
 
-export function Layout({ children }: { children: ReactNode }) {
+function Icon({ d }: { d: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={d} />
+    </svg>
+  );
+}
+const ICONS = {
+  inbox: "M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6H3v-6z",
+  archive: "M3 5h18v4H3zM5 9v10h14V9M10 13h4",
+  none: "M4 7h16M4 12h16M4 17h10",
+  sort: "M4 6h16M7 12h10M10 18h4",
+  dest: "M4 4h16v12H5.2L4 17.2zM8 9h8M8 12h5",
+  key: "M15 7a4 4 0 1 1-3.9 4.9L4 19v-3h3v-3h3l1.1-1.1A4 4 0 0 1 15 7z",
+  user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20a8 8 0 0 1 16 0",
+  globe: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18",
+  users: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 20a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 7M22 20a7 7 0 0 0-4-6.3",
+  log: "M6 3h9l4 4v14H6zM9 12h7M9 16h7",
+};
+
+function Folder({ to, active, icon, label, count, pinned, children }: { to: string; active: boolean; icon?: ReactNode; label: string; count?: number; pinned?: boolean; children?: ReactNode }) {
+  return (
+    <div className="group/f relative">
+      <Link to={to} className={itemCls(active)} aria-current={active ? "page" : undefined}>
+        {icon}
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {pinned && <span className="text-zinc-400" title="Pinned"><PinIcon filled className="size-3" /></span>}
+        {!!count && <span className={`text-xs tabular-nums text-zinc-500 ${children ? "group-hover/f:invisible" : ""}`}>{count}</span>}
+      </Link>
+      {children}
+    </div>
+  );
+}
+
+function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user, cloudflareMode } = useAuth();
   const review = useReviewCount(!!user);
-  const [open, setOpen] = useState(false);
+  const categories = useCategories(!!user);
+  const loc = useLocation();
   const qc = useQueryClient();
   const nav = useNavigate();
+  const [editing, setEditing] = useState<Category | null | undefined>(undefined);
+  const mailbox = loc.pathname === "/" || loc.pathname.startsWith("/addresses/");
+  const folder = new URLSearchParams(loc.search).get("folder") ?? "inbox";
+  const isFolder = (f: string) => mailbox && folder === f;
   const logout = async () => {
     await post("/v1/auth/logout").catch(() => {});
     qc.clear();
     nav("/login");
     location.reload();
   };
-  const links = (
-    <nav aria-label="Main" className="flex flex-col gap-1" onClick={() => setOpen(false)}>
-      <NavLink to="/" end className={linkCls}>Addresses</NavLink>
-      {(review.data?.count ?? 0) > 0 && (
-        <NavLink to="/review" className={linkCls}>
-          <span className="flex items-center justify-between">
-            To sort <span className="badge bg-indigo-600 text-white" aria-label={`${review.data!.count} to sort`}>{review.data!.count}</span>
-          </span>
-        </NavLink>
-      )}
-      <NavLink to="/destinations" className={linkCls}>Destinations</NavLink>
-      <NavLink to="/keys" className={linkCls}>API keys</NavLink>
-      <NavLink to="/account" className={linkCls}>Account</NavLink>
-      {user?.role === "admin" && (
-        <>
-          <p className="mt-4 mb-1 px-3 text-xs font-semibold tracking-wide text-zinc-400 uppercase">Admin</p>
-          <NavLink to="/admin/domains" className={linkCls}>Domains</NavLink>
-          <NavLink to="/admin/users" className={linkCls}>Users</NavLink>
-          <NavLink to="/admin/audit" className={linkCls}>Audit log</NavLink>
-        </>
-      )}
-      <a href="/docs" className="block rounded-md px-3 py-2 text-sm text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800" target="_blank" rel="noreferrer">API docs ↗</a>
-    </nav>
-  );
+  const cats = categories.data ?? [];
   return (
-    <div className="min-h-screen md:flex">
+    <div className="flex h-full flex-col" onClick={(e) => (e.target as HTMLElement).closest("a") && onNavigate?.()}>
+      <div className="flex items-center gap-2 px-4 pt-4 pb-3">
+        <span className="grid size-7 place-items-center rounded-md bg-zinc-900 font-mono text-sm font-bold text-white dark:bg-zinc-100 dark:text-zinc-900">@</span>
+        <span className="font-semibold tracking-tight">Throwaway Mail</span>
+      </div>
+      <nav aria-label="Mailbox" className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
+        <Folder to={folderHref("inbox")} active={isFolder("inbox")} icon={<Icon d={ICONS.inbox} />} label="Inbox" />
+        <Folder to={folderHref("pinned")} active={isFolder("pinned")} icon={<PinIcon />} label="Pinned" />
+        {(review.data?.count ?? 0) > 0 && (
+          <NavLink to="/review" className={navCls}>
+            <Icon d={ICONS.sort} />
+            <span className="flex-1">To sort</span>
+            <span className="rounded-full bg-zinc-900 px-1.5 text-[11px] font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">{review.data!.count}</span>
+          </NavLink>
+        )}
+        <Folder to={folderHref("archived")} active={isFolder("archived")} icon={<Icon d={ICONS.archive} />} label="Archived" />
+
+        <div className="flex items-center justify-between px-2.5 pt-5 pb-1">
+          <span className="text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Categories</span>
+          <button className="rounded px-1 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100" onClick={() => setEditing(null)} aria-label="New category" title="New category">
+            +
+          </button>
+        </div>
+        {cats.map((c) => (
+          <Folder
+            key={c.id}
+            to={folderHref(c.id)}
+            active={isFolder(c.id)}
+            icon={<span className={`mx-1 size-2 shrink-0 rounded-full ${DOT[c.color]}`} />}
+            label={c.name}
+            count={c.address_count}
+            pinned={c.pinned}
+          >
+            <button
+              className="absolute top-1 right-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 opacity-0 group-hover/f:opacity-100 hover:bg-zinc-300/60 focus-visible:opacity-100 dark:hover:bg-zinc-700"
+              onClick={() => setEditing(c)}
+              aria-label={`Edit category ${c.name}`}
+            >
+              ⋯
+            </button>
+          </Folder>
+        ))}
+        <Folder to={folderHref("none")} active={isFolder("none")} icon={<Icon d={ICONS.none} />} label="No category" />
+        {cats.length === 0 && (
+          <button className="px-2.5 py-1 text-left text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" onClick={() => setEditing(null)}>
+            Group addresses: create a category
+          </button>
+        )}
+
+        <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Settings</p>
+        <NavLink to="/destinations" className={navCls}><Icon d={ICONS.dest} /> Destinations</NavLink>
+        <NavLink to="/keys" className={navCls}><Icon d={ICONS.key} /> API keys</NavLink>
+        <NavLink to="/account" className={navCls}><Icon d={ICONS.user} /> Account</NavLink>
+        {user?.role === "admin" && (
+          <>
+            <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Admin</p>
+            <NavLink to="/admin/domains" className={navCls}><Icon d={ICONS.globe} /> Domains</NavLink>
+            <NavLink to="/admin/users" className={navCls}><Icon d={ICONS.users} /> Users</NavLink>
+            <NavLink to="/admin/audit" className={navCls}><Icon d={ICONS.log} /> Audit log</NavLink>
+          </>
+        )}
+      </nav>
+      <div className="space-y-2 border-t border-zinc-200 px-4 py-3 dark:border-zinc-800">
+        {cloudflareMode === "mock" && <p className="text-xs text-amber-700 dark:text-amber-400">Cloudflare mock mode</p>}
+        {cloudflareMode === "unconfigured" && <p className="text-xs text-red-600">Cloudflare not configured</p>}
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-xs text-zinc-500" title={user?.email}>{user?.email}</span>
+          <ThemeToggle />
+        </div>
+        <div className="flex items-center justify-between text-xs">
+          <a href="/docs" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" target="_blank" rel="noreferrer">API docs ↗</a>
+          <button className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" onClick={logout}>Log out</button>
+        </div>
+      </div>
+      <CategoryDialog open={editing !== undefined} category={editing} onClose={() => setEditing(undefined)} />
+    </div>
+  );
+}
+
+/** App shell. `bare` pages (the mailbox) fill the whole area and manage their own scrolling. */
+export function Layout({ children, bare }: { children: ReactNode; bare?: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex h-dvh flex-col md:flex-row">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2">Skip to content</a>
-      <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3 md:hidden dark:border-zinc-800 dark:bg-zinc-900">
-        <span className="font-semibold">✉ Throwaway Mail</span>
+      <header className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2.5 md:hidden dark:border-zinc-800 dark:bg-zinc-950">
+        <span className="font-semibold tracking-tight">Throwaway Mail</span>
         <button className="btn-ghost" aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen(!open)}>
           {open ? "Close" : "Menu"}
         </button>
       </header>
       {open && (
-        <div id="mobile-nav" className="border-b border-zinc-200 bg-white p-3 md:hidden dark:border-zinc-800 dark:bg-zinc-900">
-          {links}
-          <button className="btn-ghost mt-2 w-full justify-start" onClick={logout}>Log out</button>
+        <div id="mobile-nav" className="max-h-[70dvh] overflow-hidden border-b border-zinc-200 bg-zinc-50 md:hidden dark:border-zinc-800 dark:bg-zinc-950">
+          <Sidebar onNavigate={() => setOpen(false)} />
         </div>
       )}
-      <aside className="hidden w-60 shrink-0 flex-col justify-between border-r border-zinc-200 bg-white p-4 md:flex dark:border-zinc-800 dark:bg-zinc-900">
-        <div>
-          <div className="mb-6 flex items-center gap-2 px-3 text-lg font-semibold">
-            <img src="/favicon.svg" alt="" className="size-6" /> Throwaway Mail
-          </div>
-          {links}
-        </div>
-        <div className="space-y-3 px-3">
-          {cloudflareMode === "mock" && <p className="badge bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">Cloudflare mock mode</p>}
-          {cloudflareMode === "unconfigured" && <p className="badge bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300">Cloudflare not configured</p>}
-          <ThemeToggle />
-          <div className="truncate text-xs text-zinc-500" title={user?.email}>{user?.email}</div>
-          <button className="btn-secondary w-full" onClick={logout}>Log out</button>
-        </div>
+      <aside className="hidden w-60 shrink-0 border-r border-zinc-200 bg-zinc-50 md:block dark:border-zinc-800 dark:bg-zinc-950">
+        <Sidebar />
       </aside>
-      <main id="main" className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-8">
-        {children}
+      <main id="main" className={`min-h-0 min-w-0 flex-1 bg-white dark:bg-zinc-900 ${bare ? "overflow-hidden" : "overflow-y-auto"}`}>
+        {bare ? children : <div className="mx-auto w-full max-w-5xl p-4 md:p-8">{children}</div>}
       </main>
     </div>
   );

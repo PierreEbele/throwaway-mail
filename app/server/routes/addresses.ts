@@ -9,6 +9,7 @@ import { LOCAL_PART_RE } from "../lib/email.js";
 import { readableLocalPart } from "../lib/words.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { addressOut, itemsOut, messageOut, messageSummaryOut } from "../services/serialize.js";
+import { checkCategory } from "./categories.js";
 
 const SiteUrl = z
   .string()
@@ -76,6 +77,7 @@ export interface NewAddress {
   label?: string;
   forward?: boolean;
   destination_id?: string;
+  category_id?: string | null;
   expires_at?: number | null;
   expires_in_days?: number;
 }
@@ -91,6 +93,7 @@ export function createAddress(d: Deps, user: User, body: NewAddress): { a: Addre
     throw badRequest("local_part may contain a-z, 0-9, '.', '_' and '-', must start and end with a letter or digit (max 64)");
   }
   checkDestination(d, user, body.destination_id);
+  checkCategory(d, user, body.category_id);
   const now = d.now();
   const expiresAt = body.expires_at ?? (body.expires_in_days ? now + body.expires_in_days * 86400_000 : null);
   for (let attempt = 0; attempt < 12; attempt++) {
@@ -105,6 +108,7 @@ export function createAddress(d: Deps, user: User, body: NewAddress): { a: Addre
       label: body.label ?? null,
       forwardEnabled: body.forward ?? false,
       destinationId: body.destination_id ?? null,
+      categoryId: body.category_id ?? null,
       expiresAt,
       createdAt: now,
       updatedAt: now,
@@ -137,6 +141,7 @@ export function registerAddresses(r: ApiRouter) {
         label: z.string().trim().max(120).optional(),
         forward: z.boolean().optional(),
         destination_id: z.string().optional(),
+        category_id: z.string().nullable().optional(),
         expires_at: ExpiresAt.optional(),
         expires_in_days: z.number().int().min(1).max(3650).optional(),
       }),
@@ -163,6 +168,8 @@ export function registerAddresses(r: ApiRouter) {
         domain: z.string().optional(),
         status: z.enum(["active", "paused", "archived", "all"]).optional(),
         q: z.string().optional(),
+        category: z.string().optional().describe("Category id, or `none` for uncategorised addresses"),
+        pinned: z.enum(["true", "false"]).optional(),
         limit: z.coerce.number().int().min(1).max(1000).default(500),
         offset: z.coerce.number().int().min(0).default(0),
       }),
@@ -174,6 +181,9 @@ export function registerAddresses(r: ApiRouter) {
       if (query.status && query.status !== "all") conds.push(eq(addresses.status, query.status));
       else if (!query.status) conds.push(ne(addresses.status, "archived"));
       if (query.domain) conds.push(eq(domains.name, query.domain.toLowerCase()));
+      if (query.category === "none") conds.push(isNull(addresses.categoryId));
+      else if (query.category) conds.push(eq(addresses.categoryId, query.category));
+      if (query.pinned) conds.push(eq(addresses.pinned, query.pinned === "true"));
       if (query.site) {
         const s = `%${query.site.toLowerCase()}%`;
         conds.push(or(like(sql`lower(${addresses.siteName})`, s), like(sql`lower(coalesce(${addresses.siteUrl}, ''))`, s))!);
@@ -194,7 +204,7 @@ export function registerAddresses(r: ApiRouter) {
         .from(addresses)
         .innerJoin(domains, eq(domains.id, addresses.domainId))
         .where(and(...conds))
-        .orderBy(desc(sql`coalesce(${addresses.lastMessageAt}, ${addresses.createdAt})`))
+        .orderBy(desc(addresses.pinned), desc(sql`coalesce(${addresses.lastMessageAt}, ${addresses.createdAt})`))
         .limit(query.limit)
         .offset(query.offset)
         .all();
@@ -224,6 +234,8 @@ export function registerAddresses(r: ApiRouter) {
         destination_id: z.string().nullable().optional(),
         status: z.enum(["active", "paused", "archived"]).optional(),
         expires_at: ExpiresAt.optional(),
+        category_id: z.string().nullable().optional(),
+        pinned: z.boolean().optional(),
       }),
     },
     (c, { body }) => {
@@ -231,7 +243,10 @@ export function registerAddresses(r: ApiRouter) {
       const user = c.get("user")!;
       const { a, domain } = ownedAddress(d, user, c.req.param("id")!);
       checkDestination(d, user, body.destination_id);
+      checkCategory(d, user, body.category_id);
       const set: Partial<Address> = { updatedAt: d.now() };
+      if (body.category_id !== undefined) set.categoryId = body.category_id;
+      if (body.pinned !== undefined) set.pinned = body.pinned;
       if (body.site_name !== undefined) set.siteName = body.site_name;
       if (body.site_url !== undefined) set.siteUrl = body.site_url;
       if (body.label !== undefined) set.label = body.label || null;

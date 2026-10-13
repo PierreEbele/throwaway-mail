@@ -70,6 +70,20 @@ export const destinations = sqliteTable(
   (t) => [uniqueIndex("destinations_user_email_uq").on(t.userId, t.email)],
 );
 
+export const categories = sqliteTable(
+  "categories",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    color: text("color").notNull().default("zinc"),
+    pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+    position: integer("position").notNull().default(0),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("categories_user_name_uq").on(t.userId, t.name)],
+);
+
 export const addresses = sqliteTable(
   "addresses",
   {
@@ -88,6 +102,10 @@ export const addresses = sqliteTable(
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
     lastMessageAt: integer("last_message_at"),
+    categoryId: text("category_id").references(() => categories.id, { onDelete: "set null" }),
+    pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+    /** Set when the user dismissed the "never received any mail" suggestion for this address. */
+    staleDismissedAt: integer("stale_dismissed_at"),
   },
   (t) => [uniqueIndex("addresses_domain_local_uq").on(t.domainId, t.localPart), index("addresses_user_idx").on(t.userId)],
 );
@@ -157,6 +175,7 @@ export const auditLog = sqliteTable(
 export type User = typeof users.$inferSelect;
 export type Domain = typeof domains.$inferSelect;
 export type Address = typeof addresses.$inferSelect;
+export type Category = typeof categories.$inferSelect;
 export type Destination = typeof destinations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type ExtractedItem = typeof extractedItems.$inferSelect;

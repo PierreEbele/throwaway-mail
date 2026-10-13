@@ -1,0 +1,401 @@
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { del, get, patch, post } from "../api";
+import type { Address, Category, CategoryColor } from "../types";
+import { ErrorText, Modal, Spinner, confirmAction, useToast } from "../components/ui";
+import { NewAddressDialog, useDomains } from "./Addresses";
+import { AddressDetailPage } from "./AddressDetail";
+import { timeAgo } from "../util";
+
+/* ---------- Shared data ---------- */
+
+export const COLORS: CategoryColor[] = ["zinc", "red", "orange", "amber", "green", "teal", "blue", "indigo", "violet", "pink"];
+// Full class names so Tailwind keeps them.
+export const DOT: Record<CategoryColor, string> = {
+  zinc: "bg-zinc-400", red: "bg-red-500", orange: "bg-orange-500", amber: "bg-amber-500", green: "bg-green-500",
+  teal: "bg-teal-500", blue: "bg-blue-500", indigo: "bg-indigo-500", violet: "bg-violet-500", pink: "bg-pink-500",
+};
+const AVATAR: Record<CategoryColor, string> = {
+  zinc: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300", red: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
+  orange: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300", amber: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+  green: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300", teal: "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300",
+  blue: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300", indigo: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
+  violet: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300", pink: "bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300",
+};
+
+export function useCategories(enabled = true) {
+  return useQuery({ queryKey: ["categories"], enabled, queryFn: () => get<{ categories: Category[] }>("/v1/categories").then((r) => r.categories) });
+}
+
+const STALE_DAYS = 30;
+export function useStale(enabled = true) {
+  return useQuery({ queryKey: ["stale"], enabled, queryFn: () => get<{ addresses: Address[] }>(`/v1/stale-addresses?days=${STALE_DAYS}`).then((r) => r.addresses) });
+}
+
+/** Folder from `?folder=`: inbox | pinned | archived | none | <category id>. */
+export function useFolder() {
+  const [sp] = useSearchParams();
+  return sp.get("folder") ?? "inbox";
+}
+export const folderHref = (folder: string) => (folder === "inbox" ? "/" : `/?folder=${encodeURIComponent(folder)}`);
+
+export function PinIcon({ filled, className = "size-4" }: { filled?: boolean; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="M9 4h6l-1 5 4 3v2h-5v6l-1 1-1-1v-6H6v-2l4-3z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/* ---------- Category dialog ---------- */
+
+export function CategoryDialog({ open, onClose, category }: { open: boolean; onClose: () => void; category?: Category | null }) {
+  const qc = useQueryClient();
+  const nav = useNavigate();
+  const toast = useToast();
+  const [name, setName] = useState("");
+  const [color, setColor] = useState<CategoryColor>("zinc");
+  const [pinned, setPinned] = useState(false);
+  useEffect(() => {
+    if (open) {
+      setName(category?.name ?? "");
+      setColor(category?.color ?? "blue");
+      setPinned(category?.pinned ?? false);
+    }
+  }, [open, category]);
+  const done = () => {
+    qc.invalidateQueries({ queryKey: ["categories"] });
+    qc.invalidateQueries({ queryKey: ["addresses"] });
+    onClose();
+  };
+  const save = useMutation({
+    mutationFn: () => (category ? patch(`/v1/categories/${category.id}`, { name, color, pinned }) : post("/v1/categories", { name, color, pinned })),
+    onSuccess: done,
+  });
+  const remove = useMutation({
+    mutationFn: () => del(`/v1/categories/${category!.id}`),
+    onSuccess: () => {
+      toast(`Category ${category!.name} deleted`, "success");
+      nav("/");
+      done();
+    },
+  });
+  return (
+    <Modal open={open} onClose={onClose} title={category ? "Edit category" : "New category"}>
+      <form
+        className="space-y-4"
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          save.mutate();
+        }}
+      >
+        <div>
+          <label htmlFor="cat-name" className="label">Name</label>
+          <input id="cat-name" className="input" required maxLength={40} placeholder="e.g. Shopping" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <fieldset>
+          <legend className="label">Colour</legend>
+          <div className="flex flex-wrap gap-2">
+            {COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                aria-label={c}
+                aria-pressed={color === c}
+                onClick={() => setColor(c)}
+                className={`size-7 rounded-full ${DOT[c]} ring-offset-2 ring-offset-white dark:ring-offset-zinc-900 ${color === c ? "ring-2 ring-zinc-900 dark:ring-zinc-100" : ""}`}
+              />
+            ))}
+          </div>
+        </fieldset>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} /> Pin to the top of the sidebar
+        </label>
+        <ErrorText error={save.error ?? remove.error} />
+        <div className="flex items-center justify-between gap-2">
+          {category ? (
+            <button
+              type="button"
+              className="btn-ghost text-red-600"
+              onClick={() => confirmAction(`Delete the category ${category.name}? Its ${category.address_count} address(es) are kept, without a category.`) && remove.mutate()}
+            >
+              Delete
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button className="btn-primary" disabled={save.isPending}>{category ? "Save" : "Create"}</button>
+          </div>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/* ---------- Addresses that never received mail ---------- */
+
+function StaleDialog({ open, onClose, items }: { open: boolean; onClose: () => void; items: Address[] }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (open) setChecked(new Set(items.map((a) => a.id)));
+  }, [open, items]);
+  const act = useMutation({
+    mutationFn: (action: "archive" | "delete" | "keep") => post<{ affected: number }>("/v1/stale-addresses", { action, ids: [...checked], days: STALE_DAYS }).then((r) => ({ ...r, action })),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["stale"] });
+      qc.invalidateQueries({ queryKey: ["addresses"] });
+      qc.invalidateQueries({ queryKey: ["categories"] });
+      toast(`${r.affected} address(es) ${r.action === "keep" ? "kept" : r.action === "archive" ? "archived" : "deleted"}`, "success");
+      onClose();
+    },
+  });
+  const toggle = (id: string) => setChecked((s) => {
+    const n = new Set(s);
+    if (n.has(id)) n.delete(id);
+    else n.add(id);
+    return n;
+  });
+  return (
+    <Modal open={open} onClose={onClose} title="Addresses that never received mail" wide>
+      <p className="mb-3 text-sm text-zinc-500">
+        Created more than {STALE_DAYS} days ago and still empty. Archiving rejects future mail but keeps the address; deleting frees it. Pinned addresses are never listed.
+      </p>
+      <ul className="max-h-80 divide-y divide-zinc-200 overflow-auto rounded-md border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+        {items.map((a) => (
+          <li key={a.id}>
+            <label className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+              <input type="checkbox" checked={checked.has(a.id)} onChange={() => toggle(a.id)} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{a.site_name}</span>
+                <span className="block truncate font-mono text-xs text-zinc-500">{a.email}</span>
+              </span>
+              <span className="shrink-0 text-xs text-zinc-500">created {timeAgo(a.created_at)}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <ErrorText error={act.error} />
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
+        <button className="btn-ghost" disabled={!checked.size || act.isPending} onClick={() => act.mutate("keep")} title="Stop suggesting these">Keep them</button>
+        <button className="btn-secondary" disabled={!checked.size || act.isPending} onClick={() => act.mutate("archive")}>Archive {checked.size}</button>
+        <button
+          className="btn-danger"
+          disabled={!checked.size || act.isPending}
+          onClick={() => confirmAction(`Delete ${checked.size} address(es)? This cannot be undone.`) && act.mutate("delete")}
+        >
+          Delete {checked.size}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ---------- Address list (middle pane) ---------- */
+
+function AddressRow({ a, active, category, search }: { a: Address; active: boolean; category?: Category; search: string }) {
+  const qc = useQueryClient();
+  const pin = useMutation({
+    mutationFn: () => patch(`/v1/addresses/${a.id}`, { pinned: !a.pinned }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["addresses"] });
+      qc.invalidateQueries({ queryKey: ["address", a.id] });
+      qc.invalidateQueries({ queryKey: ["stale"] });
+    },
+  });
+  const unread = a.unread_count > 0;
+  return (
+    <li className="group relative">
+      <Link
+        to={`/addresses/${a.id}${search}`}
+        aria-current={active ? "page" : undefined}
+        aria-label={`${a.site_name}, ${a.email}${unread ? `, ${a.unread_count} unread` : ""}`}
+        className={`flex gap-3 border-l-2 px-4 py-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-zinc-100 ${
+          active ? "border-zinc-900 bg-zinc-100 dark:border-zinc-100 dark:bg-zinc-800/70" : "border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-900"
+        }`}
+      >
+        <span className={`grid size-9 shrink-0 place-items-center rounded-full text-sm font-semibold uppercase ${AVATAR[category?.color ?? "zinc"]}`} aria-hidden>
+          {a.site_name.trim()[0] ?? "?"}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline gap-2">
+            <span className={`truncate text-sm ${unread ? "font-semibold" : "font-medium"}`}>{a.site_name}</span>
+            <span className={`ml-auto shrink-0 text-xs ${unread ? "font-semibold text-zinc-900 dark:text-zinc-100" : "text-zinc-500"}`}>{timeAgo(a.last_message_at ?? a.created_at)}</span>
+          </span>
+          <span className="block truncate font-mono text-xs text-zinc-500">{a.email}</span>
+          <span className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
+            {unread && <span className="rounded-full bg-zinc-900 px-1.5 text-[11px] font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">{a.unread_count}</span>}
+            {category && (
+              <span className="inline-flex items-center gap-1">
+                <span className={`size-1.5 rounded-full ${DOT[category.color]}`} />
+                {category.name}
+              </span>
+            )}
+            {a.status !== "active" && <span className="rounded border border-zinc-300 px-1 dark:border-zinc-700">{a.status}</span>}
+            {a.forward_enabled && <span title="Forwarded">↪</span>}
+            {!a.message_count && <span>no mail yet</span>}
+          </span>
+        </span>
+      </Link>
+      <button
+        type="button"
+        onClick={() => pin.mutate()}
+        aria-label={a.pinned ? `Unpin ${a.site_name}` : `Pin ${a.site_name}`}
+        aria-pressed={a.pinned}
+        className={`absolute top-9 right-3 rounded p-1 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-900 focus-visible:opacity-100 dark:hover:bg-zinc-700 dark:hover:text-zinc-100 ${
+          a.pinned ? "opacity-100 text-zinc-900 dark:text-zinc-100" : "opacity-0 group-hover:opacity-100"
+        }`}
+      >
+        <PinIcon filled={a.pinned} />
+      </button>
+    </li>
+  );
+}
+
+function AddressList({ folder, activeId }: { folder: string; activeId?: string }) {
+  const [sp] = useSearchParams();
+  const [q, setQ] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [domain, setDomain] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [reviewStale, setReviewStale] = useState(false);
+  const categories = useCategories();
+  const domains = useDomains();
+  const stale = useStale(folder === "inbox");
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(q), 200);
+    return () => clearTimeout(t);
+  }, [q]);
+  const params = useMemo(() => {
+    const p = new URLSearchParams();
+    if (debounced) p.set("q", debounced);
+    if (domain) p.set("domain", domain);
+    if (folder === "archived") p.set("status", "archived");
+    else if (folder === "pinned") p.set("pinned", "true");
+    else if (folder !== "inbox") p.set("category", folder);
+    return p.toString();
+  }, [debounced, domain, folder]);
+  const list = useQuery({ queryKey: ["addresses", params], queryFn: () => get<{ addresses: Address[] }>(`/v1/addresses?${params}`).then((r) => r.addresses) });
+  const byId = useMemo(() => new Map((categories.data ?? []).map((c) => [c.id, c])), [categories.data]);
+  const title =
+    folder === "inbox" ? "Inbox" : folder === "pinned" ? "Pinned" : folder === "archived" ? "Archived" : folder === "none" ? "No category" : (byId.get(folder)?.name ?? "Category");
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || e.metaKey || e.ctrlKey) return;
+      if (e.key === "n") {
+        e.preventDefault();
+        setCreating(true);
+      }
+      if (e.key === "/") {
+        e.preventDefault();
+        document.getElementById("addr-search")?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const pinned = (list.data ?? []).filter((a) => a.pinned && folder !== "pinned");
+  const rest = (list.data ?? []).filter((a) => !a.pinned || folder === "pinned");
+  const search = sp.toString() ? `?${sp.toString()}` : "";
+  const staleCount = stale.data?.length ?? 0;
+
+  return (
+    <section aria-label={title} className="flex h-full min-h-0 flex-col">
+      <div className="space-y-2 border-b border-zinc-200 px-4 pt-4 pb-3 dark:border-zinc-800">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+          <button className="btn-primary px-2.5 py-1 text-xs" onClick={() => setCreating(true)} title="Shortcut: n">+ New</button>
+        </div>
+        <div className="flex gap-2">
+          <label className="sr-only" htmlFor="addr-search">Search addresses</label>
+          <input id="addr-search" type="search" className="input py-1" placeholder="Search…  ( / )" value={q} onChange={(e) => setQ(e.target.value)} />
+          <label className="sr-only" htmlFor="addr-domain">Filter by domain</label>
+          <select id="addr-domain" className="input w-auto py-1 text-xs" value={domain} onChange={(e) => setDomain(e.target.value)}>
+            <option value="">All domains</option>
+            {(domains.data ?? []).map((d) => (
+              <option key={d.id} value={d.name}>{d.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {folder === "inbox" && staleCount > 0 && (
+        <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+          <span className="flex-1">
+            {staleCount} address{staleCount > 1 ? "es" : ""} never received mail in {STALE_DAYS} days.
+          </span>
+          <button className="font-semibold underline" onClick={() => setReviewStale(true)}>Review</button>
+        </div>
+      )}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {list.isLoading && <Spinner />}
+        <ErrorText error={list.error} />
+        {list.data?.length === 0 && (
+          <div className="px-6 py-12 text-center text-sm text-zinc-500">
+            {debounced || domain ? "No matching addresses." : folder === "inbox" ? "No addresses yet. Press n to create one." : "Nothing here."}
+          </div>
+        )}
+        {pinned.length > 0 && (
+          <>
+            <p className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Pinned</p>
+            <ul aria-label="Pinned addresses">
+              {pinned.map((a) => <AddressRow key={a.id} a={a} active={a.id === activeId} category={a.category_id ? byId.get(a.category_id) : undefined} search={search} />)}
+            </ul>
+            {rest.length > 0 && <p className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Others</p>}
+          </>
+        )}
+        <ul aria-label="Addresses">
+          {rest.map((a) => <AddressRow key={a.id} a={a} active={a.id === activeId} category={a.category_id ? byId.get(a.category_id) : undefined} search={search} />)}
+        </ul>
+      </div>
+      <NewAddressDialog open={creating} onClose={() => setCreating(false)} defaultCategory={byId.has(folder) ? folder : undefined} />
+      <StaleDialog open={reviewStale} onClose={() => setReviewStale(false)} items={stale.data ?? []} />
+    </section>
+  );
+}
+
+/* ---------- Page: list + reading pane ---------- */
+
+export function MailboxPage() {
+  const { id } = useParams();
+  const folder = useFolder();
+  return (
+    <div className="flex h-full min-h-0">
+      <div className={`h-full w-full shrink-0 border-r border-zinc-200 md:w-80 lg:w-96 dark:border-zinc-800 ${id ? "hidden md:block" : ""}`}>
+        <AddressList folder={folder} activeId={id} />
+      </div>
+      <div className={`h-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto ${id ? "" : "hidden md:block"}`}>
+        {id ? (
+          <div className="p-4 md:p-6">
+            <AddressDetailPage key={id} />
+          </div>
+        ) : (
+          <EmptyReader />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EmptyReader(): ReactNode {
+  return (
+    <div className="grid h-full place-items-center p-8 text-center text-sm text-zinc-500">
+      <div>
+        <svg viewBox="0 0 24 24" className="mx-auto mb-3 size-10 text-zinc-300 dark:text-zinc-700" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="m3 7 9 6 9-6" />
+        </svg>
+        Select an address to read its mail.
+        <p className="mt-1 text-xs">
+          <kbd className="rounded border border-zinc-300 px-1 dark:border-zinc-700">n</kbd> new address · <kbd className="rounded border border-zinc-300 px-1 dark:border-zinc-700">/</kbd> search
+        </p>
+      </div>
+    </div>
+  );
+}

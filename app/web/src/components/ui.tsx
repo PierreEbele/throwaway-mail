@@ -90,7 +90,7 @@ export function CopyButton({ text, label = "Copy", className = "btn-secondary", 
 export function Spinner({ label = "Loading" }: { label?: string }) {
   return (
     <div className="flex items-center gap-2 p-4 text-sm text-zinc-500" role="status">
-      <span className="size-4 animate-spin rounded-full border-2 border-zinc-300 border-t-indigo-600" aria-hidden />
+      <span className="size-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900 dark:border-t-zinc-100" aria-hidden />
       {label}…
     </div>
   );
@@ -115,7 +115,7 @@ const STATUS_STYLES: Record<string, string> = {
   unverified: "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
   used: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
   expired: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-  admin: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
+  admin: "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900",
   user: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
   disabled: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
 };
@@ -133,11 +133,11 @@ export function Toggle({ checked, onChange, label, disabled, id }: { checked: bo
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:opacity-50 ${
-        checked ? "bg-indigo-600" : "bg-zinc-300 dark:bg-zinc-700"
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-zinc-100 disabled:opacity-50 ${
+        checked ? "bg-zinc-900 dark:bg-zinc-100" : "bg-zinc-300 dark:bg-zinc-700"
       }`}
     >
-      <span className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
+      <span className={`inline-block size-5 rounded-full bg-white shadow dark:bg-zinc-900 transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
     </button>
   );
 }

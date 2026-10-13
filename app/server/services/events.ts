@@ -13,7 +13,10 @@ export interface AddressEvent {
   type: "address.updated" | "address.created" | "address.deleted";
   address_id: string;
 }
-export type AppEvent = MessageEvent | AddressEvent;
+export interface CategoryEvent {
+  type: "category.changed";
+}
+export type AppEvent = MessageEvent | AddressEvent | CategoryEvent;
 
 /** In-process pub/sub, scoped per user. */
 export class EventBus {

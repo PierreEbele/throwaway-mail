@@ -42,6 +42,8 @@ export function addressOut(a: Address, domainName: string, counts?: { unread: nu
     created_at: a.createdAt,
     updated_at: a.updatedAt,
     last_message_at: a.lastMessageAt,
+    category_id: a.categoryId,
+    pinned: a.pinned,
     unread_count: counts?.unread ?? 0,
     message_count: counts?.total ?? 0,
   };
