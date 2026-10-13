@@ -1,11 +1,11 @@
 (function (root) {
   "use strict";
   // The popup reinjects this file on each fill; keep the last transaction alive.
-  if (root.FableFill?.version === "1.6") return;
+  if (root.FableFill?.version === "1.9") return;
   let lastFill = null;
   const fieldKeys = ["firstName", "lastName", "address", "city", "postalCode", "country", "email", "phone", "birthDate", "password"];
   function allowed(key, selected) {
-    if (key === "fullName") return selected.has("firstName") && selected.has("lastName");
+    if (key === "fullName" || key === "username") return selected.has("firstName") && selected.has("lastName");
     if (key === "phoneNational" || key === "phoneCountryCode") return selected.has("phone");
     if (["birthDay", "birthMonth", "birthYear"].includes(key)) return selected.has("birthDate");
     return selected.has(key);
@@ -38,7 +38,7 @@
     ["phone", /\b(phone(?:\s*number)?|telephone|tel|mobile|portable|telefon(?:nummer)?|telefono|cellulare|telefoon)\b/],
     ["address2", /\b(address\s*(?:line\s*)?2|adresse\s*2|complement|apartment|suite|building|batiment)\b/],
     ["address", /\b(address(?:\s*(?:line\s*)?1)?|adresse(?:\s*1)?|street(?:\s*address)?|rue|direccion|indirizzo|strasse|straat)\b/],
-    ["fullName", /\b(full\s*name|your\s*name|contact\s*name|customer\s*name|nom complet|votre nom|nombre completo|nome completo|vollstandiger name)\b/]
+    ["fullName", /\b(full\s*name|your\s*name|display\s*name|nom d affichage|anzeigename|contact\s*name|customer\s*name|nom complet|votre nom|nombre completo|nome completo|vollstandiger name)\b/]
   ];
   const autocomplete = {
     "given-name": "firstName", "family-name": "lastName", name: "fullName", email: "email",
@@ -63,6 +63,8 @@
     if (type === "date") return null;
     if (classifyCard(el)) return null;
     const auto = (el.getAttribute("autocomplete") || "").toLowerCase().trim().split(/\s+/).filter(token => token !== "webauthn").pop();
+    // Discord & co. : champ e-mail marqué autocomplete="username" (identifiant de connexion = e-mail).
+    if (auto === "username" && el.tagName === "INPUT" && (type === "email" || signals(el).some(text => /^e ?mail$|\bemail\b/.test(text)))) return "email";
     if (auto && /^(username|current-password|one-time-code|cc-.+|bday.*|sex|organization.*|address-level[134]|address-line3|tel-(area-code|local.*|extension))$/.test(auto)) return null;
     const texts = signals(el);
     const passwordHint = texts.some(text => /\b(password|mot de passe|motdepasse|passwort|contrasena|senha|pwd)\b/.test(text));
@@ -70,11 +72,19 @@
       if (texts.some(text => /\b(current|existing|old|actuel|actuelle|ancien|ancienne)\b/.test(text))) return null;
       return "password"; // Only a recognized registration group may use this candidate.
     }
+    // « Nouvelle adresse mail Yahoo », « choose your Gmail address » : on crée une boîte chez le site,
+    // le champ attend un identifiant (pas une adresse postale ni notre adresse jetable).
+    const mailWords = /\b(e ?mail|mail|courriel|gmail|outlook|yahoo)\b/;
+    if (el.tagName === "INPUT" && type !== "email" && texts.some(text => mailWords.test(text) && /\b(new|nouvelle|nouveau|choose|choisissez|choisir|create|creer|neue)\b/.test(text))) return "username";
+    // Pseudo : rempli seulement dans un formulaire d'inscription reconnu (voir fill()).
+    if (el.tagName === "INPUT" && auto !== "username" && texts.some(text => /^(user ?name|nom d utilisateur|pseudo|pseudonyme|benutzername|nombre de usuario)\b/.test(text))) return "username";
     if (texts.some(text => /\b(search|recherche|captcha|honeypot|website|url|password|mot de passe|username|login|subject|objet|message|company|entreprise|organisation|organization|fax|birth|naissance|iban|card number|account number)\b/.test(text))) return null;
     if (autocomplete[auto]) return autocomplete[auto];
     // Explicit semantic input types take precedence over loose textual hints.
     if (type === "email") return "email";
     if (type === "tel") return "phone";
+    // « Adresse mail » / « adresse e-mail » : jamais une adresse postale.
+    if (texts.some(text => /\badresse (e )?mail\b|\bmail address\b/.test(text))) return "email";
     for (const [key, pattern] of rules) if (texts.some(text => pattern.test(text))) return key;
     if (texts.some(text => /^(nom|name|nome|naam)$/.test(text))) return "fullName";
     return null;
@@ -111,6 +121,7 @@
   }
   function proposedValue(el, key, data) {
     if (key.startsWith("birth")) return birthValue(el, key, data.birthDate);
+    if (key === "username") return data.username || (normalize(data.firstName + data.lastName).replace(/ /g, "").slice(0, 20) + String(data.password || "").replace(/\D/g, "").slice(0, 3).padEnd(3, "7"));
     if (el.tagName === "SELECT") return selectValue(el, key, data);
     if (key === "country") return /code|iso/.test(normalize(el.name + " " + el.id)) || (el.maxLength > 0 && el.maxLength <= 3) ? data.countryCode : data.countryEnglish;
     let value = data[key];
@@ -125,9 +136,15 @@
   function write(el, value) {
     const view = el.ownerDocument.defaultView;
     const prototype = el.tagName === "SELECT" ? view.HTMLSelectElement.prototype : el.tagName === "TEXTAREA" ? view.HTMLTextAreaElement.prototype : view.HTMLInputElement.prototype;
+    // Séquence proche d'une saisie (focus → input → change → blur) : les gestionnaires de mots
+    // de passe (Bitwarden…) n'enregistrent que les champs qu'ils ont vu « taper ».
+    el.dispatchEvent(new view.FocusEvent("focus", { composed: true }));
+    el.dispatchEvent(new view.FocusEvent("focusin", { bubbles: true, composed: true }));
     Object.getOwnPropertyDescriptor(prototype, "value").set.call(el, value);
-    el.dispatchEvent(new view.Event("input", { bubbles: true, composed: true }));
+    el.dispatchEvent(new view.InputEvent("input", { bubbles: true, composed: true, inputType: "insertText", data: value }));
     el.dispatchEvent(new view.Event("change", { bubbles: true, composed: true }));
+    el.dispatchEvent(new view.FocusEvent("blur", { composed: true }));
+    el.dispatchEvent(new view.FocusEvent("focusout", { bubbles: true, composed: true }));
   }
   const cardAutocomplete = { "cc-number": "cardNumber", "cc-name": "cardHolder", "cc-exp": "cardExpiry", "cc-exp-month": "cardMonth", "cc-exp-year": "cardYear", "cc-csc": "cardCvc" };
   const birthAutocomplete = { bday: "birthDate", "bday-day": "birthDay", "bday-month": "birthMonth", "bday-year": "birthYear" };
@@ -388,6 +405,7 @@
         if (birthIssue === "preserved") report.preserved++; else report.rejected++;
         continue;
       }
+      if (key === "username" && !ranked[0].allowPassword) { report.excluded++; continue; }
       if (key === "password" && passwordIssue) {
         if (passwordIssue === "preserved") report.preserved++;
         else if (passwordIssue === "constraints") report.rejected++;

@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useCallback, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, patch, post } from "../api";
 import type { Address, Category, CategoryColor } from "../types";
 import { ErrorText, Modal, Spinner, confirmAction, useToast } from "../components/ui";
 import { NewAddressDialog, useDomains } from "./Addresses";
-import { AddressDetailPage } from "./AddressDetail";
+import { AddressDetailPage, EditSiteDialog } from "./AddressDetail";
 import { timeAgo } from "../util";
 
 /* ---------- Shared data ---------- */
@@ -197,7 +197,154 @@ function StaleDialog({ open, onClose, items }: { open: boolean; onClose: () => v
 
 /* ---------- Address list (middle pane) ---------- */
 
-function AddressRow({ a, active, category, search }: { a: Address; active: boolean; category?: Category; search: string }) {
+
+/** Hôte du site lié à une adresse (pour son logo), ou null. */
+function siteHost(a: Address): string | null {
+  try {
+    return a.site_url ? new URL(a.site_url).hostname.replace(/^www\./, "") : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Logo du site (servi et mis en cache par le serveur), ou initiale colorée à défaut. */
+export function SiteAvatar({ a, color, size = "size-9" }: { a: Address; color: CategoryColor; size?: string }) {
+  const host = siteHost(a);
+  const [failed, setFailed] = useState(false);
+  if (host && !failed)
+    return (
+      <span className={`grid ${size} shrink-0 place-items-center overflow-hidden rounded-full border border-zinc-200 bg-white dark:border-zinc-700`} aria-hidden>
+        <img src={`/v1/icons/${encodeURIComponent(host)}`} alt="" className="size-5" loading="lazy" onError={() => setFailed(true)} />
+      </span>
+    );
+  return (
+    <span className={`grid ${size} shrink-0 place-items-center rounded-full text-sm font-semibold uppercase ${AVATAR[color]}`} aria-hidden>
+      {a.site_name.trim()[0] ?? "?"}
+    </span>
+  );
+}
+
+type MenuItem = { label: string; onSelect: () => void; danger?: boolean; checked?: boolean; dot?: string } | "sep" | { heading: string };
+
+/** Menu contextuel (clic droit / touche Menu / Maj+F10) sur une adresse de la liste. */
+function AddressMenu({ a, x, y, categories, onClose, onEdit }: { a: Address; x: number; y: number; categories: Category[]; onClose: () => void; onEdit: () => void }) {
+  const qc = useQueryClient();
+  const nav = useNavigate();
+  const [sp] = useSearchParams();
+  const toast = useToast();
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ left: x, top: y });
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["addresses"] });
+    qc.invalidateQueries({ queryKey: ["address", a.id] });
+    qc.invalidateQueries({ queryKey: ["messages", a.id] });
+    qc.invalidateQueries({ queryKey: ["categories"] });
+    qc.invalidateQueries({ queryKey: ["stale"] });
+  };
+  const run = (fn: () => Promise<unknown>, done?: string) => {
+    onClose();
+    fn().then(() => { refresh(); if (done) toast(done, "success"); }, (e: Error) => toast(e.message, "error"));
+  };
+  const update = (body: Record<string, unknown>, done?: string) => run(() => patch(`/v1/addresses/${a.id}`, body), done);
+  const search = sp.toString() ? `?${sp.toString()}` : "";
+
+  const items: MenuItem[] = [
+    { label: "Open", onSelect: () => { onClose(); nav(`/addresses/${a.id}${search}`); } },
+    { label: "Copy address", onSelect: () => run(() => navigator.clipboard.writeText(a.email), "Address copied") },
+    ...(a.unread_count > 0 ? [{ label: "Mark all as read", onSelect: () => run(() => post(`/v1/addresses/${a.id}/messages/bulk`, { action: "read", scope: "inbox" })) }] : []),
+    { label: a.pinned ? "Unpin" : "Pin", onSelect: () => update({ pinned: !a.pinned }) },
+    { label: "Edit site…", onSelect: () => { onClose(); onEdit(); } },
+    "sep",
+    { heading: "Move to" },
+    ...categories.map((c) => ({ label: c.name, dot: DOT[c.color], checked: a.category_id === c.id, onSelect: () => update({ category_id: c.id }, `Moved to ${c.name}`) })),
+    { label: "No category", checked: !a.category_id, onSelect: () => update({ category_id: null }) },
+    "sep",
+    a.status === "paused"
+      ? { label: "Resume (accept mail)", onSelect: () => update({ status: "active" }) }
+      : { label: "Pause (reject mail)", onSelect: () => update({ status: "paused" }) },
+    a.status === "archived"
+      ? { label: "Unarchive", onSelect: () => update({ status: "active" }, "Address restored") }
+      : { label: "Archive", onSelect: () => update({ status: "archived" }, "Address archived") },
+    {
+      label: "Delete…",
+      danger: true,
+      onSelect: () => {
+        if (!confirmAction(`Delete ${a.email} and all its messages? This cannot be undone.`)) return onClose();
+        run(() => del(`/v1/addresses/${a.id}`), "Address deleted");
+        if (location.pathname.includes(a.id)) nav(`/${search}`);
+      },
+    },
+  ];
+
+  // Reste dans la fenêtre, focus sur le premier élément, fermeture sur Échap / clic ailleurs / défilement.
+  useLayoutEffect(() => {
+    const el = ref.current!;
+    const r = el.getBoundingClientRect();
+    setPos({ left: Math.max(4, Math.min(x, innerWidth - r.width - 4)), top: Math.max(4, Math.min(y, innerHeight - r.height - 4)) });
+    el.querySelector<HTMLElement>("[role=menuitem],[role=menuitemradio]")?.focus();
+  }, [x, y]);
+  useEffect(() => {
+    const away = (e: Event) => !ref.current?.contains(e.target as Node) && onClose();
+    const blur = () => onClose();
+    addEventListener("mousedown", away, true);
+    addEventListener("scroll", away, true);
+    addEventListener("resize", blur);
+    addEventListener("blur", blur);
+    return () => {
+      removeEventListener("mousedown", away, true);
+      removeEventListener("scroll", away, true);
+      removeEventListener("resize", blur);
+      removeEventListener("blur", blur);
+    };
+  }, [onClose]);
+  const onKey = (e: React.KeyboardEvent) => {
+    const all = [...ref.current!.querySelectorAll<HTMLElement>("[role=menuitem],[role=menuitemradio]")];
+    const i = all.indexOf(document.activeElement as HTMLElement);
+    if (e.key === "Escape" || e.key === "Tab") { e.preventDefault(); onClose(); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); all[(i + 1) % all.length]?.focus(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); all[(i - 1 + all.length) % all.length]?.focus(); }
+    else if (e.key === "Home") { e.preventDefault(); all[0]?.focus(); }
+    else if (e.key === "End") { e.preventDefault(); all[all.length - 1]?.focus(); }
+  };
+
+  return (
+    <div
+      ref={ref}
+      role="menu"
+      aria-label={`Actions for ${a.site_name}`}
+      onKeyDown={onKey}
+      onContextMenu={(e) => e.preventDefault()}
+      style={pos}
+      className="fixed z-50 max-h-[80dvh] min-w-52 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+    >
+      <p className="truncate px-3 pt-1 pb-1.5 font-mono text-xs text-zinc-500">{a.email}</p>
+      {items.map((it, i) =>
+        it === "sep" ? (
+          <div key={i} role="separator" className="my-1 border-t border-zinc-200 dark:border-zinc-800" />
+        ) : "heading" in it ? (
+          <p key={i} className="px-3 pt-1 pb-0.5 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">{it.heading}</p>
+        ) : (
+          <button
+            key={i}
+            type="button"
+            role={it.checked !== undefined ? "menuitemradio" : "menuitem"}
+            aria-checked={it.checked}
+            tabIndex={-1}
+            onClick={it.onSelect}
+            className={`flex w-full items-center gap-2 px-3 py-1.5 text-left outline-none hover:bg-zinc-100 focus:bg-zinc-100 dark:hover:bg-zinc-800 dark:focus:bg-zinc-800 ${it.danger ? "text-red-600 dark:text-red-400" : ""}`}
+          >
+            {it.dot !== undefined && <span className={`size-2 shrink-0 rounded-full ${it.dot}`} />}
+            {it.checked === undefined && it.dot === undefined ? null : it.dot === undefined && <span className="size-2 shrink-0" />}
+            <span className="flex-1 truncate">{it.label}</span>
+            {it.checked && <span aria-hidden>✓</span>}
+          </button>
+        ),
+      )}
+    </div>
+  );
+}
+
+function AddressRow({ a, active, category, search, onMenu }: { a: Address; active: boolean; category?: Category; search: string; onMenu: (a: Address, x: number, y: number) => void }) {
   const qc = useQueryClient();
   const pin = useMutation({
     mutationFn: () => patch(`/v1/addresses/${a.id}`, { pinned: !a.pinned }),
@@ -213,14 +360,19 @@ function AddressRow({ a, active, category, search }: { a: Address; active: boole
       <Link
         to={`/addresses/${a.id}${search}`}
         aria-current={active ? "page" : undefined}
+        aria-haspopup="menu"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          // Clavier (touche Menu / Maj+F10) : clientX/Y valent 0, on ouvre sous la ligne.
+          const r = e.currentTarget.getBoundingClientRect();
+          onMenu(a, e.clientX || r.left + 48, e.clientY || r.top + r.height / 2);
+        }}
         aria-label={`${a.site_name}, ${a.email}${unread ? `, ${a.unread_count} unread` : ""}`}
         className={`flex gap-3 border-l-2 px-4 py-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-zinc-100 ${
           active ? "border-zinc-900 bg-zinc-100 dark:border-zinc-100 dark:bg-zinc-800/70" : "border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-900"
         }`}
       >
-        <span className={`grid size-9 shrink-0 place-items-center rounded-full text-sm font-semibold uppercase ${AVATAR[category?.color ?? "zinc"]}`} aria-hidden>
-          {a.site_name.trim()[0] ?? "?"}
-        </span>
+        <SiteAvatar a={a} color={category?.color ?? "zinc"} />
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">
             <span className={`truncate text-sm ${unread ? "font-semibold" : "font-medium"}`}>{a.site_name}</span>
@@ -263,6 +415,10 @@ function AddressList({ folder, activeId }: { folder: string; activeId?: string }
   const [domain, setDomain] = useState("");
   const [creating, setCreating] = useState(false);
   const [reviewStale, setReviewStale] = useState(false);
+  const [menu, setMenu] = useState<{ a: Address; x: number; y: number } | null>(null);
+  const [editing, setEditing] = useState<Address | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+  const openMenu = useCallback((a: Address, x: number, y: number) => setMenu({ a, x, y }), []);
   const categories = useCategories();
   const domains = useDomains();
   const stale = useStale(folder === "inbox");
@@ -345,17 +501,19 @@ function AddressList({ folder, activeId }: { folder: string; activeId?: string }
           <>
             <p className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Pinned</p>
             <ul aria-label="Pinned addresses">
-              {pinned.map((a) => <AddressRow key={a.id} a={a} active={a.id === activeId} category={a.category_id ? byId.get(a.category_id) : undefined} search={search} />)}
+              {pinned.map((a) => <AddressRow key={a.id} a={a} active={a.id === activeId} category={a.category_id ? byId.get(a.category_id) : undefined} search={search} onMenu={openMenu} />)}
             </ul>
             {rest.length > 0 && <p className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Others</p>}
           </>
         )}
         <ul aria-label="Addresses">
-          {rest.map((a) => <AddressRow key={a.id} a={a} active={a.id === activeId} category={a.category_id ? byId.get(a.category_id) : undefined} search={search} />)}
+          {rest.map((a) => <AddressRow key={a.id} a={a} active={a.id === activeId} category={a.category_id ? byId.get(a.category_id) : undefined} search={search} onMenu={openMenu} />)}
         </ul>
       </div>
       <NewAddressDialog open={creating} onClose={() => setCreating(false)} defaultCategory={byId.has(folder) ? folder : undefined} />
       <StaleDialog open={reviewStale} onClose={() => setReviewStale(false)} items={stale.data ?? []} />
+      {menu && <AddressMenu a={menu.a} x={menu.x} y={menu.y} categories={categories.data ?? []} onClose={closeMenu} onEdit={() => setEditing(menu.a)} />}
+      {editing && <EditSiteDialog key={editing.id} address={editing} open onClose={() => setEditing(null)} />}
     </section>
   );
 }

@@ -1,3 +1,4 @@
+import { iconHost, iconType, siteIcon } from "./services/icons.js";
 import fs from "node:fs";
 import path from "node:path";
 import { Hono } from "hono";
@@ -93,6 +94,17 @@ export function createApp(deps: Deps) {
   registerReview(api);
   registerCategories(api);
   registerAdmin(api);
+  // Logo d'un site (image, donc hors du routeur JSON)
+  app.get("/v1/icons/:host", async (c) => {
+    if (!c.get("user")) return c.json({ error: { code: "unauthorized", message: "Sign in first" } }, 401);
+    const host = iconHost(c.req.param("host"));
+    const icon = host ? await siteIcon(deps, host) : null;
+    if (!icon) return c.body(null, 404, { "cache-control": "private, max-age=86400" });
+    const type = iconType(icon);
+    // Un SVG peut contenir du script : jamais servi depuis notre origine.
+    if (type === "image/svg+xml") return c.body(null, 404);
+    return c.body(new Uint8Array(icon), 200, { "content-type": type, "cache-control": "private, max-age=604800", "x-content-type-options": "nosniff" });
+  });
   app.all("/v1/*", (c) => c.json({ error: { code: "not_found", message: "Route not found" } }, 404));
 
   // SimpleLogin / addy.io compatible endpoints for the Bitwarden username generator

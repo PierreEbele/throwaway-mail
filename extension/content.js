@@ -150,11 +150,18 @@
       return;
     }
     if (!state?.autoPrompt) return;
-    propose();
-    let t = null;
-    const mo = new MutationObserver(() => { clearTimeout(t); t = setTimeout(() => { propose(); if (proposed) mo.disconnect(); }, 600); });
-    mo.observe(document.documentElement, { childList: true, subtree: true });
-    setTimeout(() => mo.disconnect(), 60_000);
+    // Throttle (pas debounce) : sur les applis web (Discord…) le DOM bouge en continu.
+    // On surveille tant que rien n'est proposé, y compris après un changement d'URL sans rechargement.
+    let t = null, url = location.href;
+    const check = () => {
+      t = null;
+      if (location.href !== url) { url = location.href; if (!host) proposed = false; }
+      propose();
+    };
+    new MutationObserver(() => { if (!proposed && !t) t = setTimeout(check, 700); })
+      .observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["type", "autocomplete"] });
+    setInterval(() => { if (location.href !== url) check(); }, 1000);
+    check();
   }).catch(() => {});
 
   // Le popup peut demander de surveiller le code après un remplissage manuel.

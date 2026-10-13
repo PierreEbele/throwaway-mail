@@ -141,7 +141,7 @@ function MessageView({ id, onGone }: { id: string; onGone: () => void }) {
   );
 }
 
-function EditSiteDialog({ address, open, onClose }: { address: Address; open: boolean; onClose: () => void }) {
+export function EditSiteDialog({ address, open, onClose }: { address: Address; open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
   const [siteName, setSiteName] = useState(address.site_name);
   const [siteUrl, setSiteUrl] = useState(address.site_url ?? "");

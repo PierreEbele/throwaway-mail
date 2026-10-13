@@ -431,3 +431,14 @@ syncControls();
     if (profile?.throwaway && await Throwaway.enabled()) void tmPoll(0);
   } catch { status("Stockage local indisponible. Vous pouvez toujours générer un profil.", true); }
 })();
+
+// Firefox (MV3) n'accorde pas « tous les sites » à l'installation : on le demande (clic requis).
+const ALL_SITES = { origins: ["<all_urls>"] };
+async function checkSitePermission() {
+  const banner = document.getElementById("perm-banner");
+  banner.hidden = await browser.permissions.contains(ALL_SITES);
+  document.getElementById("perm-grant").onclick = async () => {
+    if (await browser.permissions.request(ALL_SITES)) banner.hidden = true;
+  };
+}
+void checkSitePermission();

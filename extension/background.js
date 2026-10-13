@@ -99,3 +99,8 @@ browser.runtime.onMessage.addListener((msg, sender) => {
   }
   return undefined;
 });
+
+// À l'installation / mise à jour : sans accès aux sites, ouvrir les réglages pour le demander.
+browser.runtime.onInstalled.addListener(async () => {
+  if (!await browser.permissions.contains({ origins: ["<all_urls>"] })) browser.runtime.openOptionsPage();
+});

@@ -69,3 +69,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible{ou
 .card-bottom{display:flex;justify-content:space-between;margin-top:10px}
 .card-bottom span{display:block;font-size:10px;color:var(--muted)}
 #tm-link a{color:var(--ink)}
+
+.perm{border:1px solid #f59e0b;background:#fffbeb;color:#78350f;border-radius:10px;padding:10px 12px;margin:0 0 12px;font-size:12px}
+.perm p{margin:0 0 8px}.perm button{width:100%}
+@media (prefers-color-scheme:dark){.perm{background:#422006;color:#fde68a;border-color:#b45309}}
