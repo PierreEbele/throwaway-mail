@@ -191,16 +191,19 @@ $("fill").addEventListener("click", async () => {
   status("Recherche des champs du formulaire…");
   try {
     if (!(await ensureIdentity())) return;
-    if (!(await ensureAlias())) return;
+    const { bitwardenMode } = await browser.storage.local.get("bitwardenMode");
+    if (!bitwardenMode && !(await ensureAlias())) return;
     const tabId = await activeTabId();
     await browser.scripting.executeScript({ target: { tabId }, files: ["filler.js"] });
     const results = await browser.scripting.executeScript({
       target: { tabId },
       func: (data, options) => globalThis.FableFill.fill(data, options),
-      args: [profile, { overwrite: $("overwrite").checked, fields: [...selectedFields] }]
+      args: [profile, { overwrite: $("overwrite").checked, fields: [...selectedFields].filter(k => !bitwardenMode || (k !== "email" && k !== "password")) }]
     });
     const report = results[0]?.result;
     if (!report) throw new Error("NO_RESULT");
+    // Mode Bitwarden : la page attend l'e-mail rempli par Bitwarden, puis le code.
+    if (bitwardenMode) await browser.tabs.sendMessage(tabId, { type: "watch-email" }).catch(() => {});
     if (report.filled && profile.throwaway) void handOffCode(tabId);
     const passwordNote = (report.passwordIssue === "preserved" ? " Mots de passe conservés ensemble pour éviter une confirmation différente." : report.passwordIssue === "constraints" ? " Mot de passe incompatible avec les contraintes du site : aucun des deux champs modifié." : report.passwordIssue === "registration" ? " Mot de passe ignoré : inscription non identifiée." : "") + (report.birthIssue === "preserved" ? " Date de naissance existante conservée ensemble." : report.birthIssue === "constraints" ? " Date de naissance incompatible avec les contraintes du site : ses champs sont conservés." : "");
     if (report.filled) {
@@ -397,6 +400,7 @@ $("tm-settings").addEventListener("click", event => { event.preventDefault(); vo
 syncControls();
 (async () => {
   try {
+    await browser.runtime.sendMessage({ type: "purge" }).catch(() => {});
     const saved = await browser.storage.local.get(["profile", "revision", "countryMode", "selectedFields", "lockedFields", "settingsVersion", "testCard", "cardMode", "cardBankMode", "cardNetworkMode"]);
     if (!cardSettingsTouched) {
       if (saved.cardBankMode === "random" || Object.hasOwn(FableGenerator.banks, saved.cardBankMode)) $("card-bank").value = saved.cardBankMode;

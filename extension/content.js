@@ -81,11 +81,40 @@
         const r = await send({ type: "fill-new" }).catch(err => ({ error: err.message }));
         if (r?.error) return render(`<p>${esc(r.error)}</p><div class="row"><button class="b ghost" data-a="close">Fermer</button></div>`).addEventListener("click", close);
         const n = r?.report?.filled || 0;
+        if (r?.bitwarden) {
+          render(`<p><strong>${esc(r.name)}</strong></p><p>${n} champ${n > 1 ? "s" : ""} rempli${n > 1 ? "s" : ""}. Remplissez maintenant l’e-mail (générateur d’alias) et le mot de passe avec Bitwarden.</p><p class="muted">Le code sera collé dès son arrivée.</p>`)
+            .addEventListener("click", e2 => e2.target.closest("[data-a=close]") && close());
+          return void watchEmail();
+        }
         render(`<p><strong>${esc(r.name)}</strong><br><span class="muted">${esc(r.email)}</span></p><p>${n} champ${n > 1 ? "s" : ""} rempli${n > 1 ? "s" : ""}. Vérifiez puis validez le formulaire vous-même.</p>`)
           .addEventListener("click", e2 => e2.target.closest("[data-a=close]") && close());
         void watchCode();
       }
     });
+  }
+
+  // Mode Bitwarden : attendre que l'e-mail soit rempli, puis vérifier que c'est une de nos adresses.
+  let watchingEmail = false;
+  async function watchEmail() {
+    if (watchingEmail) return;
+    watchingEmail = true;
+    const tried = new Set();
+    try {
+      for (let i = 0; i < 600; i++) { // 10 min
+        await new Promise(res => setTimeout(res, 1000));
+        const values = [...document.querySelectorAll("input")].filter(el => el.type === "email" || /e-?mail|courriel/i.test(`${el.name} ${el.id} ${el.autocomplete} ${el.placeholder}`))
+          .map(el => el.value.trim().toLowerCase()).filter(v => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(v) && !tried.has(v));
+        for (const email of values) {
+          tried.add(email);
+          const r = await send({ type: "adopt-email", email }).catch(() => null);
+          if (r?.ok) {
+            render(`<p>Adresse jetable reconnue : <span class="muted">${esc(r.email)}</span></p><p class="muted">Validez le formulaire ; le code sera collé dès son arrivée.</p>`)
+              .addEventListener("click", e => e.target.closest("[data-a=close]") && close());
+            return void watchCode();
+          }
+        }
+      }
+    } finally { watchingEmail = false; }
   }
 
   // ---------- 2. Attente et collage du code ----------
@@ -165,5 +194,5 @@
   }).catch(() => {});
 
   // Le popup peut demander de surveiller le code après un remplissage manuel.
-  browser.runtime.onMessage.addListener(msg => { if (msg?.type === "watch-code") void watchCode(); });
+  browser.runtime.onMessage.addListener(msg => { if (msg?.type === "watch-code") void watchCode(); if (msg?.type === "watch-email") void watchEmail(); });
 })();

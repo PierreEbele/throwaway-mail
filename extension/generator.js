@@ -131,6 +131,7 @@
       }
     }
     profile.fullName = `${profile.firstName} ${profile.lastName}`;
+    profile.createdAt = Date.now(); // pour l'expiration automatique (background.js)
     return profile;
   }
   root.FableGenerator = { generate, generatePassword, generateBirthDate, validBirthDate, fields, isCountryLocked, generateCard, isTestCard, banks, cardNetworks, bankBins, luhnValid };

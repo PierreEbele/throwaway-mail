@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Fable × Throwaway Mail",
-  "version": "1.9.5",
+  "version": "1.10.0",
   "description": "Fork de Fable 1.7.0 : identités fictives + vraies adresses jetables Throwaway Mail, avec récupération du code de vérification.",
   "permissions": [
+    "alarms",
     "activeTab",
     "scripting",
     "storage"

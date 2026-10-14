@@ -24,7 +24,13 @@ async function formConfig() {
 }
 
 const TOGGLES = { "auto-prompt": "autoPrompt", "auto-code": "autoCode", "always-new": "alwaysNew" };
-const toggles = () => Object.fromEntries(Object.entries(TOGGLES).map(([id, key]) => [key, $(id).checked]));
+const toggles = () => ({ ...Object.fromEntries(Object.entries(TOGGLES).map(([id, key]) => [key, $(id).checked])), bitwardenMode: $("bitwarden-mode").checked, identityTtlHours: Number($("identity-ttl").value) });
+// Désactivés par défaut / 24 h par défaut, contrairement aux autres automatismes.
+for (const id of ["bitwarden-mode", "identity-ttl"]) $(id).addEventListener("change", async () => {
+  await browser.storage.local.set(toggles());
+  await browser.runtime.sendMessage({ type: "purge" }).catch(() => {});
+  status("Automatismes enregistrés.");
+});
 for (const id of Object.keys(TOGGLES)) $(id).addEventListener("change", async () => {
   await browser.storage.local.set(toggles());
   if ($("auto-prompt").checked || $("auto-code").checked) await browser.permissions.request({ origins: ["<all_urls>"] }).catch(() => {});
@@ -60,6 +66,9 @@ $("clear").addEventListener("click", async () => {
 (async () => {
   const flags = await browser.storage.local.get(Object.values(TOGGLES));
   for (const [id, key] of Object.entries(TOGGLES)) $(id).checked = flags[key] !== false;
+  const extra = await browser.storage.local.get(["bitwardenMode", "identityTtlHours"]);
+  $("bitwarden-mode").checked = extra.bitwardenMode === true;
+  $("identity-ttl").value = String(extra.identityTtlHours ?? 24);
   const cfg = await Throwaway.config();
   $("server").value = cfg.server || "https://mail.example.com";
   $("api-key").value = cfg.apiKey;

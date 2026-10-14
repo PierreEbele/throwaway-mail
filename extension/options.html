@@ -16,6 +16,9 @@
       <label class="check"><input type="checkbox" id="auto-prompt"> Proposer « nouvelle identité » sur les formulaires d’inscription</label>
       <label class="check"><input type="checkbox" id="auto-code"> Coller le code dans la page dès qu’il arrive</label>
       <label class="check"><input type="checkbox" id="always-new"> Nouvelle identité pour chaque nouveau site</label>
+      <label class="check"><input type="checkbox" id="bitwarden-mode"> E-mail et mot de passe gérés par Bitwarden <span class="hint">(Fable remplit le reste et colle le code ; Bitwarden génère l’alias et le mot de passe, et les enregistre)</span></label>
+      <label for="identity-ttl">Effacer l’identité Fable après</label>
+      <select id="identity-ttl"><option value="1">1 heure</option><option value="24">24 heures</option><option value="168">7 jours</option><option value="720">30 jours</option><option value="0">Jamais</option></select>
     </fieldset>
     <div class="actions"><button id="test" class="ghost" type="button">Tester la connexion</button><button class="primary" type="submit">Enregistrer</button></div>
     <button id="clear" class="link" type="button">Désactiver (effacer la clé)</button>

@@ -5,10 +5,27 @@
 // pour survivre aux changements de page entre l'inscription et la saisie du code.
 
 const PENDING_MS = 15 * 60_000;
+const DEFAULT_TTL_HOURS = 24;
+
+// Les identités Fable se périment : passé le délai (réglages, 24 h par défaut, 0 = jamais),
+// l'identité courante (nom, mot de passe…) est effacée du stockage. L'adresse jetable reste sur le serveur.
+async function purgeExpired() {
+  const { profile, identityTtlHours = DEFAULT_TTL_HOURS, tmPending = {} } = await browser.storage.local.get(["profile", "identityTtlHours", "tmPending"]);
+  const now = Date.now();
+  if (profile && !profile.createdAt) await browser.storage.local.set({ profile: { ...profile, createdAt: now } });
+  else if (profile && identityTtlHours > 0 && now - profile.createdAt > identityTtlHours * 3600_000) await browser.storage.local.remove(["profile"]);
+  const live = Object.fromEntries(Object.entries(tmPending).filter(([, p]) => p.until > now));
+  if (Object.keys(live).length !== Object.keys(tmPending).length) await browser.storage.local.set({ tmPending: live });
+}
+browser.alarms.create("purge", { periodInMinutes: 30 });
+browser.alarms.onAlarm.addListener(a => { if (a.name === "purge") void purgeExpired(); });
+browser.runtime.onStartup.addListener(() => void purgeExpired());
 
 async function settings() {
-  const s = await browser.storage.local.get(["autoPrompt", "autoCode", "alwaysNew", "selectedFields", "lockedFields", "countryMode", "profile"]);
+  await purgeExpired();
+  const s = await browser.storage.local.get(["autoPrompt", "autoCode", "alwaysNew", "bitwardenMode", "selectedFields", "lockedFields", "countryMode", "profile"]);
   return {
+    bitwardenMode: s.bitwardenMode === true,
     autoPrompt: s.autoPrompt !== false,
     autoCode: s.autoCode !== false,
     alwaysNew: s.alwaysNew !== false,
@@ -43,10 +60,13 @@ async function clearPending(host) {
 async function fillNewIdentity(tabId, pageUrl) {
   const s = await settings();
   const host = new URL(pageUrl).hostname;
-  const keepPrevious = s.profile && (!s.alwaysNew || s.profile.throwaway?.host === host);
+  // Mode Bitwarden : l'e-mail et le mot de passe sont laissés à Bitwarden (qui les enregistre).
+  const fields = s.bitwardenMode ? s.selectedFields.filter(k => k !== "email" && k !== "password") : s.selectedFields;
+  const keepPrevious = s.profile && (!s.alwaysNew || s.profile.throwaway?.host === host || (s.bitwardenMode && s.profile.site === host));
   let profile = keepPrevious ? s.profile : FableGenerator.generate(s.countryMode, s.profile, s.lockedFields);
   if (!keepPrevious && s.lockedFields.includes("email") && s.profile?.throwaway) profile.throwaway = s.profile.throwaway;
-  if (s.selectedFields.includes("email") && await Throwaway.enabled() && profile.throwaway?.host !== host) {
+  profile = { ...profile, site: host };
+  if (!s.bitwardenMode && s.selectedFields.includes("email") && await Throwaway.enabled() && profile.throwaway?.host !== host) {
     const alias = await Throwaway.createAddress(pageUrl, profile.fullName);
     profile = { ...profile, email: alias.email, throwaway: alias };
   }
@@ -56,8 +76,9 @@ async function fillNewIdentity(tabId, pageUrl) {
   const [res] = await browser.scripting.executeScript({
     target: { tabId },
     func: (data, options) => globalThis.FableFill.fill(data, options),
-    args: [profile, { overwrite: true, fields: s.selectedFields }]
+    args: [profile, { overwrite: true, fields }]
   });
+  if (s.bitwardenMode) return { report: res?.result || null, name: profile.fullName, bitwarden: true };
   if (profile.throwaway?.host === host && s.autoCode) await setPending(host, profile.throwaway);
   return { report: res?.result || null, email: profile.email, name: profile.fullName };
 }
@@ -87,6 +108,21 @@ browser.runtime.onMessage.addListener((msg, sender) => {
           return { waiting: true };
         } catch (e) { return { error: e.message }; }
       })();
+    case "adopt-email":
+      // Mode Bitwarden : l'adresse tapée/remplie dans la page est-elle une de nos adresses jetables ?
+      return (async () => {
+        const email = String(msg.email || "").trim().toLowerCase();
+        if (!host || !/^[^@\s]+@[^@\s]+$/.test(email) || !await Throwaway.enabled()) return { ok: false };
+        try {
+          const data = await Throwaway.request(`/v1/addresses?q=${encodeURIComponent(email)}`);
+          const a = (data.addresses || []).find(x => x.email.toLowerCase() === email);
+          if (!a) return { ok: false };
+          if ((await settings()).autoCode) await setPending(host, { id: a.id, email: a.email, createdAt: a.created_at });
+          return { ok: true, email: a.email };
+        } catch { return { ok: false }; }
+      })();
+    case "purge":
+      return purgeExpired();
     case "pending-set":
       return msg.host && msg.alias ? setPending(msg.host, msg.alias) : undefined;
     case "pending-clear":
