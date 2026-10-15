@@ -78,6 +78,7 @@ export const categories = sqliteTable(
     name: text("name").notNull(),
     color: text("color").notNull().default("zinc"),
     pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+    hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
     position: integer("position").notNull().default(0),
     createdAt: integer("created_at").notNull(),
   },

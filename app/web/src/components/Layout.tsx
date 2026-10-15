@@ -1,10 +1,11 @@
-import { useState, type ReactNode } from "react";
+import { useState, type DragEvent, type ReactNode } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { post } from "../api";
+import { patch, post } from "../api";
+import { useToast } from "./ui";
 import { useAuth } from "../auth";
 import { useReviewCount } from "../pages/Review";
-import { CategoryDialog, DOT, PinIcon, folderHref, useCategories } from "../pages/Mailbox";
+import { ADDRESS_DRAG_TYPE, CategoryDialog, DOT, PinIcon, folderHref, useCategories } from "../pages/Mailbox";
 import type { Category } from "../types";
 
 function ThemeToggle() {
@@ -50,10 +51,39 @@ const ICONS = {
   log: "M6 3h9l4 4v14H6zM9 12h7M9 16h7",
 };
 
-function Folder({ to, active, icon, label, count, pinned, children }: { to: string; active: boolean; icon?: ReactNode; label: string; count?: number; pinned?: boolean; children?: ReactNode }) {
+function EyeIcon({ off }: { off?: boolean }) {
   return (
-    <div className="group/f relative">
-      <Link to={to} className={itemCls(active)} aria-current={active ? "page" : undefined}>
+    <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+      {off && <path d="M3 3l18 18" />}
+    </svg>
+  );
+}
+
+function Folder({
+  to, active, icon, label, count, pinned, dimmed, onDropAddress, children,
+}: { to: string; active: boolean; icon?: ReactNode; label: string; count?: number; pinned?: boolean; dimmed?: boolean; onDropAddress?: (id: string) => void; children?: ReactNode }) {
+  const [over, setOver] = useState(false);
+  const accepts = (e: DragEvent) => !!onDropAddress && e.dataTransfer.types.includes(ADDRESS_DRAG_TYPE);
+  return (
+    <div
+      className={`group/f relative rounded-md ${over ? "ring-2 ring-zinc-900 dark:ring-zinc-100" : ""}`}
+      onDragOver={(e) => {
+        if (!accepts(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        setOver(true);
+      }}
+      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setOver(false)}
+      onDrop={(e) => {
+        setOver(false);
+        if (!accepts(e)) return;
+        e.preventDefault();
+        onDropAddress!(e.dataTransfer.getData(ADDRESS_DRAG_TYPE));
+      }}
+    >
+      <Link to={to} className={`${itemCls(active)} ${dimmed ? "opacity-50" : ""}`} aria-current={active ? "page" : undefined}>
         {icon}
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {pinned && <span className="text-zinc-400" title="Pinned"><PinIcon filled className="size-3" /></span>}
@@ -72,6 +102,19 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const qc = useQueryClient();
   const nav = useNavigate();
   const [editing, setEditing] = useState<Category | null | undefined>(undefined);
+  const toast = useToast();
+  const refreshLists = () => {
+    qc.invalidateQueries({ queryKey: ["addresses"] });
+    qc.invalidateQueries({ queryKey: ["address"] });
+    qc.invalidateQueries({ queryKey: ["categories"] });
+  };
+  const moveTo = (cat: Category | null) => (id: string) =>
+    patch(`/v1/addresses/${id}`, { category_id: cat?.id ?? null }).then(
+      () => { refreshLists(); toast(cat ? `Moved to ${cat.name}` : "Removed from its category", "success"); },
+      (e: Error) => toast(e.message, "error"),
+    );
+  const toggleHidden = (c: Category) =>
+    patch(`/v1/categories/${c.id}`, { hidden: !c.hidden }).then(refreshLists, (e: Error) => toast(e.message, "error"));
   const mailbox = loc.pathname === "/" || loc.pathname.startsWith("/addresses/");
   const folder = new URLSearchParams(loc.search).get("folder") ?? "inbox";
   const isFolder = (f: string) => mailbox && folder === f;
@@ -115,7 +158,18 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             label={c.name}
             count={c.address_count}
             pinned={c.pinned}
+            dimmed={c.hidden}
+            onDropAddress={moveTo(c)}
           >
+            <button
+              className={`absolute top-1 right-7 rounded px-1 py-0.5 text-zinc-500 hover:bg-zinc-300/60 focus-visible:opacity-100 dark:hover:bg-zinc-700 ${c.hidden ? "opacity-100 group-hover/f:opacity-100" : "opacity-0 group-hover/f:opacity-100"}`}
+              onClick={() => toggleHidden(c)}
+              aria-pressed={c.hidden}
+              aria-label={c.hidden ? `Show ${c.name} in the Inbox` : `Hide ${c.name} from the Inbox`}
+              title={c.hidden ? "Hidden from the Inbox — click to show" : "Hide from the Inbox"}
+            >
+              <EyeIcon off={c.hidden} />
+            </button>
             <button
               className="absolute top-1 right-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 opacity-0 group-hover/f:opacity-100 hover:bg-zinc-300/60 focus-visible:opacity-100 dark:hover:bg-zinc-700"
               onClick={() => setEditing(c)}
@@ -125,7 +179,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             </button>
           </Folder>
         ))}
-        <Folder to={folderHref("none")} active={isFolder("none")} icon={<Icon d={ICONS.none} />} label="No category" />
+        <Folder to={folderHref("none")} active={isFolder("none")} icon={<Icon d={ICONS.none} />} label="No category" onDropAddress={moveTo(null)} />
         {cats.length === 0 && (
           <button className="px-2.5 py-1 text-left text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" onClick={() => setEditing(null)}>
             Group addresses: create a category

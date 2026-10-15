@@ -9,7 +9,7 @@ export interface Address {
   unread_count: number; message_count: number; category_id: string | null; pinned: boolean;
 }
 export type CategoryColor = "zinc" | "red" | "orange" | "amber" | "green" | "teal" | "blue" | "indigo" | "violet" | "pink";
-export interface Category { id: string; name: string; color: CategoryColor; pinned: boolean; position: number; created_at: number; address_count: number }
+export interface Category { id: string; name: string; color: CategoryColor; pinned: boolean; hidden: boolean; position: number; created_at: number; address_count: number }
 export interface MessageSummary {
   id: string; address_id: string; from: string | null; from_name: string | null; subject: string | null;
   received_at: number; read_at: number | null; archived_at: number | null; forwarded: boolean; preview: string; code: string | null; has_links: boolean;

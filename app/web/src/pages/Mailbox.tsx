@@ -24,6 +24,9 @@ const AVATAR: Record<CategoryColor, string> = {
   violet: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300", pink: "bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300",
 };
 
+/** MIME type used when dragging an address row onto a sidebar category. */
+export const ADDRESS_DRAG_TYPE = "application/x-throwaway-address";
+
 export function useCategories(enabled = true) {
   return useQuery({ queryKey: ["categories"], enabled, queryFn: () => get<{ categories: Category[] }>("/v1/categories").then((r) => r.categories) });
 }
@@ -56,12 +59,14 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
   const toast = useToast();
   const [name, setName] = useState("");
   const [color, setColor] = useState<CategoryColor>("zinc");
+  const [hidden, setHidden] = useState(false);
   const [pinned, setPinned] = useState(false);
   useEffect(() => {
     if (open) {
       setName(category?.name ?? "");
       setColor(category?.color ?? "blue");
       setPinned(category?.pinned ?? false);
+      setHidden(category?.hidden ?? false);
     }
   }, [open, category]);
   const done = () => {
@@ -70,7 +75,7 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
     onClose();
   };
   const save = useMutation({
-    mutationFn: () => (category ? patch(`/v1/categories/${category.id}`, { name, color, pinned }) : post("/v1/categories", { name, color, pinned })),
+    mutationFn: () => (category ? patch(`/v1/categories/${category.id}`, { name, color, pinned, hidden }) : post("/v1/categories", { name, color, pinned })),
     onSuccess: done,
   });
   const remove = useMutation({
@@ -112,6 +117,11 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} /> Pin to the top of the sidebar
         </label>
+        {category && (
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} /> Hide its addresses from the Inbox
+          </label>
+        )}
         <ErrorText error={save.error ?? remove.error} />
         <div className="flex items-center justify-between gap-2">
           {category ? (
@@ -361,6 +371,12 @@ function AddressRow({ a, active, category, search, onMenu }: { a: Address; activ
         to={`/addresses/${a.id}${search}`}
         aria-current={active ? "page" : undefined}
         aria-haspopup="menu"
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData(ADDRESS_DRAG_TYPE, a.id);
+          e.dataTransfer.setData("text/plain", a.email);
+          e.dataTransfer.effectAllowed = "move";
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
           // Clavier (touche Menu / Maj+F10) : clientX/Y valent 0, on ouvre sous la ligne.
@@ -432,7 +448,8 @@ function AddressList({ folder, activeId }: { folder: string; activeId?: string }
     if (domain) p.set("domain", domain);
     if (folder === "archived") p.set("status", "archived");
     else if (folder === "pinned") p.set("pinned", "true");
-    else if (folder !== "inbox") p.set("category", folder);
+    else if (folder === "inbox") p.set("hide_hidden", "true");
+    else p.set("category", folder);
     return p.toString();
   }, [debounced, domain, folder]);
   const list = useQuery({ queryKey: ["addresses", params], queryFn: () => get<{ addresses: Address[] }>(`/v1/addresses?${params}`).then((r) => r.addresses) });

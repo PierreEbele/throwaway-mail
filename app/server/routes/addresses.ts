@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Ctx, ApiRouter } from "../lib/http.js";
 import { parseTimestamp } from "../lib/http.js";
 import type { Deps } from "../context.js";
-import { addresses, destinations, domains, extractedItems, messages, type Address, type User } from "../db/schema.js";
+import { addresses, categories, destinations, domains, extractedItems, messages, type Address, type User } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
 import { LOCAL_PART_RE } from "../lib/email.js";
 import { readableLocalPart } from "../lib/words.js";
@@ -170,6 +170,7 @@ export function registerAddresses(r: ApiRouter) {
         q: z.string().optional(),
         category: z.string().optional().describe("Category id, or `none` for uncategorised addresses"),
         pinned: z.enum(["true", "false"]).optional(),
+        hide_hidden: z.enum(["true", "false"]).optional().describe("Exclude addresses whose category is hidden (used by the Inbox)"),
         limit: z.coerce.number().int().min(1).max(1000).default(500),
         offset: z.coerce.number().int().min(0).default(0),
       }),
@@ -184,6 +185,9 @@ export function registerAddresses(r: ApiRouter) {
       if (query.category === "none") conds.push(isNull(addresses.categoryId));
       else if (query.category) conds.push(eq(addresses.categoryId, query.category));
       if (query.pinned) conds.push(eq(addresses.pinned, query.pinned === "true"));
+      if (query.hide_hidden === "true") {
+        conds.push(sql`(${addresses.categoryId} is null or not exists (select 1 from ${categories} where ${categories.id} = ${addresses.categoryId} and ${categories.hidden} = 1))`);
+      }
       if (query.site) {
         const s = `%${query.site.toLowerCase()}%`;
         conds.push(or(like(sql`lower(${addresses.siteName})`, s), like(sql`lower(coalesce(${addresses.siteUrl}, ''))`, s))!);

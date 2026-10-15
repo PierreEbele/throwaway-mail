@@ -44,6 +44,19 @@ describe("categories and pins", () => {
     expect((await user.patch(`/v1/addresses/${a.id}`, { category_id: cat.id })).status).toBe(400);
   });
 
+  it("hides addresses of hidden categories from the inbox only", async () => {
+    const { user, mk } = await setup();
+    const cat = (await user.post("/v1/categories", { name: "Noise" })).json.category;
+    expect(cat.hidden).toBe(false);
+    const a = await mk("Spammy");
+    await mk("Loose");
+    await user.patch(`/v1/addresses/${a.id}`, { category_id: cat.id });
+    expect((await user.patch(`/v1/categories/${cat.id}`, { hidden: true })).json.category.hidden).toBe(true);
+    expect((await user.get("/v1/addresses?hide_hidden=true")).json.addresses.map((x: any) => x.site_name)).toEqual(["Loose"]);
+    expect((await user.get("/v1/addresses")).json.addresses).toHaveLength(2);
+    expect((await user.get(`/v1/addresses?category=${cat.id}&hide_hidden=false`)).json.addresses).toHaveLength(1);
+  });
+
   it("lists pinned addresses first", async () => {
     const { user, mk } = await setup();
     const first = await mk("Old");

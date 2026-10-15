@@ -14,6 +14,7 @@ const categoryOut = (c: Category, count = 0) => ({
   name: c.name,
   color: c.color,
   pinned: c.pinned,
+  hidden: c.hidden,
   position: c.position,
   created_at: c.createdAt,
   address_count: count,
@@ -78,10 +79,10 @@ export function registerCategories(r: ApiRouter) {
     {
       method: "patch",
       path: "/v1/categories/:id",
-      summary: "Rename, recolour, pin or reorder a category",
+      summary: "Rename, recolour, pin, hide or reorder a category",
       tags: ["categories"],
       auth: "user",
-      body: z.object({ name: Name.optional(), color: Color.optional(), pinned: z.boolean().optional(), position: z.number().int().min(0).max(10_000).optional() }),
+      body: z.object({ name: Name.optional(), color: Color.optional(), pinned: z.boolean().optional(), hidden: z.boolean().optional(), position: z.number().int().min(0).max(10_000).optional() }),
     },
     (c, { body }) => {
       const d = c.get("deps");
@@ -94,6 +95,7 @@ export function registerCategories(r: ApiRouter) {
       if (body.name !== undefined) set.name = body.name;
       if (body.color !== undefined) set.color = body.color;
       if (body.pinned !== undefined) set.pinned = body.pinned;
+      if (body.hidden !== undefined) set.hidden = body.hidden;
       if (body.position !== undefined) set.position = body.position;
       if (Object.keys(set).length) d.db.update(categories).set(set).where(eq(categories.id, cat.id)).run();
       d.bus.publish(user.id, { type: "category.changed" });
