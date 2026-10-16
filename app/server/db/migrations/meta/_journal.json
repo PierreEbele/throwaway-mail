@@ -36,6 +36,13 @@
       "when": 1793728232099,
       "tag": "0004_category_hidden",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793728435985,
+      "tag": "0005_features_batch",
+      "breakpoints": true
     }
   ]
 }

@@ -11,6 +11,7 @@ import { MailboxPage } from "./pages/Mailbox";
 import { AccountPage, DestinationsPage, KeysPage } from "./pages/Settings";
 import { AuditPage, DomainsPage, UsersPage } from "./pages/Admin";
 import { ReviewPage } from "./pages/Review";
+import { DigestPage } from "./pages/Digest";
 import { ApiError } from "./api";
 
 const qc = new QueryClient({
@@ -42,6 +43,7 @@ function App() {
       <Route path="/" element={<Protected bare><MailboxPage /></Protected>} />
       <Route path="/addresses/:id" element={<Protected bare><MailboxPage /></Protected>} />
       <Route path="/review" element={<Protected><ReviewPage /></Protected>} />
+      <Route path="/digest" element={<Protected><DigestPage /></Protected>} />
       <Route path="/destinations" element={<Protected><DestinationsPage /></Protected>} />
       <Route path="/keys" element={<Protected><KeysPage /></Protected>} />
       <Route path="/account" element={<Protected><AccountPage /></Protected>} />

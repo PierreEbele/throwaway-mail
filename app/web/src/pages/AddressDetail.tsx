@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, patch, post } from "../api";
-import type { Address, CodeResult, MessageFull, MessageSummary } from "../types";
+import type { Address, AddressStats, CodeResult, MessageFull, MessageSummary } from "../types";
 import { Badge, CopyButton, EmptyState, ErrorText, Modal, Spinner, Toggle, confirmAction, useToast } from "../components/ui";
 import { useDestinations } from "./Addresses";
 import { fullDate, hostOf, timeAgo } from "../util";
@@ -192,6 +192,119 @@ export function EditSiteDialog({ address, open, onClose }: { address: Address; o
   );
 }
 
+function useSenderAction(id: string) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  return useMutation({
+    mutationFn: (b: { action: string; sender?: string }) => post<{ address: Address }>(`/v1/addresses/${id}/senders`, b),
+    onSuccess: (r) => {
+      qc.setQueryData(["address", id], r.address);
+      qc.invalidateQueries({ queryKey: ["addresses"] });
+      qc.invalidateQueries({ queryKey: ["digest"] });
+    },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+}
+
+function LeakBanner({ a, onPause }: { a: Address; onPause: () => void }) {
+  const act = useSenderAction(a.id);
+  const btn = "rounded border border-red-300 px-2 py-0.5 hover:bg-red-100 dark:border-red-800 dark:hover:bg-red-900/50";
+  return (
+    <div role="alert" className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+      <p>
+        <strong>Possible leak.</strong> {timeAgo(a.leak!.at)}, this address received mail from <code className="font-mono">{a.leak!.sender}</code>, which is not{" "}
+        {hostOf(a.site_url)}. The site may have sold or leaked it.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+        <button className={btn} onClick={() => act.mutate({ action: "block" })}>Block this sender</button>
+        {a.status === "active" && <button className={btn} onClick={onPause}>Burn the address (reject all mail)</button>}
+        <button className={btn} onClick={() => act.mutate({ action: "trust" })}>It's legit, trust this sender</button>
+        <button className={btn} onClick={() => act.mutate({ action: "dismiss" })}>Dismiss</button>
+      </div>
+    </div>
+  );
+}
+
+function SendersCard({ a }: { a: Address }) {
+  const act = useSenderAction(a.id);
+  const [value, setValue] = useState("");
+  const chip = (d: string, undo: string, cls: string) => (
+    <span key={d} className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-xs ${cls}`}>
+      {d}
+      <button aria-label={`Remove ${d}`} className="opacity-60 hover:opacity-100" onClick={() => act.mutate({ action: undo, sender: d })}>×</button>
+    </span>
+  );
+  return (
+    <section className="card space-y-3 p-5" aria-labelledby="senders">
+      <h2 id="senders" className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">Senders</h2>
+      <form
+        className="flex gap-2"
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          if (value.trim()) act.mutate({ action: "block", sender: value.trim() }, { onSuccess: () => setValue("") });
+        }}
+      >
+        <label className="sr-only" htmlFor="block-sender">Block a sender domain</label>
+        <input id="block-sender" className="input py-1" placeholder="spammer.com or someone@spammer.com" value={value} onChange={(e) => setValue(e.target.value)} />
+        <button className="btn-secondary shrink-0">Block</button>
+      </form>
+      <div className="text-sm">
+        <p className="text-xs text-zinc-500">Blocked (mail rejected)</p>
+        <div className="mt-1 flex flex-wrap gap-1">
+          {a.blocked_senders.length ? a.blocked_senders.map((d) => chip(d, "unblock", "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200")) : <span className="text-xs text-zinc-500">None</span>}
+        </div>
+      </div>
+      {a.trusted_senders.length > 0 && (
+        <div className="text-sm">
+          <p className="text-xs text-zinc-500">Trusted (no leak warning)</p>
+          <div className="mt-1 flex flex-wrap gap-1">{a.trusted_senders.map((d) => chip(d, "untrust", "bg-zinc-100 dark:bg-zinc-800"))}</div>
+        </div>
+      )}
+      <ErrorText error={act.error} />
+    </section>
+  );
+}
+
+function StatsCard({ id }: { id: string }) {
+  const stats = useQuery({ queryKey: ["stats", id], queryFn: () => get<AddressStats>(`/v1/addresses/${id}/stats`) });
+  const s = stats.data;
+  const max = Math.max(1, ...(s?.per_week ?? []));
+  return (
+    <section className="card space-y-3 p-5" aria-labelledby="stats">
+      <h2 id="stats" className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">Activity</h2>
+      {!s ? (
+        <Spinner />
+      ) : (
+        <>
+          <dl className="grid grid-cols-3 gap-2 text-sm">
+            <div><dt className="text-xs text-zinc-500">Mails</dt><dd className="text-lg font-semibold tabular-nums">{s.total}</dd></div>
+            <div><dt className="text-xs text-zinc-500">With a code</dt><dd className="text-lg font-semibold tabular-nums">{s.with_code}</dd></div>
+            <div><dt className="text-xs text-zinc-500">Last mail</dt><dd className="text-lg font-semibold">{s.last_at ? timeAgo(s.last_at) : "—"}</dd></div>
+          </dl>
+          <div>
+            <p className="text-xs text-zinc-500">Mails per week (last 12 weeks)</p>
+            <div className="mt-1 flex h-12 items-end gap-1" role="img" aria-label={`Mails per week: ${s.per_week.join(", ")}`}>
+              {s.per_week.map((n, i) => (
+                <div key={i} className="flex-1 rounded-sm bg-zinc-300 dark:bg-zinc-700" style={{ height: `${Math.max(n ? 8 : 2, (n / max) * 100)}%` }} title={`${n} mail(s)`} />
+              ))}
+            </div>
+          </div>
+          {s.top_senders.length > 0 && (
+            <div>
+              <p className="text-xs text-zinc-500">Top senders</p>
+              <ul className="mt-1 space-y-0.5 text-sm">
+                {s.top_senders.map((t) => (
+                  <li key={t.domain} className="flex justify-between gap-2"><span className="truncate font-mono text-xs">{t.domain}</span><span className="tabular-nums text-zinc-500">{t.count}</span></li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export function AddressDetailPage() {
   const { id = "" } = useParams();
   const qc = useQueryClient();
@@ -310,6 +423,7 @@ export function AddressDetailPage() {
           </div>
         </div>
         {a.status !== "active" && <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">This address is {a.status}: new mail is rejected.</p>}
+        {a.leak && <LeakBanner a={a} onPause={() => update.mutate({ status: "paused" })} />}
       </div>
 
       <div className="grid gap-4 2xl:grid-cols-3">
@@ -383,6 +497,11 @@ export function AddressDetailPage() {
             <dt>Expires</dt><dd>{a.expires_at ? fullDate(a.expires_at) : "never"}</dd>
           </dl>
         </section>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <StatsCard id={a.id} />
+        <SendersCard a={a} />
       </div>
 
       <section aria-labelledby="inbox" className="grid gap-4 xl:grid-cols-5">

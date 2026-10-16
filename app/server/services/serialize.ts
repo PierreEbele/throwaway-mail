@@ -1,3 +1,4 @@
+import { parseList } from "../lib/senders.js";
 import type { Address, Destination, Domain, ExtractedItem, Message, User } from "../db/schema.js";
 
 export function userOut(u: User) {
@@ -44,6 +45,9 @@ export function addressOut(a: Address, domainName: string, counts?: { unread: nu
     last_message_at: a.lastMessageAt,
     category_id: a.categoryId,
     pinned: a.pinned,
+    blocked_senders: parseList(a.blockedSendersJson),
+    trusted_senders: parseList(a.trustedSendersJson),
+    leak: a.leakSender ? { sender: a.leakSender, at: a.leakAt } : null,
     unread_count: counts?.unread ?? 0,
     message_count: counts?.total ?? 0,
   };

@@ -7,9 +7,10 @@ export interface Address {
   forward_enabled: boolean; destination_id: string | null; status: AddressStatus; is_unassigned: boolean;
   expires_at: number | null; created_at: number; updated_at: number; last_message_at: number | null;
   unread_count: number; message_count: number; category_id: string | null; pinned: boolean;
+  blocked_senders: string[]; trusted_senders: string[]; leak: { sender: string; at: number } | null;
 }
 export type CategoryColor = "zinc" | "red" | "orange" | "amber" | "green" | "teal" | "blue" | "indigo" | "violet" | "pink";
-export interface Category { id: string; name: string; color: CategoryColor; pinned: boolean; hidden: boolean; position: number; created_at: number; address_count: number }
+export interface Category { id: string; name: string; color: CategoryColor; pinned: boolean; hidden: boolean; auto_match: string | null; retention_days: number | null; position: number; created_at: number; address_count: number; unread_count: number }
 export interface MessageSummary {
   id: string; address_id: string; from: string | null; from_name: string | null; subject: string | null;
   received_at: number; read_at: number | null; archived_at: number | null; forwarded: boolean; preview: string; code: string | null; has_links: boolean;
@@ -36,3 +37,11 @@ export interface Domain {
 export interface Destination { id: string; email: string; verified: boolean; verified_at: number | null; last_error: string | null; created_at: number }
 export interface ApiKey { id: string; name: string; prefix: string; created_at: number; last_used_at: number | null; revoked_at: number | null }
 export interface AuditEntry { id: string; user_id: string | null; action: string; target: string | null; meta: unknown; ip: string | null; created_at: number }
+export interface AddressStats {
+  total: number; unread: number; with_code: number; first_at: number | null; last_at: number | null;
+  per_week: number[]; top_senders: Array<{ domain: string; count: number }>;
+}
+export interface Digest {
+  days: number; since: number; received: number; created: Address[]; leaks: Address[]; silent: Address[];
+  busiest: Array<{ address: Address; count: number }>;
+}

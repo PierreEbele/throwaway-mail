@@ -165,6 +165,83 @@ export function AccountPage() {
           refreshed at every sign-in.
         </p>
       </div>
+      <NotificationsCard />
+      <BackupCard />
     </>
+  );
+}
+
+export const NOTIFY_KEY = "notify-new-mail";
+
+function NotificationsCard() {
+  const supported = typeof Notification !== "undefined";
+  const [on, setOn] = useState(supported && localStorage.getItem(NOTIFY_KEY) === "1" && Notification.permission === "granted");
+  const toggle = async () => {
+    if (on) {
+      localStorage.removeItem(NOTIFY_KEY);
+      setOn(false);
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm === "granted") {
+      localStorage.setItem(NOTIFY_KEY, "1");
+      setOn(true);
+    }
+  };
+  return (
+    <div className="card mt-4 max-w-xl space-y-2 p-5 text-sm">
+      <h2 className="font-semibold">Desktop notifications</h2>
+      {supported ? (
+        <>
+          <p className="text-zinc-500">
+            Get a system notification when a mail arrives while this app is open in a tab (even in the background). Mails with a verification code show the code; click the
+            notification to copy it.
+          </p>
+          <button className={on ? "btn-secondary" : "btn-primary"} onClick={toggle}>{on ? "Turn off" : "Turn on"}</button>
+          {Notification.permission === "denied" && <p className="text-amber-700 dark:text-amber-400">Notifications are blocked for this site in your browser settings.</p>}
+        </>
+      ) : (
+        <p className="text-zinc-500">This browser does not support notifications.</p>
+      )}
+    </div>
+  );
+}
+
+function BackupCard() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [result, setResult] = useState<string | null>(null);
+  const importFile = async (file: File) => {
+    try {
+      const data = JSON.parse(await file.text());
+      const r = await post<{ categories_created: number; addresses_created: number; skipped: Array<{ email: string; reason: string }> }>("/v1/import", {
+        categories: data.categories ?? [],
+        addresses: data.addresses ?? [],
+      });
+      qc.invalidateQueries();
+      setResult(
+        `${r.addresses_created} address(es) and ${r.categories_created} categor${r.categories_created === 1 ? "y" : "ies"} imported` +
+          (r.skipped.length ? `, ${r.skipped.length} skipped (${[...new Set(r.skipped.map((x) => x.reason))].join(", ")})` : ""),
+      );
+    } catch (e) {
+      toast((e as Error).message, "error");
+    }
+  };
+  return (
+    <div className="card mt-4 max-w-xl space-y-2 p-5 text-sm">
+      <h2 className="font-semibold">Export / import</h2>
+      <p className="text-zinc-500">
+        Download your addresses and categories as JSON (mails are not included), or import such a file. Addresses must be on a domain configured here; existing ones are
+        skipped.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <a className="btn-secondary" href="/v1/export" download>Export JSON</a>
+        <label className="btn-secondary cursor-pointer">
+          Import JSON…
+          <input type="file" accept="application/json,.json" className="sr-only" onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0]).finally(() => (e.target.value = ""))} />
+        </label>
+      </div>
+      {result && <p role="status">{result}</p>}
+    </div>
   );
 }

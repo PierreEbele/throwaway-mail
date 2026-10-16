@@ -9,7 +9,7 @@ import { LOCAL_PART_RE } from "../lib/email.js";
 import { readableLocalPart } from "../lib/words.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { addressOut, itemsOut, messageOut, messageSummaryOut } from "../services/serialize.js";
-import { checkCategory } from "./categories.js";
+import { checkCategory, matchCategory } from "./categories.js";
 
 const SiteUrl = z
   .string()
@@ -108,7 +108,7 @@ export function createAddress(d: Deps, user: User, body: NewAddress): { a: Addre
       label: body.label ?? null,
       forwardEnabled: body.forward ?? false,
       destinationId: body.destination_id ?? null,
-      categoryId: body.category_id ?? null,
+      categoryId: body.category_id === undefined ? matchCategory(d, user.id, body.site_name, body.site_url ?? null) : body.category_id,
       expiresAt,
       createdAt: now,
       updatedAt: now,
@@ -200,6 +200,8 @@ export function registerAddresses(r: ApiRouter) {
             like(sql`lower(${addresses.siteName})`, s),
             like(sql`lower(coalesce(${addresses.siteUrl}, ''))`, s),
             like(sql`lower(coalesce(${addresses.label}, ''))`, s),
+            // Full-text-ish: the address also matches when one of its mails does.
+            sql`exists (select 1 from ${messages} where ${messages.addressId} = ${addresses.id} and (lower(coalesce(${messages.subject}, '')) like ${s} or lower(coalesce(${messages.text}, '')) like ${s} or lower(coalesce(${messages.fromAddr}, '')) like ${s}))`,
           )!,
         );
       }

@@ -26,6 +26,8 @@ const AVATAR: Record<CategoryColor, string> = {
 
 /** MIME type used when dragging an address row onto a sidebar category. */
 export const ADDRESS_DRAG_TYPE = "application/x-throwaway-address";
+/** MIME type used when dragging a category to reorder the sidebar. */
+export const CATEGORY_DRAG_TYPE = "application/x-throwaway-category";
 
 export function useCategories(enabled = true) {
   return useQuery({ queryKey: ["categories"], enabled, queryFn: () => get<{ categories: Category[] }>("/v1/categories").then((r) => r.categories) });
@@ -60,6 +62,8 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
   const [name, setName] = useState("");
   const [color, setColor] = useState<CategoryColor>("zinc");
   const [hidden, setHidden] = useState(false);
+  const [autoMatch, setAutoMatch] = useState("");
+  const [retention, setRetention] = useState("");
   const [pinned, setPinned] = useState(false);
   useEffect(() => {
     if (open) {
@@ -67,6 +71,8 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
       setColor(category?.color ?? "blue");
       setPinned(category?.pinned ?? false);
       setHidden(category?.hidden ?? false);
+      setAutoMatch(category?.auto_match ?? "");
+      setRetention(category?.retention_days ? String(category.retention_days) : "");
     }
   }, [open, category]);
   const done = () => {
@@ -74,8 +80,9 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
     qc.invalidateQueries({ queryKey: ["addresses"] });
     onClose();
   };
+  const extra = { auto_match: autoMatch.trim() || null, retention_days: retention ? Number(retention) : null };
   const save = useMutation({
-    mutationFn: () => (category ? patch(`/v1/categories/${category.id}`, { name, color, pinned, hidden }) : post("/v1/categories", { name, color, pinned })),
+    mutationFn: () => (category ? patch(`/v1/categories/${category.id}`, { name, color, pinned, hidden, ...extra }) : post("/v1/categories", { name, color, pinned, ...extra })),
     onSuccess: done,
   });
   const remove = useMutation({
@@ -117,6 +124,16 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} /> Pin to the top of the sidebar
         </label>
+        <div>
+          <label htmlFor="cat-auto" className="label">Auto-sort keywords</label>
+          <input id="cat-auto" className="input" maxLength={500} placeholder="e.g. shop, store, amazon" value={autoMatch} onChange={(e) => setAutoMatch(e.target.value)} />
+          <p className="mt-1 text-xs text-zinc-500">New addresses whose site name or URL contains one of these words go into this category.</p>
+        </div>
+        <div>
+          <label htmlFor="cat-ret" className="label">Delete mail after (days)</label>
+          <input id="cat-ret" className="input" type="number" min={1} max={3650} placeholder="Server default" value={retention} onChange={(e) => setRetention(e.target.value)} />
+          <p className="mt-1 text-xs text-zinc-500">Only shortens the server-wide retention; leave empty to keep the default.</p>
+        </div>
         {category && (
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} /> Hide its addresses from the Inbox
@@ -354,7 +371,12 @@ function AddressMenu({ a, x, y, categories, onClose, onEdit }: { a: Address; x: 
   );
 }
 
-function AddressRow({ a, active, category, search, onMenu }: { a: Address; active: boolean; category?: Category; search: string; onMenu: (a: Address, x: number, y: number) => void }) {
+function AddressRow({
+  a, active, category, search, onMenu, selected, onSelect, dragIds,
+}: {
+  a: Address; active: boolean; category?: Category; search: string; onMenu: (a: Address, x: number, y: number) => void;
+  selected: boolean; onSelect: (a: Address, range: boolean) => void; dragIds: () => string[];
+}) {
   const qc = useQueryClient();
   const pin = useMutation({
     mutationFn: () => patch(`/v1/addresses/${a.id}`, { pinned: !a.pinned }),
@@ -373,10 +395,17 @@ function AddressRow({ a, active, category, search, onMenu }: { a: Address; activ
         aria-haspopup="menu"
         draggable
         onDragStart={(e) => {
-          e.dataTransfer.setData(ADDRESS_DRAG_TYPE, a.id);
+          const ids = selected ? dragIds() : [a.id];
+          e.dataTransfer.setData(ADDRESS_DRAG_TYPE, JSON.stringify(ids));
           e.dataTransfer.setData("text/plain", a.email);
           e.dataTransfer.effectAllowed = "move";
         }}
+        onClick={(e) => {
+          if (!(e.ctrlKey || e.metaKey || e.shiftKey)) return;
+          e.preventDefault();
+          onSelect(a, e.shiftKey);
+        }}
+        aria-selected={selected}
         onContextMenu={(e) => {
           e.preventDefault();
           // Clavier (touche Menu / Maj+F10) : clientX/Y valent 0, on ouvre sous la ligne.
@@ -385,7 +414,9 @@ function AddressRow({ a, active, category, search, onMenu }: { a: Address; activ
         }}
         aria-label={`${a.site_name}, ${a.email}${unread ? `, ${a.unread_count} unread` : ""}`}
         className={`flex gap-3 border-l-2 px-4 py-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-zinc-100 ${
-          active ? "border-zinc-900 bg-zinc-100 dark:border-zinc-100 dark:bg-zinc-800/70" : "border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-900"
+          selected
+            ? "border-blue-600 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/40"
+            : active ? "border-zinc-900 bg-zinc-100 dark:border-zinc-100 dark:bg-zinc-800/70" : "border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-900"
         }`}
       >
         <SiteAvatar a={a} color={category?.color ?? "zinc"} />
@@ -405,6 +436,7 @@ function AddressRow({ a, active, category, search, onMenu }: { a: Address; activ
             )}
             {a.status !== "active" && <span className="rounded border border-zinc-300 px-1 dark:border-zinc-700">{a.status}</span>}
             {a.forward_enabled && <span title="Forwarded">↪</span>}
+            {a.leak && <span className="rounded bg-red-100 px-1 text-red-700 dark:bg-red-950 dark:text-red-300" title={`Mail from ${a.leak.sender}: this address may have leaked`}>leak?</span>}
             {!a.message_count && <span>no mail yet</span>}
           </span>
         </span>
@@ -424,6 +456,34 @@ function AddressRow({ a, active, category, search, onMenu }: { a: Address; activ
   );
 }
 
+function SelectionBar({
+  count, categories, archived, onClear, onAction,
+}: { count: number; categories: Category[]; archived: boolean; onClear: () => void; onAction: (action: string, extra?: Record<string, unknown>) => void }) {
+  const btn = "rounded px-2 py-1 hover:bg-blue-100 dark:hover:bg-blue-900/50";
+  return (
+    <div role="toolbar" aria-label="Selected addresses" className="flex flex-wrap items-center gap-1 border-b border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-950 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-100">
+      <span className="mr-1 font-semibold">{count} selected</span>
+      <label className="sr-only" htmlFor="bulk-move">Move selection to</label>
+      <select
+        id="bulk-move"
+        className="input w-auto py-0.5 text-xs"
+        value=""
+        onChange={(e) => onAction("move", { category_id: e.target.value === "__none" ? null : e.target.value })}
+      >
+        <option value="" disabled>Move to…</option>
+        {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        <option value="__none">No category</option>
+      </select>
+      <button className={btn} onClick={() => onAction("pin")}>Pin</button>
+      <button className={btn} onClick={() => onAction("unpin")}>Unpin</button>
+      <button className={btn} onClick={() => onAction("read")}>Mark read</button>
+      <button className={btn} onClick={() => onAction(archived ? "unarchive" : "archive")}>{archived ? "Restore" : "Archive"}</button>
+      <button className={`${btn} text-red-700 dark:text-red-300`} onClick={() => onAction("delete")}>Delete</button>
+      <button className={`${btn} ml-auto`} onClick={onClear} aria-label="Clear selection">✕</button>
+    </div>
+  );
+}
+
 function AddressList({ folder, activeId }: { folder: string; activeId?: string }) {
   const [sp] = useSearchParams();
   const [q, setQ] = useState("");
@@ -438,6 +498,12 @@ function AddressList({ folder, activeId }: { folder: string; activeId?: string }
   const categories = useCategories();
   const domains = useDomains();
   const stale = useStale(folder === "inbox");
+  const qc = useQueryClient();
+  const nav = useNavigate();
+  const toast = useToast();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const anchor = useRef<string | null>(null);
+  useEffect(() => setSelected(new Set()), [folder]);
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q), 200);
     return () => clearTimeout(t);
@@ -457,25 +523,78 @@ function AddressList({ folder, activeId }: { folder: string; activeId?: string }
   const title =
     folder === "inbox" ? "Inbox" : folder === "pinned" ? "Pinned" : folder === "archived" ? "Archived" : folder === "none" ? "No category" : (byId.get(folder)?.name ?? "Category");
 
+  const pinned = (list.data ?? []).filter((a) => a.pinned && folder !== "pinned");
+  const rest = (list.data ?? []).filter((a) => !a.pinned || folder === "pinned");
+  const ordered = useMemo(() => [...pinned, ...rest], [pinned, rest]);
+
+  const refresh = useCallback(() => {
+    for (const k of ["addresses", "address", "categories", "stale", "messages"]) qc.invalidateQueries({ queryKey: [k] });
+  }, [qc]);
+  const bulk = useCallback(
+    (ids: string[], action: string, extra: Record<string, unknown> = {}, done?: string) =>
+      post<{ affected: number }>("/v1/addresses/bulk", { ids, action, ...extra }).then(
+        (r) => { refresh(); toast(done ?? `${r.affected} address${r.affected > 1 ? "es" : ""} updated`, "success"); },
+        (e: Error) => toast(e.message, "error"),
+      ),
+    [refresh, toast],
+  );
+  const onSelect = useCallback(
+    (a: Address, range: boolean) => {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (range && anchor.current) {
+          const i = ordered.findIndex((x) => x.id === anchor.current);
+          const j = ordered.findIndex((x) => x.id === a.id);
+          if (i >= 0 && j >= 0) for (const x of ordered.slice(Math.min(i, j), Math.max(i, j) + 1)) next.add(x.id);
+        } else if (next.has(a.id)) next.delete(a.id);
+        else next.add(a.id);
+        return next;
+      });
+      if (!range) anchor.current = a.id;
+    },
+    [ordered],
+  );
+  const dragIds = useCallback(() => [...selected], [selected]);
+
+  // Keyboard: n new, / search, j/k move, x select, 1-9 move to category N, 0 no category, p pin, a archive address, h hide this category, Esc clear selection.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || e.metaKey || e.ctrlKey) return;
-      if (e.key === "n") {
-        e.preventDefault();
-        setCreating(true);
-      }
-      if (e.key === "/") {
-        e.preventDefault();
-        document.getElementById("addr-search")?.focus();
-      }
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (document.querySelector("[role=dialog], [role=menu]")) return;
+      const targets = selected.size ? [...selected] : activeId ? [activeId] : [];
+      const current = ordered.find((x) => x.id === activeId);
+      const cats = categories.data ?? [];
+      const go = (a?: Address) => a && nav(`/addresses/${a.id}${sp.toString() ? `?${sp}` : ""}`);
+      const idx = ordered.findIndex((x) => x.id === activeId);
+      if (e.key === "n") setCreating(true);
+      else if (e.key === "/") document.getElementById("addr-search")?.focus();
+      else if (e.key === "j") go(ordered[idx + 1] ?? ordered[0]);
+      else if (e.key === "k") go(ordered[idx - 1] ?? ordered[0]);
+      else if (e.key === "x" && current) onSelect(current, false);
+      else if (e.key === "Escape" && selected.size) setSelected(new Set());
+      else if (/^[0-9]$/.test(e.key) && targets.length) {
+        const cat = e.key === "0" ? null : cats[Number(e.key) - 1];
+        if (cat === undefined) return;
+        void bulk(targets, "move", { category_id: cat?.id ?? null }, cat ? `Moved to ${cat.name}` : "Removed from category");
+      } else if (e.key === "p" && targets.length) {
+        const pin = !(current && targets.length === 1 && current.pinned);
+        void bulk(targets, pin ? "pin" : "unpin", {}, pin ? "Pinned" : "Unpinned");
+      } else if (e.key === "a" && targets.length) {
+        void bulk(targets, folder === "archived" ? "unarchive" : "archive", {}, folder === "archived" ? "Restored" : "Archived");
+        setSelected(new Set());
+      } else if (e.key === "h" && byId.has(folder)) {
+        const c = byId.get(folder)!;
+        patch(`/v1/categories/${c.id}`, { hidden: !c.hidden }).then(() => {
+          refresh();
+          toast(c.hidden ? `${c.name} shown in the Inbox` : `${c.name} hidden from the Inbox`, "success");
+        });
+      } else return;
+      e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  const pinned = (list.data ?? []).filter((a) => a.pinned && folder !== "pinned");
-  const rest = (list.data ?? []).filter((a) => !a.pinned || folder === "pinned");
+  }, [selected, activeId, ordered, categories.data, nav, sp, onSelect, bulk, folder, byId, refresh, toast]);
   const search = sp.toString() ? `?${sp.toString()}` : "";
   const staleCount = stale.data?.length ?? 0;
 
@@ -506,6 +625,19 @@ function AddressList({ folder, activeId }: { folder: string; activeId?: string }
           <button className="font-semibold underline" onClick={() => setReviewStale(true)}>Review</button>
         </div>
       )}
+      {selected.size > 0 && (
+        <SelectionBar
+          count={selected.size}
+          categories={categories.data ?? []}
+          archived={folder === "archived"}
+          onClear={() => setSelected(new Set())}
+          onAction={(action, extra) => {
+            if (action === "delete" && !confirmAction(`Delete ${selected.size} address(es) and all their mail?`)) return;
+            void bulk([...selected], action, extra);
+            if (action !== "move" && action !== "pin" && action !== "unpin" && action !== "read") setSelected(new Set());
+          }}
+        />
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {list.isLoading && <Spinner />}
         <ErrorText error={list.error} />
@@ -518,13 +650,13 @@ function AddressList({ folder, activeId }: { folder: string; activeId?: string }
           <>
             <p className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Pinned</p>
             <ul aria-label="Pinned addresses">
-              {pinned.map((a) => <AddressRow key={a.id} a={a} active={a.id === activeId} category={a.category_id ? byId.get(a.category_id) : undefined} search={search} onMenu={openMenu} />)}
+              {pinned.map((a) => <AddressRow key={a.id} a={a} active={a.id === activeId} category={a.category_id ? byId.get(a.category_id) : undefined} search={search} onMenu={openMenu} selected={selected.has(a.id)} onSelect={onSelect} dragIds={dragIds} />)}
             </ul>
             {rest.length > 0 && <p className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Others</p>}
           </>
         )}
         <ul aria-label="Addresses">
-          {rest.map((a) => <AddressRow key={a.id} a={a} active={a.id === activeId} category={a.category_id ? byId.get(a.category_id) : undefined} search={search} onMenu={openMenu} />)}
+          {rest.map((a) => <AddressRow key={a.id} a={a} active={a.id === activeId} category={a.category_id ? byId.get(a.category_id) : undefined} search={search} onMenu={openMenu} selected={selected.has(a.id)} onSelect={onSelect} dragIds={dragIds} />)}
         </ul>
       </div>
       <NewAddressDialog open={creating} onClose={() => setCreating(false)} defaultCategory={byId.has(folder) ? folder : undefined} />
@@ -568,7 +700,12 @@ function EmptyReader(): ReactNode {
         </svg>
         Select an address to read its mail.
         <p className="mt-1 text-xs">
-          <kbd className="rounded border border-zinc-300 px-1 dark:border-zinc-700">n</kbd> new address · <kbd className="rounded border border-zinc-300 px-1 dark:border-zinc-700">/</kbd> search
+          <kbd className="rounded border border-zinc-300 px-1 dark:border-zinc-700">n</kbd> new address · <kbd className="rounded border border-zinc-300 px-1 dark:border-zinc-700">/</kbd> search ·{" "}
+          <kbd className="rounded border border-zinc-300 px-1 dark:border-zinc-700">j</kbd>/<kbd className="rounded border border-zinc-300 px-1 dark:border-zinc-700">k</kbd> next/previous
+        </p>
+        <p className="mt-1 text-xs">
+          Ctrl/Shift+click to select several · <kbd className="rounded border border-zinc-300 px-1 dark:border-zinc-700">1</kbd>–<kbd className="rounded border border-zinc-300 px-1 dark:border-zinc-700">9</kbd> move to category ·{" "}
+          <kbd className="rounded border border-zinc-300 px-1 dark:border-zinc-700">p</kbd> pin · <kbd className="rounded border border-zinc-300 px-1 dark:border-zinc-700">a</kbd> archive · <kbd className="rounded border border-zinc-300 px-1 dark:border-zinc-700">h</kbd> hide category
         </p>
       </div>
     </div>

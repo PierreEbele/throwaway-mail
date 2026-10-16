@@ -5,7 +5,7 @@ import { patch, post } from "../api";
 import { useToast } from "./ui";
 import { useAuth } from "../auth";
 import { useReviewCount } from "../pages/Review";
-import { ADDRESS_DRAG_TYPE, CategoryDialog, DOT, PinIcon, folderHref, useCategories } from "../pages/Mailbox";
+import { ADDRESS_DRAG_TYPE, CATEGORY_DRAG_TYPE, CategoryDialog, DOT, PinIcon, folderHref, useCategories } from "../pages/Mailbox";
 import type { Category } from "../types";
 
 function ThemeToggle() {
@@ -49,6 +49,7 @@ const ICONS = {
   globe: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18",
   users: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 20a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 7M22 20a7 7 0 0 0-4-6.3",
   log: "M6 3h9l4 4v14H6zM9 12h7M9 16h7",
+  digest: "M4 20V10M10 20V4M16 20v-7M22 20H2",
 };
 
 function EyeIcon({ off }: { off?: boolean }) {
@@ -62,32 +63,49 @@ function EyeIcon({ off }: { off?: boolean }) {
 }
 
 function Folder({
-  to, active, icon, label, count, pinned, dimmed, onDropAddress, children,
-}: { to: string; active: boolean; icon?: ReactNode; label: string; count?: number; pinned?: boolean; dimmed?: boolean; onDropAddress?: (id: string) => void; children?: ReactNode }) {
-  const [over, setOver] = useState(false);
-  const accepts = (e: DragEvent) => !!onDropAddress && e.dataTransfer.types.includes(ADDRESS_DRAG_TYPE);
+  to, active, icon, label, count, unread, pinned, dimmed, onDropAddress, categoryId, onDropCategory, children,
+}: {
+  to: string; active: boolean; icon?: ReactNode; label: string; count?: number; unread?: number; pinned?: boolean; dimmed?: boolean;
+  onDropAddress?: (ids: string[]) => void; categoryId?: string; onDropCategory?: (draggedId: string) => void; children?: ReactNode;
+}) {
+  const [over, setOver] = useState<"" | "address" | "category">("");
+  const kind = (e: DragEvent) =>
+    onDropAddress && e.dataTransfer.types.includes(ADDRESS_DRAG_TYPE) ? "address" : onDropCategory && e.dataTransfer.types.includes(CATEGORY_DRAG_TYPE) ? "category" : "";
   return (
     <div
-      className={`group/f relative rounded-md ${over ? "ring-2 ring-zinc-900 dark:ring-zinc-100" : ""}`}
+      className={`group/f relative rounded-md ${over === "address" ? "ring-2 ring-zinc-900 dark:ring-zinc-100" : over === "category" ? "shadow-[inset_0_2px_0_0] shadow-zinc-900 dark:shadow-zinc-100" : ""}`}
       onDragOver={(e) => {
-        if (!accepts(e)) return;
+        const k = kind(e);
+        if (!k) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
-        setOver(true);
+        setOver(k);
       }}
-      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setOver(false)}
+      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setOver("")}
       onDrop={(e) => {
-        setOver(false);
-        if (!accepts(e)) return;
+        setOver("");
+        const k = kind(e);
+        if (!k) return;
         e.preventDefault();
-        onDropAddress!(e.dataTransfer.getData(ADDRESS_DRAG_TYPE));
+        if (k === "address") onDropAddress!(JSON.parse(e.dataTransfer.getData(ADDRESS_DRAG_TYPE)) as string[]);
+        else onDropCategory!(e.dataTransfer.getData(CATEGORY_DRAG_TYPE));
       }}
     >
-      <Link to={to} className={`${itemCls(active)} ${dimmed ? "opacity-50" : ""}`} aria-current={active ? "page" : undefined}>
+      <Link
+        to={to}
+        draggable={!!categoryId}
+        onDragStart={categoryId ? (e) => { e.dataTransfer.setData(CATEGORY_DRAG_TYPE, categoryId); e.dataTransfer.effectAllowed = "move"; } : undefined}
+        className={`${itemCls(active)} ${dimmed ? "opacity-50" : ""}`}
+        aria-current={active ? "page" : undefined}
+      >
         {icon}
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {pinned && <span className="text-zinc-400" title="Pinned"><PinIcon filled className="size-3" /></span>}
-        {!!count && <span className={`text-xs tabular-nums text-zinc-500 ${children ? "group-hover/f:invisible" : ""}`}>{count}</span>}
+        {unread ? (
+          <span className={`text-xs font-semibold tabular-nums text-zinc-900 dark:text-zinc-100 ${children ? "group-hover/f:invisible" : ""}`} title={`${unread} unread`}>{unread}</span>
+        ) : (
+          !!count && <span className={`text-xs tabular-nums text-zinc-500 ${children ? "group-hover/f:invisible" : ""}`}>{count}</span>
+        )}
       </Link>
       {children}
     </div>
@@ -108,11 +126,22 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     qc.invalidateQueries({ queryKey: ["address"] });
     qc.invalidateQueries({ queryKey: ["categories"] });
   };
-  const moveTo = (cat: Category | null) => (id: string) =>
-    patch(`/v1/addresses/${id}`, { category_id: cat?.id ?? null }).then(
-      () => { refreshLists(); toast(cat ? `Moved to ${cat.name}` : "Removed from its category", "success"); },
+  const moveTo = (cat: Category | null) => (ids: string[]) =>
+    post("/v1/addresses/bulk", { ids, action: "move", category_id: cat?.id ?? null }).then(
+      () => {
+        refreshLists();
+        const n = ids.length > 1 ? `${ids.length} addresses` : "";
+        toast(cat ? `${n || "Moved"}${n ? " moved" : ""} to ${cat.name}` : `${n || "Address"} removed from category`, "success");
+      },
       (e: Error) => toast(e.message, "error"),
     );
+  /** Drop category `draggedId` just above `target`. */
+  const reorder = (target: Category) => (draggedId: string) => {
+    if (draggedId === target.id) return;
+    const ids = (categories.data ?? []).map((c) => c.id).filter((id) => id !== draggedId);
+    ids.splice(ids.indexOf(target.id), 0, draggedId);
+    post("/v1/categories/reorder", { ids }).then(refreshLists, (e: Error) => toast(e.message, "error"));
+  };
   const toggleHidden = (c: Category) =>
     patch(`/v1/categories/${c.id}`, { hidden: !c.hidden }).then(refreshLists, (e: Error) => toast(e.message, "error"));
   const mailbox = loc.pathname === "/" || loc.pathname.startsWith("/addresses/");
@@ -142,6 +171,10 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </NavLink>
         )}
         <Folder to={folderHref("archived")} active={isFolder("archived")} icon={<Icon d={ICONS.archive} />} label="Archived" />
+        <NavLink to="/digest" className={navCls}>
+          <Icon d={ICONS.digest} />
+          <span className="flex-1">This week</span>
+        </NavLink>
 
         <div className="flex items-center justify-between px-2.5 pt-5 pb-1">
           <span className="text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Categories</span>
@@ -158,8 +191,11 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             label={c.name}
             count={c.address_count}
             pinned={c.pinned}
+            unread={c.unread_count}
             dimmed={c.hidden}
             onDropAddress={moveTo(c)}
+            categoryId={c.id}
+            onDropCategory={reorder(c)}
           >
             <button
               className={`absolute top-1 right-7 rounded px-1 py-0.5 text-zinc-500 hover:bg-zinc-300/60 focus-visible:opacity-100 dark:hover:bg-zinc-700 ${c.hidden ? "opacity-100 group-hover/f:opacity-100" : "opacity-0 group-hover/f:opacity-100"}`}

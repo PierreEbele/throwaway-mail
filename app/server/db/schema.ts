@@ -79,6 +79,10 @@ export const categories = sqliteTable(
     color: text("color").notNull().default("zinc"),
     pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
     hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
+    /** Comma-separated keywords: new addresses whose site name/URL contains one land in this category. */
+    autoMatch: text("auto_match"),
+    /** Messages of this category's addresses are deleted after this many days (null: global setting). */
+    retentionDays: integer("retention_days"),
     position: integer("position").notNull().default(0),
     createdAt: integer("created_at").notNull(),
   },
@@ -107,6 +111,13 @@ export const addresses = sqliteTable(
     pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
     /** Set when the user dismissed the "never received any mail" suggestion for this address. */
     staleDismissedAt: integer("stale_dismissed_at"),
+    /** JSON array of sender domains whose mail is rejected for this address. */
+    blockedSendersJson: text("blocked_senders_json"),
+    /** JSON array of sender domains accepted as legitimate for this site (no leak warning). */
+    trustedSendersJson: text("trusted_senders_json"),
+    /** Last sender whose domain does not match the site: the address has probably leaked or been sold. */
+    leakSender: text("leak_sender"),
+    leakAt: integer("leak_at"),
   },
   (t) => [uniqueIndex("addresses_domain_local_uq").on(t.domainId, t.localPart), index("addresses_user_idx").on(t.userId)],
 );

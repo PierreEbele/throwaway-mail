@@ -5,7 +5,9 @@ import { addresses, destinations, domains, extractedItems, messages, users, type
 import { newId } from "../lib/crypto.js";
 import { LOCAL_PART_RE, normalizeRecipient } from "../lib/email.js";
 import { sanitizeEmailHtml } from "../lib/sanitize.js";
+import { matchCategory } from "../routes/categories.js";
 import { runParser } from "../parser/index.js";
+import { listed, looksLikeLeak, parseList, senderDomain } from "../lib/senders.js";
 
 export type IngestAction = "forward" | "store_only" | "reject";
 
@@ -44,6 +46,7 @@ function resolveUnknown(deps: Deps, domain: Domain, local: string, senderDomain:
       siteName: senderDomain ? senderDomain : "Auto-created",
       siteUrl: senderDomain ? `https://${senderDomain}` : null,
       label: "auto-created",
+      categoryId: matchCategory(deps, owner, senderDomain ?? "", senderDomain ? `https://${senderDomain}` : null),
       createdAt: now,
       updatedAt: now,
     };
@@ -132,6 +135,11 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
   if (address.expiresAt && address.expiresAt <= deps.now()) return { action: "reject", reason: "address_expired" };
 
   const email = await PostalMime.parse(input.raw);
+  const fromDomain = senderDomain(email.from?.address) ?? sender?.domain ?? null;
+  if (fromDomain && listed(parseList(address.blockedSendersJson), fromDomain)) {
+    log.info("reject: blocked sender", { address_id: address.id, sender: fromDomain });
+    return { action: "reject", reason: "sender_blocked" };
+  }
   const messageIdHeader = email.messageId?.trim() || null;
 
   if (messageIdHeader) {
@@ -201,7 +209,11 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
       })),
     ];
     if (items.length) tx.insert(extractedItems).values(items).run();
-    tx.update(addresses).set({ lastMessageAt: now }).where(eq(addresses.id, address!.id)).run();
+    const leak = !address!.isUnassigned && looksLikeLeak(address!.siteUrl, email.from?.address ?? null, parseList(address!.trustedSendersJson));
+    tx.update(addresses)
+      .set({ lastMessageAt: now, ...(leak ? { leakSender: email.from!.address!.toLowerCase(), leakAt: now } : {}) })
+      .where(eq(addresses.id, address!.id))
+      .run();
   });
 
   log.info("stored message", { message_id: id, address_id: address.id, size: input.raw.byteLength, has_code: !!parsed.code, action: forwardTo ? "forward" : "store_only" });

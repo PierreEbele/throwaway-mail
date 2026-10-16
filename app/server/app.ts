@@ -23,6 +23,7 @@ import { registerEvents } from "./routes/events.js";
 import { registerReview } from "./routes/review.js";
 import { registerCompat } from "./routes/compat.js";
 import { registerCategories } from "./routes/categories.js";
+import { registerExtras } from "./routes/extras.js";
 
 const APP_CSP = {
   defaultSrc: ["'self'"],
@@ -86,6 +87,7 @@ export function createApp(deps: Deps) {
   app.use("/v1/*", authenticate, csrf, rateLimit(limiter, callerKey));
   const api = new ApiRouter(app);
   registerAuth(api);
+  registerExtras(api);
   registerAddresses(api);
   registerDomains(api);
   registerDestinations(api);
