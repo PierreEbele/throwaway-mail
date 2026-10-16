@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { get } from "../api";
-import type { Address, Digest } from "../types";
-import { ErrorText, PageHeader, Spinner } from "../components/ui";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { get, post } from "../api";
+import type { Address, Digest, LeakGroup } from "../types";
+import { ErrorText, PageHeader, Spinner, confirmAction, useToast } from "../components/ui";
 import { timeAgo } from "../util";
 
 function List({ title, items, empty, extra }: { title: string; items: Address[]; empty: string; extra?: (a: Address) => string }) {
@@ -21,6 +21,44 @@ function List({ title, items, empty, extra }: { title: string; items: Address[];
                 <span className="truncate font-mono text-xs text-zinc-500">{a.email}</span>
                 {extra && <span className="ml-auto shrink-0 text-xs text-zinc-500">{extra(a)}</span>}
               </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function LeakHistory() {
+  const q = useQuery({ queryKey: ["leaks"], queryFn: () => get<{ leaks: LeakGroup[] }>("/v1/leaks").then((r) => r.leaks) });
+  const qc = useQueryClient();
+  const toast = useToast();
+  const block = (g: LeakGroup) =>
+    confirmAction(`Block ${g.sender_domain} on the ${g.addresses.length} address(es) it wrote to?`) &&
+    post<{ affected: number }>("/v1/leaks/block", { sender_domain: g.sender_domain }).then(
+      (r) => { qc.invalidateQueries(); toast(`${g.sender_domain} blocked on ${r.affected} address(es)`, "success"); },
+      (e: Error) => toast(e.message, "error"),
+    );
+  return (
+    <section className="card p-5 lg:col-span-2" aria-label="Leak history">
+      <h2 className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">Leak history by sender</h2>
+      <p className="mt-1 text-xs text-zinc-500">Senders that wrote to an address created for another site: who sold or leaked what.</p>
+      {!q.data ? (
+        <Spinner />
+      ) : q.data.length === 0 ? (
+        <p className="mt-2 text-sm text-zinc-500">No leak recorded yet.</p>
+      ) : (
+        <ul className="mt-2 divide-y divide-zinc-100 text-sm dark:divide-zinc-800">
+          {q.data.map((g) => (
+            <li key={g.sender_domain} className="flex flex-wrap items-center gap-2 py-2">
+              <span className="font-mono font-medium">{g.sender_domain}</span>
+              <span className="text-xs text-zinc-500">{g.count} mail(s) · last {timeAgo(g.last_at)}</span>
+              <span className="flex flex-wrap gap-1">
+                {g.addresses.map((a) => (
+                  <Link key={a.id} to={`/addresses/${a.id}`} className="rounded bg-zinc-100 px-1.5 text-xs hover:underline dark:bg-zinc-800">{a.site_name}</Link>
+                ))}
+              </span>
+              <button className="btn-secondary ml-auto px-2 py-0.5 text-xs" onClick={() => block(g)}>Block everywhere</button>
             </li>
           ))}
         </ul>
@@ -74,6 +112,7 @@ export function DigestPage() {
             )}
           </section>
           <List title="New addresses" items={d.created} empty="No address created in this period." extra={(a) => timeAgo(a.created_at)} />
+          <LeakHistory />
           <List title="Silent for 30+ days" items={d.silent} empty="Every address has received mail." extra={(a) => `created ${timeAgo(a.created_at)}`} />
         </div>
       )}

@@ -96,3 +96,49 @@ describe("extra features", () => {
     expect((await other.get("/v1/addresses")).json.addresses[0].category_id).toBeTruthy();
   });
 });
+
+describe("leak history, dedupe and attachments", () => {
+  it("records every leak and blocks a sender everywhere", async () => {
+    const { t, user, mk } = await setup();
+    const a = await mk("A", { site_url: "a.com" });
+    const b = await mk("B", { site_url: "b.com" });
+    await ingest(t, a.email, simpleEml({ text: "1", from: "x@spam.biz" }));
+    await ingest(t, b.email, simpleEml({ text: "2", from: "y@news.spam.biz" }));
+    const leaks = (await user.get("/v1/leaks")).json.leaks;
+    expect(leaks).toHaveLength(1);
+    expect(leaks[0]).toMatchObject({ sender_domain: "spam.biz", count: 2 });
+    expect(leaks[0].addresses).toHaveLength(2);
+    expect((await user.post("/v1/leaks/block", { sender_domain: "spam.biz" })).json.affected).toBe(2);
+    expect((await user.get(`/v1/addresses/${b.id}`)).json.address.blocked_senders).toEqual(["spam.biz"]);
+  });
+
+  it("deduplicates retried mail without Message-ID and lists attachments", async () => {
+    const { t, user, mk } = await setup();
+    const a = await mk("A");
+    const eml = [
+      "From: x@a.com",
+      "To: a@mail.example.test",
+      "Subject: file",
+      "MIME-Version: 1.0",
+      'Content-Type: multipart/mixed; boundary="b"',
+      "",
+      "--b",
+      "Content-Type: text/plain",
+      "",
+      "see attached",
+      "--b",
+      'Content-Type: application/pdf; name="bill.pdf"',
+      'Content-Disposition: attachment; filename="bill.pdf"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      "JVBERi0xLjQK",
+      "--b--",
+      "",
+    ].join("\r\n");
+    await ingest(t, a.email, eml);
+    expect((await ingest(t, a.email, eml)).json.duplicate).toBe(true);
+    const msgs = (await user.get(`/v1/addresses/${a.id}/messages`)).json.messages;
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0].attachments).toEqual([{ filename: "bill.pdf", mime_type: "application/pdf", size: 9, inline: false }]);
+  });
+});

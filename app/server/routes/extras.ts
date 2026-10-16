@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { ApiRouter } from "../lib/http.js";
-import { addresses, categories, domains, extractedItems, messages, type Address } from "../db/schema.js";
+import { addresses, categories, domains, extractedItems, leakEvents, messages, type Address } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
 import { LOCAL_PART_RE } from "../lib/email.js";
 import { badRequest } from "../lib/errors.js";
@@ -127,6 +127,62 @@ export function registerExtras(r: ApiRouter) {
       top_senders: [...senders].sort((x, y) => y[1] - x[1]).slice(0, 5).map(([domain, count]) => ({ domain, count })),
     });
   });
+
+  // --- Leak history: which sender domains wrote to which addresses ------------------------------
+  r.add({ method: "get", path: "/v1/leaks", summary: "Leak history grouped by sender domain (newest first)", tags: ["addresses"], auth: "user" }, (c) => {
+    const d = c.get("deps");
+    const user = c.get("user")!;
+    const rows = d.db
+      .select({ e: leakEvents, a: addresses, domain: domains.name })
+      .from(leakEvents)
+      .innerJoin(addresses, eq(addresses.id, leakEvents.addressId))
+      .innerJoin(domains, eq(domains.id, addresses.domainId))
+      .where(eq(leakEvents.userId, user.id))
+      .orderBy(desc(leakEvents.at))
+      .limit(2000)
+      .all();
+    const groups = new Map<string, { sender_domain: string; count: number; first_at: number; last_at: number; senders: Set<string>; addresses: Map<string, ReturnType<typeof addressOut>> }>();
+    for (const { e, a, domain } of rows) {
+      const g = groups.get(e.senderDomain) ?? { sender_domain: e.senderDomain, count: 0, first_at: e.at, last_at: e.at, senders: new Set(), addresses: new Map() };
+      g.count++;
+      g.first_at = Math.min(g.first_at, e.at);
+      g.last_at = Math.max(g.last_at, e.at);
+      g.senders.add(e.sender);
+      if (!g.addresses.has(a.id)) g.addresses.set(a.id, addressOut(a, domain));
+      groups.set(e.senderDomain, g);
+    }
+    return c.json({
+      leaks: [...groups.values()]
+        .sort((x, y) => y.last_at - x.last_at)
+        .map((g) => ({ ...g, senders: [...g.senders], addresses: [...g.addresses.values()] })),
+    });
+  });
+
+  r.add(
+    {
+      method: "post",
+      path: "/v1/leaks/block",
+      summary: "Block a sender domain on every address it wrote to",
+      tags: ["addresses"],
+      auth: "user",
+      body: z.object({ sender_domain: z.string().trim().toLowerCase().min(3).max(255) }),
+    },
+    (c, { body }) => {
+      const d = c.get("deps");
+      const user = c.get("user")!;
+      const ids = d.db.selectDistinct({ id: leakEvents.addressId }).from(leakEvents).where(and(eq(leakEvents.userId, user.id), eq(leakEvents.senderDomain, body.sender_domain))).all().map((x) => x.id);
+      for (const id of ids) {
+        const a = d.db.select().from(addresses).where(and(eq(addresses.id, id), eq(addresses.userId, user.id))).get();
+        if (!a) continue;
+        const list = new Set(parseList(a.blockedSendersJson));
+        list.add(body.sender_domain);
+        const clear = a.leakSender && baseDomain(senderDomain(a.leakSender) ?? "") === body.sender_domain;
+        d.db.update(addresses).set({ blockedSendersJson: JSON.stringify([...list].sort()), ...(clear ? { leakSender: null, leakAt: null } : {}), updatedAt: d.now() }).where(eq(addresses.id, id)).run();
+        d.bus.publish(user.id, { type: "address.updated", address_id: id });
+      }
+      return c.json({ affected: ids.length });
+    },
+  );
 
   // --- Weekly summary --------------------------------------------------------------------------
   r.add(

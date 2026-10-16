@@ -146,6 +146,10 @@ export const messages = sqliteTable(
     archivedAt: integer("archived_at"),
     forwarded: integer("forwarded", { mode: "boolean" }).notNull().default(false),
     forwardTo: text("forward_to"),
+    /** sha256 of sender + subject + body: deduplicates retried deliveries of mail without a Message-ID. */
+    bodyHash: text("body_hash"),
+    /** JSON [{filename, mime_type, size}] — attachments are not stored, only described. */
+    attachmentsJson: text("attachments_json"),
   },
   (t) => [
     uniqueIndex("messages_address_msgid_uq").on(t.addressId, t.messageIdHeader),
@@ -168,6 +172,20 @@ export const extractedItems = sqliteTable(
     rank: integer("rank").notNull().default(0),
   },
   (t) => [index("extracted_message_idx").on(t.messageId)],
+);
+
+/** Every mail whose sender does not match the address's site (the address column only keeps the latest). */
+export const leakEvents = sqliteTable(
+  "leak_events",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    addressId: text("address_id").notNull().references(() => addresses.id, { onDelete: "cascade" }),
+    sender: text("sender").notNull(),
+    senderDomain: text("sender_domain").notNull(),
+    at: integer("at").notNull(),
+  },
+  (t) => [index("leak_events_user_idx").on(t.userId, t.senderDomain), index("leak_events_address_idx").on(t.addressId)],
 );
 
 export const auditLog = sqliteTable(

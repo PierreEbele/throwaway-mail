@@ -14,6 +14,7 @@ export interface Category { id: string; name: string; color: CategoryColor; pinn
 export interface MessageSummary {
   id: string; address_id: string; from: string | null; from_name: string | null; subject: string | null;
   received_at: number; read_at: number | null; archived_at: number | null; forwarded: boolean; preview: string; code: string | null; has_links: boolean;
+  attachments: Array<{ filename: string | null; mime_type: string; size: number; inline: boolean }>;
 }
 export interface ExtractedCode { value: string; confidence: number; method: string; raw: string | null }
 export interface ExtractedLink { url: string; label: string | null; confidence: number; method: string }
@@ -45,3 +46,4 @@ export interface Digest {
   days: number; since: number; received: number; created: Address[]; leaks: Address[]; silent: Address[];
   busiest: Array<{ address: Address; count: number }>;
 }
+export interface LeakGroup { sender_domain: string; count: number; first_at: number; last_at: number; senders: string[]; addresses: Address[] }

@@ -1,13 +1,14 @@
+import { createHash } from "node:crypto";
 import PostalMime from "postal-mime";
-import { and, asc, eq, isNotNull } from "drizzle-orm";
+import { and, asc, eq, gt, isNotNull } from "drizzle-orm";
 import type { Deps } from "../context.js";
-import { addresses, destinations, domains, extractedItems, messages, users, type Address, type Domain } from "../db/schema.js";
+import { addresses, destinations, domains, extractedItems, leakEvents, messages, users, type Address, type Domain } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
 import { LOCAL_PART_RE, normalizeRecipient } from "../lib/email.js";
 import { sanitizeEmailHtml } from "../lib/sanitize.js";
 import { matchCategory } from "../routes/categories.js";
 import { runParser } from "../parser/index.js";
-import { listed, looksLikeLeak, parseList, senderDomain } from "../lib/senders.js";
+import { baseDomain, listed, looksLikeLeak, parseList, senderDomain } from "../lib/senders.js";
 
 export type IngestAction = "forward" | "store_only" | "reject";
 
@@ -141,6 +142,24 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     return { action: "reject", reason: "sender_blocked" };
   }
   const messageIdHeader = email.messageId?.trim() || null;
+  const bodyHash = createHash("sha256")
+    .update(`${email.from?.address ?? ""}\n${email.subject ?? ""}\n${email.text ?? email.html ?? ""}`)
+    .digest("hex");
+
+  if (!messageIdHeader) {
+    // No Message-ID: treat an identical mail within 15 minutes as a retried delivery.
+    const dup = deps.db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.addressId, address.id), eq(messages.bodyHash, bodyHash), gt(messages.receivedAt, deps.now() - 15 * 60_000)))
+      .get();
+    if (dup) {
+      log.info("duplicate delivery (body hash)", { message_id: dup.id });
+      return dup.forwarded && dup.forwardTo
+        ? { action: "forward", forward_to: dup.forwardTo, message_id: dup.id, duplicate: true }
+        : { action: "store_only", message_id: dup.id, duplicate: true };
+    }
+  }
 
   if (messageIdHeader) {
     const dup = deps.db
@@ -184,6 +203,17 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
         dmarc: authResult(email.headers, "dmarc"),
         forwarded: !!forwardTo,
         forwardTo,
+        bodyHash,
+        attachmentsJson: email.attachments.length
+          ? JSON.stringify(
+              email.attachments.slice(0, 50).map((a) => ({
+                filename: a.filename ?? null,
+                mime_type: a.mimeType,
+                size: typeof a.content === "string" ? a.content.length : a.content.byteLength,
+                inline: a.disposition === "inline",
+              })),
+            )
+          : null,
       })
       .run();
     const items = [
@@ -214,6 +244,10 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
       .set({ lastMessageAt: now, ...(leak ? { leakSender: email.from!.address!.toLowerCase(), leakAt: now } : {}) })
       .where(eq(addresses.id, address!.id))
       .run();
+    if (leak) {
+      const sender = email.from!.address!.toLowerCase();
+      tx.insert(leakEvents).values({ id: newId("lek"), userId: address!.userId, addressId: address!.id, sender, senderDomain: baseDomain(senderDomain(sender)!), at: now }).run();
+    }
   });
 
   log.info("stored message", { message_id: id, address_id: address.id, size: input.raw.byteLength, has_code: !!parsed.code, action: forwardTo ? "forward" : "store_only" });

@@ -14,6 +14,10 @@ function emailDoc(html: string) {
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${IFRAME_CSP}"><base target="_blank"><style>body{margin:0;padding:12px;font-family:system-ui,sans-serif;color:#111;background:#fff;word-wrap:break-word}img{max-width:100%;height:auto}</style></head><body>${html}</body></html>`;
 }
 
+function formatSize(n: number) {
+  return n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function MessageView({ id, onGone }: { id: string; onGone: () => void }) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -93,6 +97,15 @@ function MessageView({ id, onGone }: { id: string; onGone: () => void }) {
           ))}
         </p>
       </div>
+      {m.attachments.some((x) => !x.inline) && (
+        <ul className="flex flex-wrap gap-2 text-xs" aria-label="Attachments (not stored)">
+          {m.attachments.filter((x) => !x.inline).map((x, i) => (
+            <li key={i} className="rounded border border-zinc-200 px-2 py-1 dark:border-zinc-700" title="Attachments are not stored, only listed">
+              📎 {x.filename ?? "unnamed"} <span className="text-zinc-500">· {x.mime_type} · {formatSize(x.size)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       {m.extracted.code && (
         <div className="flex items-center gap-3 rounded-md bg-zinc-100 p-3 dark:bg-zinc-800">
           <span className="font-mono text-2xl font-bold tracking-widest">{m.extracted.code.value}</span>
@@ -567,6 +580,7 @@ export function AddressDetailPage() {
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-zinc-500">
                     {m.code && <code className="rounded bg-zinc-900 px-1.5 font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">{m.code}</code>}
                     {m.forwarded && <span>↪ forwarded</span>}
+                    {m.attachments.some((x) => !x.inline) && <span title="Has attachments (not stored)">📎</span>}
                     <span className="truncate">{m.preview}</span>
                   </div>
                 </button>

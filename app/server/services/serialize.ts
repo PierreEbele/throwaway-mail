@@ -77,6 +77,7 @@ export function messageSummaryOut(m: Message, items: ExtractedItem[]) {
     read_at: m.readAt,
     archived_at: m.archivedAt,
     forwarded: m.forwarded,
+    attachments: m.attachmentsJson ? (JSON.parse(m.attachmentsJson) as Array<{ filename: string | null; mime_type: string; size: number; inline: boolean }>) : [],
     preview,
     code: ex.code?.value ?? null,
     has_links: ex.links.length > 0,
