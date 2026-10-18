@@ -51,6 +51,12 @@ const Throwaway = (() => {
     return { id: data.id, email: data.email, host: url.hostname, createdAt: data.address?.created_at ?? Date.now() };
   }
 
+  // Adresse déjà créée pour ce site (site_name = nom d'hôte exact ; `site` côté serveur est un LIKE).
+  async function siteAddress(host) {
+    const data = await request(`/v1/addresses?site=${encodeURIComponent(host)}&status=active&limit=50`);
+    return (data?.addresses || []).find(a => String(a.site_name || "").toLowerCase() === host.toLowerCase()) || null;
+  }
+
   // Attend (long polling, 55 s max par appel) un code arrivé après `since`.
   function waitForCode(addressId, since, wait = 55) {
     const q = new URLSearchParams({ wait: String(wait), require: "any" });
@@ -58,5 +64,5 @@ const Throwaway = (() => {
     return request(`/v1/addresses/${encodeURIComponent(addressId)}/code?${q}`);
   }
 
-  return { KEYS, normalizeServer, config, enabled, request, createAddress, waitForCode };
+  return { KEYS, normalizeServer, config, enabled, request, createAddress, siteAddress, waitForCode };
 })();

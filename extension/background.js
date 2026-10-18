@@ -121,6 +121,18 @@ browser.runtime.onMessage.addListener((msg, sender) => {
           return { ok: true, email: a.email };
         } catch { return { ok: false }; }
       })();
+    case "site-code":
+      // Champ de code détecté sans attente en cours : dernier code (< 15 min) de l'adresse de ce site.
+      return (async () => {
+        if (!host || !await Throwaway.enabled() || !(await settings()).autoCode) return { done: true };
+        try {
+          const a = await addressForHost(host, url, false);
+          if (!a) return { done: true };
+          const q = new URLSearchParams({ wait: String(Math.min(Math.max(Number(msg.wait) || 0, 0), 20)), require: "code", since: String(Date.now() - PENDING_MS) });
+          const found = await Throwaway.request(`/v1/addresses/${encodeURIComponent(a.id)}/code?${q}`);
+          return found?.code ? { code: found.code, from: found.from } : { waiting: true };
+        } catch (e) { return { error: e.message }; }
+      })();
     case "purge":
       return purgeExpired();
     case "pending-set":
@@ -136,7 +148,74 @@ browser.runtime.onMessage.addListener((msg, sender) => {
   return undefined;
 });
 
+// Adresse jetable de ce site : celle de l'identité courante, celle en attente de code, sinon celle
+// du serveur (site_name = hôte) ; si `create`, une nouvelle est créée en dernier recours.
+async function addressForHost(host, pageUrl, create) {
+  const { profile } = await browser.storage.local.get("profile");
+  if (profile?.throwaway?.host === host) return profile.throwaway;
+  const p = await getPending(host);
+  if (p) return { id: p.id, email: p.email, host, createdAt: p.since };
+  const a = await Throwaway.siteAddress(host);
+  if (a) return { id: a.id, email: a.email, host, createdAt: a.created_at, unread: a.unread_count || 0, leak: a.leak || null };
+  return create ? Throwaway.createAddress(pageUrl, profile?.fullName) : null;
+}
+
+// ---------- Menu contextuel des champs éditables ----------
+browser.menus.create({ id: "tm-insert", title: "Générer une adresse Throwaway ici", contexts: ["editable"] }, () => void browser.runtime.lastError);
+browser.menus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId !== "tm-insert" || !tab?.id || !/^https?:/.test(tab.url || "")) return;
+  const host = new URL(tab.url).hostname;
+  let email;
+  try {
+    if (!await Throwaway.enabled()) throw new Error("Throwaway Mail n’est pas configuré (réglages de l’extension).");
+    const a = await addressForHost(host, tab.url, true);
+    email = a.email;
+    if ((await settings()).autoCode) await setPending(host, a);
+  } catch (e) {
+    email = null;
+    await browser.scripting.executeScript({ target: { tabId: tab.id, frameIds: [info.frameId ?? 0] }, func: m => alert(m), args: [e.status === 401 ? "Clé API Throwaway Mail invalide." : e.message] }).catch(() => {});
+    return;
+  }
+  await browser.scripting.executeScript({
+    target: { tabId: tab.id, frameIds: [info.frameId ?? 0] },
+    args: [email],
+    func: value => {
+      const el = document.activeElement;
+      if (!el) return;
+      if (el.isContentEditable) { document.execCommand("insertText", false, value); return; }
+      const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, "value").set.call(el, value);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }).catch(() => {});
+  void updateBadge(tab.id);
+});
+
+// ---------- Badge : non lus (ou « ! » si fuite) de l'adresse du site actif ----------
+async function updateBadge(tabId) {
+  const tab = await browser.tabs.get(tabId).catch(() => null);
+  let text = "", color = "#18181b";
+  try {
+    if (tab && /^https?:/.test(tab.url || "") && await Throwaway.enabled()) {
+      const a = await Throwaway.siteAddress(new URL(tab.url).hostname);
+      if (a?.leak) { text = "!"; color = "#dc2626"; }
+      else if (a?.unread_count) text = a.unread_count > 99 ? "99+" : String(a.unread_count);
+    }
+  } catch { /* serveur injoignable : badge vide */ }
+  await browser.action.setBadgeText({ tabId, text }).catch(() => {});
+  if (text) await browser.action.setBadgeBackgroundColor({ tabId, color }).catch(() => {});
+}
+async function updateActiveBadge() {
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true }).catch(() => []);
+  if (tab?.id) await updateBadge(tab.id);
+}
+browser.tabs.onActivated.addListener(({ tabId }) => void updateBadge(tabId));
+browser.tabs.onUpdated.addListener((tabId, change, tab) => { if (tab.active && (change.status === "complete" || change.url)) void updateBadge(tabId); });
+browser.alarms.create("badge", { periodInMinutes: 2 });
+browser.alarms.onAlarm.addListener(a => { if (a.name === "badge") void updateActiveBadge(); });
+
 // À l'installation / mise à jour : sans accès aux sites, ouvrir les réglages pour le demander.
 browser.runtime.onInstalled.addListener(async () => {
-  if (!await browser.permissions.contains({ origins: ["<all_urls>"] })) browser.runtime.openOptionsPage();
+  if (!await browser.permissions.contains({ origins: ["http://*/*", "https://*/*"] })) browser.runtime.openOptionsPage();
 });

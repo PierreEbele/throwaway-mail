@@ -437,7 +437,7 @@ syncControls();
 })();
 
 // Firefox (MV3) n'accorde pas « tous les sites » à l'installation : on le demande (clic requis).
-const ALL_SITES = { origins: ["<all_urls>"] };
+const ALL_SITES = { origins: ["http://*/*", "https://*/*"] };
 async function checkSitePermission() {
   const banner = document.getElementById("perm-banner");
   banner.hidden = await browser.permissions.contains(ALL_SITES);

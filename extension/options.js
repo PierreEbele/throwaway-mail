@@ -18,7 +18,7 @@ async function formConfig() {
   const server = Throwaway.normalizeServer($("server").value);
   const apiKey = $("api-key").value.trim();
   if (!apiKey) throw new Error("Collez une clé API.");
-  const granted = await browser.permissions.request({ origins: [server + "/*", "<all_urls>"] });
+  const granted = await browser.permissions.request({ origins: [server + "/*", "http://*/*", "https://*/*"] });
   if (!granted) throw new Error("Permission d’accès au serveur refusée.");
   return { server, apiKey, domain: $("domain").value };
 }
@@ -33,7 +33,7 @@ for (const id of ["bitwarden-mode", "identity-ttl"]) $(id).addEventListener("cha
 });
 for (const id of Object.keys(TOGGLES)) $(id).addEventListener("change", async () => {
   await browser.storage.local.set(toggles());
-  if ($("auto-prompt").checked || $("auto-code").checked) await browser.permissions.request({ origins: ["<all_urls>"] }).catch(() => {});
+  if ($("auto-prompt").checked || $("auto-code").checked) await browser.permissions.request({ origins: ["http://*/*", "https://*/*"] }).catch(() => {});
   status("Automatismes enregistrés.");
 });
 
@@ -79,7 +79,7 @@ $("clear").addEventListener("click", async () => {
 })();
 
 // Firefox (MV3) n'accorde pas « tous les sites » à l'installation : on le demande (clic requis).
-const ALL_SITES = { origins: ["<all_urls>"] };
+const ALL_SITES = { origins: ["http://*/*", "https://*/*"] };
 async function checkSitePermission() {
   const banner = document.getElementById("perm-banner");
   banner.hidden = await browser.permissions.contains(ALL_SITES);
