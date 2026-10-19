@@ -57,6 +57,13 @@
       "when": 1793729241730,
       "tag": "0007_notify_targets",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793729385575,
+      "tag": "0008_trackers_phishing_newsletters",
+      "breakpoints": true
     }
   ]
 }

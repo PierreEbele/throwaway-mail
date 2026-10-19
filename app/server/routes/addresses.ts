@@ -242,6 +242,7 @@ export function registerAddresses(r: ApiRouter) {
         expires_at: ExpiresAt.optional(),
         category_id: z.string().nullable().optional(),
         pinned: z.boolean().optional(),
+        block_promos: z.boolean().optional(),
       }),
     },
     (c, { body }) => {
@@ -253,6 +254,7 @@ export function registerAddresses(r: ApiRouter) {
       const set: Partial<Address> = { updatedAt: d.now() };
       if (body.category_id !== undefined) set.categoryId = body.category_id;
       if (body.pinned !== undefined) set.pinned = body.pinned;
+      if (body.block_promos !== undefined) set.blockPromos = body.block_promos;
       if (body.site_name !== undefined) set.siteName = body.site_name;
       if (body.site_url !== undefined) set.siteUrl = body.site_url;
       if (body.label !== undefined) set.label = body.label || null;

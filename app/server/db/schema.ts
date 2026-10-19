@@ -118,6 +118,8 @@ export const addresses = sqliteTable(
     /** Last sender whose domain does not match the site: the address has probably leaked or been sold. */
     leakSender: text("leak_sender"),
     leakAt: integer("leak_at"),
+    /** Reject newsletters / promotional bulk mail (mail with a verification code still gets through). */
+    blockPromos: integer("block_promos", { mode: "boolean" }).notNull().default(false),
   },
   (t) => [uniqueIndex("addresses_domain_local_uq").on(t.domainId, t.localPart), index("addresses_user_idx").on(t.userId)],
 );
@@ -150,6 +152,16 @@ export const messages = sqliteTable(
     bodyHash: text("body_hash"),
     /** JSON [{filename, mime_type, size}] — attachments are not stored, only described. */
     attachmentsJson: text("attachments_json"),
+    /** Tracking pixels and tracking link parameters removed from the stored HTML. */
+    trackersRemoved: integer("trackers_removed").notNull().default(0),
+    /** "auth_failed" | "lookalike": possible phishing. */
+    authWarning: text("auth_warning"),
+    /** Newsletter / bulk mail (List-Unsubscribe, List-Id, Precedence: bulk). */
+    isBulk: integer("is_bulk", { mode: "boolean" }).notNull().default(false),
+    unsubscribeUrl: text("unsubscribe_url"),
+    unsubscribeMailto: text("unsubscribe_mailto"),
+    unsubscribeOneClick: integer("unsubscribe_one_click", { mode: "boolean" }).notNull().default(false),
+    unsubscribedAt: integer("unsubscribed_at"),
   },
   (t) => [
     uniqueIndex("messages_address_msgid_uq").on(t.addressId, t.messageIdHeader),

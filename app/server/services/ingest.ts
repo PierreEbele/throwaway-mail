@@ -5,7 +5,9 @@ import type { Deps } from "../context.js";
 import { addresses, destinations, domains, extractedItems, leakEvents, messages, users, type Address, type Domain } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
 import { LOCAL_PART_RE, normalizeRecipient } from "../lib/email.js";
-import { sanitizeEmailHtml } from "../lib/sanitize.js";
+import { sanitizeEmail } from "../lib/sanitize.js";
+import { authWarning } from "../lib/phishing.js";
+import { listInfo } from "../lib/listheaders.js";
 import { matchCategory } from "../routes/categories.js";
 import { notify } from "./notify.js";
 import { runParser } from "../parser/index.js";
@@ -177,6 +179,13 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
   }
 
   const parsed = await runParser({ subject: email.subject, text: email.text, html: email.html }, deps.parserStrategies);
+  const list = listInfo(email.headers);
+  if (address.blockPromos && list.bulk && !parsed.code) {
+    log.info("reject: promotional mail blocked", { address_id: address.id });
+    return { action: "reject", reason: "promotional_blocked" };
+  }
+  const clean = email.html ? sanitizeEmail(email.html) : null;
+  const auth = { spf: authResult(email.headers, "spf"), dkim: authResult(email.headers, "dkim"), dmarc: authResult(email.headers, "dmarc") };
   const forwardTo = preservedForward ?? forwardTarget(deps, address);
   const now = deps.now();
   const id = newId("msg");
@@ -197,12 +206,16 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
         subject: email.subject ?? null,
         receivedAt: now,
         text: email.text ?? null,
-        html: email.html ? sanitizeEmailHtml(email.html) : null,
+        html: clean?.html ?? null,
         rawSize: input.raw.byteLength,
         headersJson: JSON.stringify(headers),
-        spf: authResult(email.headers, "spf"),
-        dkim: authResult(email.headers, "dkim"),
-        dmarc: authResult(email.headers, "dmarc"),
+        ...auth,
+        trackersRemoved: clean?.trackers ?? 0,
+        authWarning: address.isUnassigned ? null : authWarning(address.siteUrl, email.from?.address ?? null, auth),
+        isBulk: list.bulk,
+        unsubscribeUrl: list.url,
+        unsubscribeMailto: list.mailto,
+        unsubscribeOneClick: list.oneClick,
         forwarded: !!forwardTo,
         forwardTo,
         bodyHash,

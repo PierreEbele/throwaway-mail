@@ -47,6 +47,7 @@ export function addressOut(a: Address, domainName: string, counts?: { unread: nu
     pinned: a.pinned,
     blocked_senders: parseList(a.blockedSendersJson),
     trusted_senders: parseList(a.trustedSendersJson),
+    block_promos: a.blockPromos,
     leak: a.leakSender ? { sender: a.leakSender, at: a.leakAt } : null,
     unread_count: counts?.unread ?? 0,
     message_count: counts?.total ?? 0,
@@ -79,6 +80,10 @@ export function messageSummaryOut(m: Message, items: ExtractedItem[]) {
     forwarded: m.forwarded,
     attachments: m.attachmentsJson ? (JSON.parse(m.attachmentsJson) as Array<{ filename: string | null; mime_type: string; size: number; inline: boolean }>) : [],
     preview,
+    trackers_removed: m.trackersRemoved,
+    auth_warning: m.authWarning,
+    is_bulk: m.isBulk,
+    unsubscribe: m.unsubscribeUrl || m.unsubscribeMailto ? { url: m.unsubscribeUrl, mailto: m.unsubscribeMailto, one_click: m.unsubscribeOneClick, done_at: m.unsubscribedAt } : null,
     code: ex.code?.value ?? null,
     has_links: ex.links.length > 0,
   };

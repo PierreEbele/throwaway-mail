@@ -66,3 +66,30 @@ describe("notifications", () => {
     expect((await user.get("/v1/notify-targets")).json.targets[0].last_error).toBe("HTTP 500");
   });
 });
+
+describe("newsletters", () => {
+  const news = (extra: string[] = []) =>
+    ["From: News <news@shop.com>", "To: x@mail.example.test", "Subject: Deals", `Message-ID: <${Math.random()}@shop.com>`, "List-Unsubscribe: <https://shop.com/unsub?u=1>", "List-Unsubscribe-Post: List-Unsubscribe=One-Click", ...extra, "", "Big deals"].join("\r\n");
+
+  it("unsubscribes in one click and can block future newsletters", async () => {
+    const { t, user, calls } = await setup();
+    const a = (await user.post("/v1/addresses", { site_name: "Shop", site_url: "shop.com" })).json.address;
+    await ingest(t, a.email, news());
+    const m = (await user.get(`/v1/addresses/${a.id}/messages`)).json.messages[0];
+    expect(m).toMatchObject({ is_bulk: true, unsubscribe: { url: "https://shop.com/unsub?u=1", one_click: true } });
+    const r = (await user.post(`/v1/messages/${m.id}/unsubscribe`, { block: true })).json;
+    expect(r).toMatchObject({ done: true, blocked: true });
+    expect(calls.at(-1)).toMatchObject({ url: "https://shop.com/unsub?u=1" });
+    expect(calls.at(-1)!.init.body).toBe("List-Unsubscribe=One-Click");
+    expect((await ingest(t, a.email, news())).json).toMatchObject({ action: "reject", reason: "promotional_blocked" });
+    // a code still gets through
+    expect((await ingest(t, a.email, news(["X-Extra: 1"]).replace("Big deals", "Your verification code is 552211"))).json.action).toBe("store_only");
+  });
+
+  it("flags look-alike senders", async () => {
+    const { t, user } = await setup();
+    const a = (await user.post("/v1/addresses", { site_name: "PayPal", site_url: "paypal.com" })).json.address;
+    await ingest(t, a.email, simpleEml({ text: "verify your account", from: "PayPal <service@paypa1.com>" }));
+    expect((await user.get(`/v1/addresses/${a.id}/messages`)).json.messages[0].auth_warning).toBe("lookalike");
+  });
+});

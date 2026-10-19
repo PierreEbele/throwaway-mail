@@ -14,6 +14,38 @@ function emailDoc(html: string) {
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${IFRAME_CSP}"><base target="_blank"><style>body{margin:0;padding:12px;font-family:system-ui,sans-serif;color:#111;background:#fff;word-wrap:break-word}img{max-width:100%;height:auto}</style></head><body>${html}</body></html>`;
 }
 
+function UnsubscribeButton({ m }: { m: MessageFull }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  if (m.unsubscribe!.done_at) return <span>✓ Unsubscribed {timeAgo(m.unsubscribe!.done_at)}</span>;
+  const run = async (block: boolean) => {
+    setBusy(true);
+    try {
+      const r = await post<{ done: boolean; error: string | null; url: string | null; mailto: string | null }>(`/v1/messages/${m.id}/unsubscribe`, { block });
+      qc.invalidateQueries({ queryKey: ["message", m.id] });
+      qc.invalidateQueries({ queryKey: ["address", m.address_id] });
+      if (r.done) toast(block ? "Unsubscribed, newsletters now rejected" : "Unsubscribed", "success");
+      else if (r.url || r.mailto) {
+        window.open(r.url ?? r.mailto!, "_blank", "noopener,noreferrer");
+        toast("Finish unsubscribing on the page that just opened", "success");
+      } else toast(r.error ?? "Could not unsubscribe", "error");
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <span className="flex gap-1">
+      <button className="btn-secondary px-2 py-0.5 text-xs" disabled={busy} onClick={() => run(false)}>Unsubscribe</button>
+      <button className="btn-secondary px-2 py-0.5 text-xs" disabled={busy} onClick={() => run(true)} title="Unsubscribe and reject future newsletters on this address">
+        Unsubscribe &amp; block newsletters
+      </button>
+    </span>
+  );
+}
+
 function formatSize(n: number) {
   return n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
@@ -97,6 +129,20 @@ function MessageView({ id, onGone }: { id: string; onGone: () => void }) {
           ))}
         </p>
       </div>
+      {m.auth_warning && (
+        <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+          <strong>Possible phishing.</strong>{" "}
+          {m.auth_warning === "lookalike"
+            ? `The sender's domain imitates the site's (${m.from}). Do not click its links or enter a password.`
+            : "This mail failed sender authentication (SPF/DKIM/DMARC): the sender may be forged."}
+        </div>
+      )}
+      {(m.trackers_removed > 0 || m.unsubscribe) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+          {m.trackers_removed > 0 && <span title="Tracking pixels and link tracking parameters were removed">🛡 {m.trackers_removed} tracker{m.trackers_removed > 1 ? "s" : ""} removed</span>}
+          {m.unsubscribe && <UnsubscribeButton m={m} />}
+        </div>
+      )}
       {m.attachments.some((x) => !x.inline) && (
         <ul className="flex flex-wrap gap-2 text-xs" aria-label="Attachments (not stored)">
           {m.attachments.filter((x) => !x.inline).map((x, i) => (
@@ -487,6 +533,10 @@ export function AddressDetailPage() {
             <label htmlFor="fwd-toggle" className="text-sm">Forward new mail to my mailbox</label>
             <Toggle id="fwd-toggle" checked={a.forward_enabled} onChange={(v) => update.mutate({ forward_enabled: v })} label="Forward new mail for this site" />
           </div>
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor="promo-toggle" className="text-sm">Reject newsletters &amp; promotions <span className="block text-xs text-zinc-500">Mail with a verification code still gets through.</span></label>
+            <Toggle id="promo-toggle" checked={a.block_promos} onChange={(v) => update.mutate({ block_promos: v })} label="Reject newsletters and promotions" />
+          </div>
           <div>
             <label htmlFor="fwd-dest" className="label">Destination</label>
             <select id="fwd-dest" className="input" value={a.destination_id ?? ""} onChange={(e) => update.mutate({ destination_id: e.target.value || null })}>
@@ -581,6 +631,8 @@ export function AddressDetailPage() {
                     {m.code && <code className="rounded bg-zinc-900 px-1.5 font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">{m.code}</code>}
                     {m.forwarded && <span>↪ forwarded</span>}
                     {m.attachments.some((x) => !x.inline) && <span title="Has attachments (not stored)">📎</span>}
+                    {m.auth_warning && <span className="rounded bg-red-100 px-1 text-red-700 dark:bg-red-950 dark:text-red-300" title="Possible phishing">phishing?</span>}
+                    {m.is_bulk && <span title="Newsletter / bulk mail">newsletter</span>}
                     <span className="truncate">{m.preview}</span>
                   </div>
                 </button>
