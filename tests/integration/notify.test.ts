@@ -1,0 +1,68 @@
+import { describe, expect, it } from "vitest";
+import { addDomain, ingest, loginAs, makeTestApp, setupAdmin, simpleEml } from "../helpers.js";
+import { isPrivateHost, webhookSignature } from "../../app/server/services/notify.js";
+
+async function setup() {
+  const t = makeTestApp();
+  const admin = await setupAdmin(t);
+  await addDomain(admin, "mail.example.test");
+  const user = loginAs(t, "u@example.org");
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  t.deps.fetch = (async (url: string, init: RequestInit) => {
+    calls.push({ url: String(url), init });
+    return new Response("ok");
+  }) as typeof fetch;
+  const flush = () => new Promise((r) => setTimeout(r, 20));
+  return { t, admin, user, calls, flush };
+}
+
+describe("notifications", () => {
+  it("detects private hosts", () => {
+    for (const h of ["localhost", "127.0.0.1", "10.1.2.3", "192.168.1.5", "172.20.0.1", "ha.local", "nas.lan", "homeassistant", "::1", "[fd00::1]"]) expect(isPrivateHost(h)).toBe(true);
+    for (const h of ["ntfy.sh", "8.8.8.8", "172.32.0.1", "example.com"]) expect(isPrivateHost(h)).toBe(false);
+  });
+
+  it("validates targets and keeps tokens write-only", async () => {
+    const { admin, user } = await setup();
+    expect((await user.post("/v1/notify-targets", { kind: "ntfy", name: "x", url: "http://192.168.1.2/topic" })).status).toBe(400);
+    expect((await admin.post("/v1/notify-targets", { kind: "ntfy", name: "x", url: "http://192.168.1.2/topic" })).status).toBe(201);
+    expect((await user.post("/v1/notify-targets", { kind: "telegram", name: "t" })).status).toBe(400);
+    expect((await user.post("/v1/notify-targets", { kind: "ntfy", name: "x", url: "ftp://ntfy.sh/t" })).status).toBe(400);
+    const t = (await user.post("/v1/notify-targets", { kind: "gotify", name: "g", url: "https://gotify.example.com", token: "SECRET" })).json.target;
+    expect(t).toMatchObject({ has_token: true });
+    expect(JSON.stringify(t)).not.toContain("SECRET");
+  });
+
+  it("pushes codes to ntfy, Telegram and signed webhooks", async () => {
+    const { t, user, calls, flush } = await setup();
+    await user.post("/v1/notify-targets", { kind: "ntfy", name: "phone", url: "https://ntfy.sh/my-topic", token: "tk", events: ["code.received"] });
+    await user.post("/v1/notify-targets", { kind: "telegram", name: "tg", token: "123:abc", chat_id: "42", events: ["code.received"] });
+    const hook = (await user.post("/v1/notify-targets", { kind: "webhook", name: "n8n", url: "https://n8n.example.com/hook", events: ["message.received", "code.received"] })).json.target;
+    const a = (await user.post("/v1/addresses", { site_name: "GitHub" })).json.address;
+
+    await ingest(t, a.email, simpleEml({ subject: "Hi", text: "nothing here" }));
+    await flush();
+    expect(calls.map((c) => c.url)).toEqual(["https://n8n.example.com/hook"]);
+
+    calls.length = 0;
+    await ingest(t, a.email, simpleEml({ subject: "Your code", text: "Your verification code is 482913" }));
+    await flush();
+    const ntfy = calls.find((c) => c.url === "https://ntfy.sh/my-topic")!;
+    expect((ntfy.init.headers as any).title).toBe("Code 482913");
+    expect((ntfy.init.headers as any).authorization).toBe("Bearer tk");
+    const tg = calls.find((c) => c.url.startsWith("https://api.telegram.org/bot123:abc/"))!;
+    expect(JSON.parse(tg.init.body as string)).toMatchObject({ chat_id: "42" });
+    const wh = calls.filter((c) => c.url === "https://n8n.example.com/hook");
+    expect(wh.map((c) => JSON.parse(c.init.body as string).type).sort()).toEqual(["code.received", "message.received"]);
+    const h = wh[0]!.init.headers as Record<string, string>;
+    expect(h["x-tm-signature"]).toBe(webhookSignature(hook.secret, h["x-tm-timestamp"]!, wh[0]!.init.body as string));
+  });
+
+  it("records failures and supports a test send", async () => {
+    const { t, user } = await setup();
+    t.deps.fetch = (async () => new Response("no", { status: 500 })) as typeof fetch;
+    const tg = (await user.post("/v1/notify-targets", { kind: "telegram", name: "tg", token: "1:a", chat_id: "1" })).json.target;
+    expect((await user.post(`/v1/notify-targets/${tg.id}/test`)).json).toEqual({ ok: false, error: "HTTP 500" });
+    expect((await user.get("/v1/notify-targets")).json.targets[0].last_error).toBe("HTTP 500");
+  });
+});

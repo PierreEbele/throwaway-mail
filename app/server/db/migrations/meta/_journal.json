@@ -50,6 +50,13 @@
       "when": 1793729121409,
       "tag": "0006_leak_history_dedupe_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1793729241730,
+      "tag": "0007_notify_targets",
+      "breakpoints": true
     }
   ]
 }

@@ -16,6 +16,8 @@ export interface Deps {
   parserStrategies: ParserStrategy[];
   now: () => number;
   oidc: OidcService;
+  /** Outbound HTTP (notifications, webhooks); replaced in tests. */
+  fetch: typeof fetch;
 }
 
 export interface SessionInfo {

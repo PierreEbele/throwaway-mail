@@ -47,3 +47,8 @@ export interface Digest {
   busiest: Array<{ address: Address; count: number }>;
 }
 export interface LeakGroup { sender_domain: string; count: number; first_at: number; last_at: number; senders: string[]; addresses: Address[] }
+export type NotifyKind = "ntfy" | "gotify" | "telegram" | "webhook";
+export interface NotifyTarget {
+  id: string; kind: NotifyKind; name: string; url: string | null; chat_id: string | null; has_token: boolean; secret: string | null;
+  events: string[]; enabled: boolean; last_ok_at: number | null; last_error: string | null; created_at: number;
+}

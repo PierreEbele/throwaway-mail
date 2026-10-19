@@ -24,6 +24,7 @@ import { registerReview } from "./routes/review.js";
 import { registerCompat } from "./routes/compat.js";
 import { registerCategories } from "./routes/categories.js";
 import { registerExtras } from "./routes/extras.js";
+import { registerNotify } from "./routes/notify.js";
 
 const APP_CSP = {
   defaultSrc: ["'self'"],
@@ -88,6 +89,7 @@ export function createApp(deps: Deps) {
   const api = new ApiRouter(app);
   registerAuth(api);
   registerExtras(api);
+  registerNotify(api);
   registerAddresses(api);
   registerDomains(api);
   registerDestinations(api);

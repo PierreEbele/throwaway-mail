@@ -25,6 +25,7 @@ export function buildDeps(config: Config, logger: Logger, overrides: Partial<Dep
     parserStrategies: config.PARSER_LLM_FALLBACK ? [new LlmFallbackStrategy()] : [],
     now: () => Date.now(),
     oidc: new OidcService(config, logger),
+    fetch: (input, init) => fetch(input, init),
     ...overrides,
   };
 }

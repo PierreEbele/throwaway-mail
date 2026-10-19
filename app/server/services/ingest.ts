@@ -7,6 +7,7 @@ import { newId } from "../lib/crypto.js";
 import { LOCAL_PART_RE, normalizeRecipient } from "../lib/email.js";
 import { sanitizeEmailHtml } from "../lib/sanitize.js";
 import { matchCategory } from "../routes/categories.js";
+import { notify } from "./notify.js";
 import { runParser } from "../parser/index.js";
 import { baseDomain, listed, looksLikeLeak, parseList, senderDomain } from "../lib/senders.js";
 
@@ -181,6 +182,7 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
   const id = newId("msg");
   const headers = email.headers.map((h) => ({ key: h.key, value: h.value.slice(0, 2000) })).slice(0, 200);
 
+  let leak = false;
   deps.db.transaction((tx) => {
     tx.insert(messages)
       .values({
@@ -239,7 +241,7 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
       })),
     ];
     if (items.length) tx.insert(extractedItems).values(items).run();
-    const leak = !address!.isUnassigned && looksLikeLeak(address!.siteUrl, email.from?.address ?? null, parseList(address!.trustedSendersJson));
+    leak = !address!.isUnassigned && looksLikeLeak(address!.siteUrl, email.from?.address ?? null, parseList(address!.trustedSendersJson));
     tx.update(addresses)
       .set({ lastMessageAt: now, ...(leak ? { leakSender: email.from!.address!.toLowerCase(), leakAt: now } : {}) })
       .where(eq(addresses.id, address!.id))
@@ -262,6 +264,29 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     received_at: now,
     has_code: !!parsed.code,
   });
+
+  const link = `${deps.config.APP_URL.replace(/\/$/, "")}/addresses/${address.id}`;
+  const site = address.siteName;
+  const data = { address_id: address.id, address: rcpt.full, site, message_id: id, from: email.from?.address ?? null, subject: email.subject ?? null };
+  const pushes: Promise<unknown>[] = [
+    notify(deps, address.userId, { type: "message.received", title: `New mail for ${site}`, body: `${email.from?.address ?? "?"}: ${email.subject ?? "(no subject)"}`, url: link, data }),
+  ];
+  if (parsed.code) {
+    pushes.push(notify(deps, address.userId, { type: "code.received", title: `Code ${parsed.code.value}`, body: `${site} · ${email.subject ?? ""}`.trim(), url: link, data: { ...data, code: parsed.code.value } }));
+  }
+  if (leak) {
+    pushes.push(
+      notify(deps, address.userId, {
+        type: "leak.detected",
+        title: `Possible leak: ${site}`,
+        body: `${rcpt.full} received mail from ${email.from?.address}, which is not ${site}.`,
+        url: link,
+        data,
+      }),
+    );
+  }
+  // Never delay the Worker's answer on slow notification endpoints.
+  void Promise.all(pushes).catch(() => {});
 
   return forwardTo ? { action: "forward", forward_to: forwardTo, message_id: id } : { action: "store_only", message_id: id };
 }

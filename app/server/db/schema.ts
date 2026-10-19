@@ -174,6 +174,32 @@ export const extractedItems = sqliteTable(
   (t) => [index("extracted_message_idx").on(t.messageId)],
 );
 
+/** Where to push events: ntfy / Gotify / Telegram, or a signed generic webhook. */
+export const notifyTargets = sqliteTable(
+  "notify_targets",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["ntfy", "gotify", "telegram", "webhook"] }).notNull(),
+    name: text("name").notNull(),
+    /** ntfy topic URL, Gotify server URL or webhook URL (unused for Telegram). */
+    url: text("url"),
+    /** ntfy access token, Gotify app token or Telegram bot token. */
+    token: text("token"),
+    /** Telegram chat id. */
+    chatId: text("chat_id"),
+    /** HMAC secret for webhooks. */
+    secret: text("secret"),
+    /** JSON array of event types. */
+    eventsJson: text("events_json").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    lastOkAt: integer("last_ok_at"),
+    lastError: text("last_error"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("notify_targets_user_idx").on(t.userId)],
+);
+
 /** Every mail whose sender does not match the address's site (the address column only keeps the latest). */
 export const leakEvents = sqliteTable(
   "leak_events",
@@ -208,4 +234,5 @@ export type Address = typeof addresses.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type Destination = typeof destinations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
+export type NotifyTarget = typeof notifyTargets.$inferSelect;
 export type ExtractedItem = typeof extractedItems.$inferSelect;
