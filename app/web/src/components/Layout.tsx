@@ -1,11 +1,11 @@
 import { useState, type DragEvent, type ReactNode } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { patch, post } from "../api";
+import { del, patch, post } from "../api";
 import { useToast } from "./ui";
 import { useAuth } from "../auth";
 import { useReviewCount } from "../pages/Review";
-import { ADDRESS_DRAG_TYPE, CATEGORY_DRAG_TYPE, CategoryDialog, DOT, PinIcon, folderHref, useCategories } from "../pages/Mailbox";
+import { ADDRESS_DRAG_TYPE, CATEGORY_DRAG_TYPE, CategoryDialog, DOT, PinIcon, folderHref, useCategories, useSavedSearches } from "../pages/Mailbox";
 import type { Category } from "../types";
 
 function ThemeToggle() {
@@ -50,6 +50,7 @@ const ICONS = {
   users: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 20a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 7M22 20a7 7 0 0 0-4-6.3",
   log: "M6 3h9l4 4v14H6zM9 12h7M9 16h7",
   digest: "M4 20V10M10 20V4M16 20v-7M22 20H2",
+  search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-5-5",
 };
 
 function EyeIcon({ off }: { off?: boolean }) {
@@ -116,6 +117,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user, cloudflareMode } = useAuth();
   const review = useReviewCount(!!user);
   const categories = useCategories(!!user);
+  const searches = useSavedSearches(!!user);
   const loc = useLocation();
   const qc = useQueryClient();
   const nav = useNavigate();
@@ -220,6 +222,23 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <button className="px-2.5 py-1 text-left text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" onClick={() => setEditing(null)}>
             Group addresses: create a category
           </button>
+        )}
+
+        {(searches.data ?? []).length > 0 && (
+          <>
+            <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Smart folders</p>
+            {searches.data!.map((x) => (
+              <Folder key={x.id} to={folderHref(`smart:${x.id}`)} active={isFolder(`smart:${x.id}`)} icon={<Icon d={ICONS.search} />} label={x.name}>
+                <button
+                  className="absolute top-1 right-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 opacity-0 group-hover/f:opacity-100 hover:bg-zinc-300/60 focus-visible:opacity-100 dark:hover:bg-zinc-700"
+                  onClick={() => del(`/v1/saved-searches/${x.id}`).then(() => qc.invalidateQueries({ queryKey: ["saved-searches"] }))}
+                  aria-label={`Delete smart folder ${x.name}`}
+                >
+                  ×
+                </button>
+              </Folder>
+            ))}
+          </>
         )}
 
         <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Settings</p>

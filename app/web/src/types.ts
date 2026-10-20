@@ -55,3 +55,4 @@ export interface NotifyTarget {
   id: string; kind: NotifyKind; name: string; url: string | null; chat_id: string | null; has_token: boolean; secret: string | null;
   events: string[]; enabled: boolean; last_ok_at: number | null; last_error: string | null; created_at: number;
 }
+export interface SavedSearch { id: string; name: string; params: Record<string, string>; position: number; created_at: number }

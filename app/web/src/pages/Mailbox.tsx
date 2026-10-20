@@ -2,7 +2,7 @@ import { useEffect, useCallback, useLayoutEffect, useMemo, useRef, useState, typ
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, patch, post } from "../api";
-import type { Address, Category, CategoryColor } from "../types";
+import type { Address, Category, CategoryColor, SavedSearch } from "../types";
 import { ErrorText, Modal, Spinner, confirmAction, useToast } from "../components/ui";
 import { NewAddressDialog, useDomains } from "./Addresses";
 import { AddressDetailPage, EditSiteDialog } from "./AddressDetail";
@@ -38,7 +38,19 @@ export function useStale(enabled = true) {
   return useQuery({ queryKey: ["stale"], enabled, queryFn: () => get<{ addresses: Address[] }>(`/v1/stale-addresses?days=${STALE_DAYS}`).then((r) => r.addresses) });
 }
 
-/** Folder from `?folder=`: inbox | pinned | archived | none | <category id>. */
+export function useSavedSearches(enabled = true) {
+  return useQuery({ queryKey: ["saved-searches"], enabled, queryFn: () => get<{ searches: SavedSearch[] }>("/v1/saved-searches").then((r) => r.searches) });
+}
+
+/** Quick filters shown as chips above the list; also what a smart folder stores. */
+const QUICK_FILTERS: Array<{ key: string; value: string; label: string }> = [
+  { key: "unread", value: "true", label: "Unread" },
+  { key: "has_code", value: "true", label: "Has code" },
+  { key: "since_hours", value: "24", label: "Last 24 h" },
+  { key: "leak", value: "true", label: "Leak" },
+];
+
+/** Folder from `?folder=`: inbox | pinned | archived | none | smart:<id> | <category id>. */
 export function useFolder() {
   const [sp] = useSearchParams();
   return sp.get("folder") ?? "inbox";
@@ -506,6 +518,9 @@ function AddressList({ folder, activeId }: { folder: string; activeId?: string }
   const [debounced, setDebounced] = useState("");
   const [domain, setDomain] = useState("");
   const [creating, setCreating] = useState(false);
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  const searches = useSavedSearches();
+  const smart = folder.startsWith("smart:") ? searches.data?.find((x) => x.id === folder.slice(6)) : undefined;
   const [reviewStale, setReviewStale] = useState(false);
   const [menu, setMenu] = useState<{ a: Address; x: number; y: number } | null>(null);
   const [editing, setEditing] = useState<Address | null>(null);
@@ -519,25 +534,44 @@ function AddressList({ folder, activeId }: { folder: string; activeId?: string }
   const toast = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const anchor = useRef<string | null>(null);
-  useEffect(() => setSelected(new Set()), [folder]);
+  useEffect(() => {
+    setSelected(new Set());
+    setFilters({});
+  }, [folder]);
+  const saveSearch = () => {
+    const name = window.prompt("Name of the smart folder", Object.keys(filters).map((k) => QUICK_FILTERS.find((f) => f.key === k)?.label ?? k).join(" + ") || debounced);
+    if (!name) return;
+    const params: Record<string, string> = { ...filters };
+    if (debounced) params.q = debounced;
+    if (domain) params.domain = domain;
+    if (byId.has(folder) || folder === "none") params.category = folder;
+    post("/v1/saved-searches", { name, params }).then(
+      () => { qc.invalidateQueries({ queryKey: ["saved-searches"] }); toast(`Smart folder ${name} saved`, "success"); },
+      (e: Error) => toast(e.message, "error"),
+    );
+  };
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q), 200);
     return () => clearTimeout(t);
   }, [q]);
   const params = useMemo(() => {
     const p = new URLSearchParams();
+    if (smart) for (const [k, v] of Object.entries(smart.params)) p.set(k, v);
+    for (const [k, v] of Object.entries(filters)) p.set(k, v);
     if (debounced) p.set("q", debounced);
     if (domain) p.set("domain", domain);
-    if (folder === "archived") p.set("status", "archived");
+    if (folder.startsWith("smart:")) {
+      /* params come from the smart folder */
+    } else if (folder === "archived") p.set("status", "archived");
     else if (folder === "pinned") p.set("pinned", "true");
     else if (folder === "inbox") p.set("hide_hidden", "true");
     else p.set("category", folder);
     return p.toString();
-  }, [debounced, domain, folder]);
+  }, [debounced, domain, folder, filters, smart]);
   const list = useQuery({ queryKey: ["addresses", params], queryFn: () => get<{ addresses: Address[] }>(`/v1/addresses?${params}`).then((r) => r.addresses) });
   const byId = useMemo(() => new Map((categories.data ?? []).map((c) => [c.id, c])), [categories.data]);
   const title =
-    folder === "inbox" ? "Inbox" : folder === "pinned" ? "Pinned" : folder === "archived" ? "Archived" : folder === "none" ? "No category" : (byId.get(folder)?.name ?? "Category");
+    folder === "inbox" ? "Inbox" : folder === "pinned" ? "Pinned" : folder === "archived" ? "Archived" : folder === "none" ? "No category" : smart ? smart.name : (byId.get(folder)?.name ?? "Category");
 
   const pinned = (list.data ?? []).filter((a) => a.pinned && folder !== "pinned");
   const rest = (list.data ?? []).filter((a) => !a.pinned || folder === "pinned");
@@ -631,6 +665,24 @@ function AddressList({ folder, activeId }: { folder: string; activeId?: string }
               <option key={d.id} value={d.name}>{d.name}</option>
             ))}
           </select>
+        </div>
+        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Quick filters">
+          {QUICK_FILTERS.map((f) => {
+            const on = filters[f.key] === f.value;
+            return (
+              <button
+                key={f.key}
+                aria-pressed={on}
+                onClick={() => setFilters((prev) => { const n = { ...prev }; if (on) delete n[f.key]; else n[f.key] = f.value; return n; })}
+                className={`rounded-full border px-2 py-0.5 text-xs ${on ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900" : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"}`}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+          {(Object.keys(filters).length > 0 || debounced) && !smart && (
+            <button className="ml-auto text-xs text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-100" onClick={saveSearch}>Save as smart folder</button>
+          )}
         </div>
       </div>
       {folder === "inbox" && staleCount > 0 && (

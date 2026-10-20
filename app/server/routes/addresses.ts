@@ -170,6 +170,10 @@ export function registerAddresses(r: ApiRouter) {
         q: z.string().optional(),
         category: z.string().optional().describe("Category id, or `none` for uncategorised addresses"),
         pinned: z.enum(["true", "false"]).optional(),
+        unread: z.enum(["true"]).optional().describe("Only addresses with unread mail"),
+        has_code: z.enum(["true"]).optional().describe("Only addresses that received a verification code"),
+        since_hours: z.coerce.number().int().min(1).max(24 * 365).optional().describe("Only addresses that received mail in the last N hours"),
+        leak: z.enum(["true"]).optional().describe("Only addresses with a leak warning"),
         hide_hidden: z.enum(["true", "false"]).optional().describe("Exclude addresses whose category is hidden (used by the Inbox)"),
         limit: z.coerce.number().int().min(1).max(1000).default(500),
         offset: z.coerce.number().int().min(0).default(0),
@@ -185,6 +189,13 @@ export function registerAddresses(r: ApiRouter) {
       if (query.category === "none") conds.push(isNull(addresses.categoryId));
       else if (query.category) conds.push(eq(addresses.categoryId, query.category));
       if (query.pinned) conds.push(eq(addresses.pinned, query.pinned === "true"));
+      if (query.unread) conds.push(sql`exists (select 1 from ${messages} where ${messages.addressId} = ${addresses.id} and ${messages.readAt} is null and ${messages.archivedAt} is null)`);
+      if (query.has_code) {
+        const since = query.since_hours ? d.now() - query.since_hours * 3600_000 : 0;
+        conds.push(sql`exists (select 1 from ${messages} join ${extractedItems} on ${extractedItems.messageId} = ${messages.id} where ${messages.addressId} = ${addresses.id} and ${extractedItems.kind} = 'code' and ${extractedItems.rank} = 0 and ${messages.receivedAt} >= ${since})`);
+      }
+      if (query.since_hours) conds.push(gt(addresses.lastMessageAt, d.now() - query.since_hours * 3600_000));
+      if (query.leak) conds.push(isNotNull(addresses.leakAt));
       if (query.hide_hidden === "true") {
         conds.push(sql`(${addresses.categoryId} is null or not exists (select 1 from ${categories} where ${categories.id} = ${addresses.categoryId} and ${categories.hidden} = 1))`);
       }

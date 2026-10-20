@@ -92,3 +92,25 @@ describe("expiry reminders", () => {
     expect((await user.post(`/v1/addresses/${far.id}/extend`, { days: null })).json.address.expires_at).toBe(null);
   });
 });
+
+describe("smart folders", () => {
+  it("filters by unread / code / recency / leak and saves searches", async () => {
+    const { t, user, mk } = await setup();
+    const a = await mk();
+    const b = await mk();
+    const c = await mk();
+    await ingest(t, a.email, simpleEml({ text: "Your verification code is 991122", from: "a@shop.com" }));
+    await ingest(t, b.email, simpleEml({ text: "hello", from: "x@casino.biz" }));
+    const ids = async (q: string) => (await user.get(`/v1/addresses?${q}`)).json.addresses.map((x: any) => x.id).sort();
+    expect(await ids("has_code=true")).toEqual([a.id]);
+    expect(await ids("unread=true")).toEqual([a.id, b.id].sort());
+    expect(await ids("leak=true")).toEqual([b.id]);
+    expect(await ids("since_hours=24")).toEqual([a.id, b.id].sort());
+    expect(await ids("")).toContain(c.id);
+
+    const s = (await user.post("/v1/saved-searches", { name: "Codes", params: { has_code: "true" } })).json.search;
+    expect((await user.get("/v1/saved-searches")).json.searches).toEqual([s]);
+    expect((await user.del(`/v1/saved-searches/${s.id}`)).status).toBe(200);
+    expect((await user.get("/v1/saved-searches")).json.searches).toEqual([]);
+  });
+});

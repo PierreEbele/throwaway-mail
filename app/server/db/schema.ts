@@ -197,6 +197,21 @@ export const extractedItems = sqliteTable(
   (t) => [index("extracted_message_idx").on(t.messageId)],
 );
 
+/** Smart folders: a named set of /v1/addresses filters shown in the sidebar. */
+export const savedSearches = sqliteTable(
+  "saved_searches",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** JSON object of /v1/addresses query parameters. */
+    paramsJson: text("params_json").notNull(),
+    position: integer("position").notNull().default(0),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("saved_searches_user_idx").on(t.userId)],
+);
+
 /** Where to push events: ntfy / Gotify / Telegram, or a signed generic webhook. */
 export const notifyTargets = sqliteTable(
   "notify_targets",

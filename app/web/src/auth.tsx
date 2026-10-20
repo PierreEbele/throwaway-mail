@@ -94,7 +94,10 @@ export function LiveEvents() {
     };
     es.addEventListener("message.received", onMessage);
     for (const t of ["address.created", "address.updated", "address.deleted"]) es.addEventListener(t, onAddress);
-    es.addEventListener("category.changed", () => qc.invalidateQueries({ queryKey: ["categories"] }));
+    es.addEventListener("category.changed", () => {
+      qc.invalidateQueries({ queryKey: ["categories"] });
+      qc.invalidateQueries({ queryKey: ["saved-searches"] });
+    });
     return () => es.close();
   }, [user, qc, toast]);
   return null;
