@@ -4,6 +4,7 @@ import { createLogger } from "./logger.js";
 import { buildDeps } from "./build-deps.js";
 import { createApp } from "./app.js";
 import { runRetention } from "./services/retention.js";
+import { runExpiryReminders } from "./services/reminders.js";
 import { backfillAuthResults } from "./services/maintenance.js";
 
 // Local (non-Docker) runs may keep settings in .env.
@@ -42,8 +43,19 @@ const retention = () => {
     logger.error("retention failed", { err: e as Error });
   }
 };
+const reminders = () => {
+  try {
+    runExpiryReminders(deps);
+  } catch (e) {
+    logger.error("expiry reminders failed", { err: e as Error });
+  }
+};
 retention();
+reminders();
 const retentionTimer = setInterval(retention, 60 * 60 * 1000);
+retentionTimer.unref();
+const reminderTimer = setInterval(reminders, 10 * 60 * 1000);
+reminderTimer.unref();
 retentionTimer.unref();
 
 const server = serve({ fetch: app.fetch, port: config.PORT, hostname: config.HOST }, (info) => {
@@ -56,6 +68,7 @@ function shutdown(signal: string) {
   stopping = true;
   logger.info("shutting down", { signal });
   clearInterval(retentionTimer);
+  clearInterval(reminderTimer);
   const force = setTimeout(() => {
     logger.warn("forced exit after timeout");
     process.exit(1);

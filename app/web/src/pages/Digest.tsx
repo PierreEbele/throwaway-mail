@@ -111,6 +111,7 @@ export function DigestPage() {
               </ul>
             )}
           </section>
+          <List title="Expiring within 3 days" items={d.expiring} empty="No address about to expire." extra={(a) => new Date(a.expires_at!).toLocaleString()} />
           <List title="New addresses" items={d.created} empty="No address created in this period." extra={(a) => timeAgo(a.created_at)} />
           <LeakHistory />
           <List title="Silent for 30+ days" items={d.silent} empty="Every address has received mail." extra={(a) => `created ${timeAgo(a.created_at)}`} />

@@ -265,6 +265,27 @@ function useSenderAction(id: string) {
   });
 }
 
+function ExpiryBanner({ a }: { a: Address }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const left = a.expires_at! - Date.now();
+  if (left > 3 * 86400_000) return null;
+  const extend = (days: number | null) =>
+    post<{ address: Address }>(`/v1/addresses/${a.id}/extend`, { days }).then(
+      (r) => { qc.setQueryData(["address", a.id], r.address); qc.invalidateQueries({ queryKey: ["addresses"] }); toast(days ? `Extended by ${days} days` : "Expiry removed", "success"); },
+      (e: Error) => toast(e.message, "error"),
+    );
+  const btn = "rounded border border-amber-300 px-2 py-0.5 hover:bg-amber-100 dark:border-amber-800 dark:hover:bg-amber-900/50";
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+      <span className="flex-1">{left <= 0 ? "This address has expired: new mail is rejected." : `This address expires ${timeAgo(a.expires_at!)} (${fullDate(a.expires_at!)}).`}</span>
+      <button className={btn} onClick={() => extend(7)}>+7 days</button>
+      <button className={btn} onClick={() => extend(30)}>+30 days</button>
+      <button className={btn} onClick={() => extend(null)}>Never expire</button>
+    </div>
+  );
+}
+
 function useReplace(a: Address) {
   const qc = useQueryClient();
   const nav = useNavigate();
@@ -542,6 +563,7 @@ export function AddressDetailPage() {
           </div>
         </div>
         {a.status !== "active" && <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">This address is {a.status}: new mail is rejected.</p>}
+        {a.expires_at && a.status !== "archived" && <ExpiryBanner a={a} />}
         {a.burned && a.status !== "active" && (
           <p className="mt-1 text-sm text-zinc-500">
             Paused automatically {timeAgo(a.burned.at)}:{" "}

@@ -68,3 +68,27 @@ describe("address protections", () => {
     expect((await user.get(`/v1/addresses/${c.id}`)).json.address.status).toBe("paused");
   });
 });
+
+describe("expiry reminders", () => {
+  it("reminds once, and extending re-arms the reminder", async () => {
+    const { runExpiryReminders } = await import("../../app/server/services/reminders.js");
+    const { t, user, mk } = await setup();
+    const calls: string[] = [];
+    t.deps.fetch = (async (_u: string, init: RequestInit) => {
+      calls.push(JSON.parse(init.body as string).type);
+      return new Response("ok");
+    }) as typeof fetch;
+    await user.post("/v1/notify-targets", { kind: "webhook", name: "h", url: "https://h.example.com", events: ["address.expiring"] });
+    const a = await mk({ expires_in_days: 1 });
+    const far = await mk({ expires_in_days: 5 });
+    expect(runExpiryReminders(t.deps)).toBe(1);
+    expect(runExpiryReminders(t.deps)).toBe(0);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls).toEqual(["address.expiring"]);
+    expect((await user.get("/v1/digest")).json.expiring.map((x: any) => x.id).sort()).toEqual([a.id].sort());
+
+    const ext = (await user.post(`/v1/addresses/${a.id}/extend`, { days: 30 })).json.address;
+    expect(ext.expires_at).toBeGreaterThan(a.expires_at + 29 * 86400_000);
+    expect((await user.post(`/v1/addresses/${far.id}/extend`, { days: null })).json.address.expires_at).toBe(null);
+  });
+});

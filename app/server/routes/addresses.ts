@@ -268,7 +268,7 @@ export function registerAddresses(r: ApiRouter) {
       if (body.forward_enabled !== undefined) set.forwardEnabled = body.forward_enabled;
       if (body.destination_id !== undefined) set.destinationId = body.destination_id;
       if (body.status !== undefined) set.status = body.status;
-      if (body.expires_at !== undefined) set.expiresAt = body.expires_at;
+      if (body.expires_at !== undefined) Object.assign(set, { expiresAt: body.expires_at, expiryRemindedAt: null });
       d.db.update(addresses).set(set).where(and(eq(addresses.id, a.id), eq(addresses.userId, user.id))).run();
       d.bus.publish(user.id, { type: "address.updated", address_id: a.id });
       return c.json({ address: out(d, d.db.select().from(addresses).where(eq(addresses.id, a.id)).get()!, domain) });

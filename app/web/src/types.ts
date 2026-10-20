@@ -46,7 +46,7 @@ export interface AddressStats {
   per_week: number[]; top_senders: Array<{ domain: string; count: number }>;
 }
 export interface Digest {
-  days: number; since: number; received: number; created: Address[]; leaks: Address[]; silent: Address[];
+  days: number; since: number; received: number; created: Address[]; leaks: Address[]; silent: Address[]; expiring: Address[];
   busiest: Array<{ address: Address; count: number }>;
 }
 export interface LeakGroup { sender_domain: string; count: number; first_at: number; last_at: number; senders: string[]; addresses: Address[] }

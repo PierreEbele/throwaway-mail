@@ -98,6 +98,27 @@ export function registerExtras(r: ApiRouter) {
     },
   );
 
+  r.add(
+    {
+      method: "post",
+      path: "/v1/addresses/:id/extend",
+      summary: "Push an address's expiry back (or remove it)",
+      tags: ["addresses"],
+      auth: "user",
+      body: z.object({ days: z.number().int().min(1).max(3650).nullable().describe("null removes the expiry") }),
+    },
+    (c, { body }) => {
+      const d = c.get("deps");
+      const user = c.get("user")!;
+      const { a, domain } = ownedAddress(d, user, c.req.param("id")!);
+      const now = d.now();
+      const expiresAt = body.days === null ? null : Math.max(a.expiresAt ?? now, now) + body.days * DAY;
+      d.db.update(addresses).set({ expiresAt, expiryRemindedAt: null, updatedAt: now }).where(eq(addresses.id, a.id)).run();
+      d.bus.publish(user.id, { type: "address.updated", address_id: a.id });
+      return c.json({ address: addressOut(d.db.select().from(addresses).where(eq(addresses.id, a.id)).get()!, domain) });
+    },
+  );
+
   // --- Panic button ------------------------------------------------------------------------------
   r.add(
     {
@@ -337,6 +358,7 @@ export function registerExtras(r: ApiRouter) {
         created: list(and(base, gte(addresses.createdAt, since))),
         busiest: busiest.filter((b) => busyRows.has(b.id)).map((b) => ({ address: addressOut(busyRows.get(b.id)!.a, busyRows.get(b.id)!.domain), count: b.n })),
         leaks: list(and(base, isNotNull(addresses.leakAt)), desc(addresses.leakAt)),
+        expiring: list(and(base, isNotNull(addresses.expiresAt), gte(addresses.expiresAt, d.now()), sql`${addresses.expiresAt} < ${d.now() + 3 * DAY}`), asc(addresses.expiresAt)),
         silent: list(and(base, isNull(addresses.lastMessageAt), sql`${addresses.createdAt} < ${d.now() - 30 * DAY}`, eq(addresses.pinned, false)), asc(addresses.createdAt)),
       });
     },

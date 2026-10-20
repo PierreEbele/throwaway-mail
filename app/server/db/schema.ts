@@ -129,6 +129,8 @@ export const addresses = sqliteTable(
     /** Why the address was paused automatically ("max_messages", "after_code", "panic"). */
     burnReason: text("burn_reason"),
     burnedAt: integer("burned_at"),
+    /** Set when the "expires soon" reminder was sent for the current expires_at. */
+    expiryRemindedAt: integer("expiry_reminded_at"),
   },
   (t) => [uniqueIndex("addresses_domain_local_uq").on(t.domainId, t.localPart), index("addresses_user_idx").on(t.userId)],
 );
