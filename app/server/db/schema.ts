@@ -120,6 +120,15 @@ export const addresses = sqliteTable(
     leakAt: integer("leak_at"),
     /** Reject newsletters / promotional bulk mail (mail with a verification code still gets through). */
     blockPromos: integer("block_promos", { mode: "boolean" }).notNull().default(false),
+    /** Only accept mail whose sender domain matches the site (others are rejected and logged as leaks). */
+    siteLock: integer("site_lock", { mode: "boolean" }).notNull().default(false),
+    /** Pause the address automatically after this many mails. */
+    maxMessages: integer("max_messages"),
+    /** Pause the address automatically after the first mail with a verification code. */
+    burnAfterCode: integer("burn_after_code", { mode: "boolean" }).notNull().default(false),
+    /** Why the address was paused automatically ("max_messages", "after_code", "panic"). */
+    burnReason: text("burn_reason"),
+    burnedAt: integer("burned_at"),
   },
   (t) => [uniqueIndex("addresses_domain_local_uq").on(t.domainId, t.localPart), index("addresses_user_idx").on(t.userId)],
 );

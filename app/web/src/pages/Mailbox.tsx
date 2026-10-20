@@ -152,6 +152,22 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
           ) : (
             <span />
           )}
+          {category && (
+            <button
+              type="button"
+              className="btn-ghost text-xs"
+              onClick={() =>
+                confirmAction(`Pause every active address in ${category.name}? (Undo from Account → Panic button)`) &&
+                post<{ affected: number }>("/v1/panic", { category_id: category.id }).then((r) => {
+                  qc.invalidateQueries();
+                  toast(`${r.affected} address(es) paused`, "success");
+                  onClose();
+                })
+              }
+            >
+              Pause all
+            </button>
+          )}
           <div className="flex gap-2">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
             <button className="btn-primary" disabled={save.isPending}>{category ? "Save" : "Create"}</button>

@@ -243,6 +243,9 @@ export function registerAddresses(r: ApiRouter) {
         category_id: z.string().nullable().optional(),
         pinned: z.boolean().optional(),
         block_promos: z.boolean().optional(),
+        site_lock: z.boolean().optional(),
+        max_messages: z.number().int().min(1).max(100_000).nullable().optional(),
+        burn_after_code: z.boolean().optional(),
       }),
     },
     (c, { body }) => {
@@ -255,6 +258,10 @@ export function registerAddresses(r: ApiRouter) {
       if (body.category_id !== undefined) set.categoryId = body.category_id;
       if (body.pinned !== undefined) set.pinned = body.pinned;
       if (body.block_promos !== undefined) set.blockPromos = body.block_promos;
+      if (body.site_lock !== undefined) set.siteLock = body.site_lock;
+      if (body.max_messages !== undefined) set.maxMessages = body.max_messages;
+      if (body.burn_after_code !== undefined) set.burnAfterCode = body.burn_after_code;
+      if (body.status === "active") Object.assign(set, { burnReason: null, burnedAt: null });
       if (body.site_name !== undefined) set.siteName = body.site_name;
       if (body.site_url !== undefined) set.siteUrl = body.site_url;
       if (body.label !== undefined) set.label = body.label || null;

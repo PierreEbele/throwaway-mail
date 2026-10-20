@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import PostalMime from "postal-mime";
-import { and, asc, eq, gt, isNotNull } from "drizzle-orm";
+import { and, asc, eq, gt, isNotNull, sql } from "drizzle-orm";
 import type { Deps } from "../context.js";
 import { addresses, destinations, domains, extractedItems, leakEvents, messages, users, type Address, type Domain } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
@@ -191,7 +191,25 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
   const id = newId("msg");
   const headers = email.headers.map((h) => ({ key: h.key, value: h.value.slice(0, 2000) })).slice(0, 200);
 
-  let leak = false;
+  const leak = !address.isUnassigned && looksLikeLeak(address.siteUrl, email.from?.address ?? null, parseList(address.trustedSendersJson));
+  const link = `${deps.config.APP_URL.replace(/\/$/, "")}/addresses/${address.id}`;
+  if (leak && address.siteLock) {
+    // Locked to its site: refuse the mail, but keep the evidence.
+    const sender = email.from!.address!.toLowerCase();
+    const now = deps.now();
+    deps.db.update(addresses).set({ leakSender: sender, leakAt: now }).where(eq(addresses.id, address.id)).run();
+    deps.db.insert(leakEvents).values({ id: newId("lek"), userId: address.userId, addressId: address.id, sender, senderDomain: baseDomain(senderDomain(sender)!), at: now }).run();
+    deps.bus.publish(address.userId, { type: "address.updated", address_id: address.id });
+    void notify(deps, address.userId, {
+      type: "leak.detected",
+      title: `Blocked leak: ${address.siteName}`,
+      body: `${rcpt.full} is locked to ${address.siteName}; mail from ${sender} was rejected.`,
+      url: link,
+      data: { address_id: address.id, address: rcpt.full, site: address.siteName, from: sender, rejected: true },
+    }).catch(() => {});
+    log.info("reject: site-locked address", { address_id: address.id, sender });
+    return { action: "reject", reason: "sender_not_site" };
+  }
   deps.db.transaction((tx) => {
     tx.insert(messages)
       .values({
@@ -254,7 +272,6 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
       })),
     ];
     if (items.length) tx.insert(extractedItems).values(items).run();
-    leak = !address!.isUnassigned && looksLikeLeak(address!.siteUrl, email.from?.address ?? null, parseList(address!.trustedSendersJson));
     tx.update(addresses)
       .set({ lastMessageAt: now, ...(leak ? { leakSender: email.from!.address!.toLowerCase(), leakAt: now } : {}) })
       .where(eq(addresses.id, address!.id))
@@ -278,7 +295,6 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     has_code: !!parsed.code,
   });
 
-  const link = `${deps.config.APP_URL.replace(/\/$/, "")}/addresses/${address.id}`;
   const site = address.siteName;
   const data = { address_id: address.id, address: rcpt.full, site, message_id: id, from: email.from?.address ?? null, subject: email.subject ?? null };
   const pushes: Promise<unknown>[] = [
@@ -295,6 +311,22 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
         body: `${rcpt.full} received mail from ${email.from?.address}, which is not ${site}.`,
         url: link,
         data,
+      }),
+    );
+  }
+  // Self-destructing addresses: pause after N mails or after the first code.
+  const count = address.maxMessages ? deps.db.select({ n: sql<number>`count(*)` }).from(messages).where(eq(messages.addressId, address.id)).get()!.n : 0;
+  const burn = address.burnAfterCode && parsed.code ? "after_code" : address.maxMessages && count >= address.maxMessages ? "max_messages" : null;
+  if (burn) {
+    deps.db.update(addresses).set({ status: "paused", burnReason: burn, burnedAt: now, updatedAt: now }).where(eq(addresses.id, address.id)).run();
+    deps.bus.publish(address.userId, { type: "address.updated", address_id: address.id });
+    pushes.push(
+      notify(deps, address.userId, {
+        type: "address.burned",
+        title: `${site}: address burned`,
+        body: burn === "after_code" ? `${rcpt.full} received its code and now rejects mail.` : `${rcpt.full} reached ${address.maxMessages} mail(s) and now rejects mail.`,
+        url: link,
+        data: { ...data, reason: burn },
       }),
     );
   }

@@ -7,7 +7,8 @@ export interface Address {
   forward_enabled: boolean; destination_id: string | null; status: AddressStatus; is_unassigned: boolean;
   expires_at: number | null; created_at: number; updated_at: number; last_message_at: number | null;
   unread_count: number; message_count: number; category_id: string | null; pinned: boolean;
-  blocked_senders: string[]; trusted_senders: string[]; block_promos: boolean; leak: { sender: string; at: number } | null;
+  blocked_senders: string[]; trusted_senders: string[]; block_promos: boolean; site_lock: boolean; max_messages: number | null; burn_after_code: boolean;
+  burned: { reason: string; at: number } | null; leak: { sender: string; at: number } | null;
 }
 export type CategoryColor = "zinc" | "red" | "orange" | "amber" | "green" | "teal" | "blue" | "indigo" | "violet" | "pink";
 export interface Category { id: string; name: string; color: CategoryColor; pinned: boolean; hidden: boolean; auto_match: string | null; retention_days: number | null; position: number; created_at: number; address_count: number; unread_count: number }

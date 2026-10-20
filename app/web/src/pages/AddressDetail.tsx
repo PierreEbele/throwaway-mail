@@ -265,8 +265,27 @@ function useSenderAction(id: string) {
   });
 }
 
+function useReplace(a: Address) {
+  const qc = useQueryClient();
+  const nav = useNavigate();
+  const toast = useToast();
+  return () =>
+    confirmAction(`Create a new address for ${a.site_name} and pause ${a.email}? You will then need to change the e-mail on the site.`) &&
+    post<{ address: Address }>(`/v1/addresses/${a.id}/replace`, {}).then(
+      (r) => {
+        qc.invalidateQueries();
+        navigator.clipboard.writeText(r.address.email).catch(() => {});
+        toast(`New address ${r.address.email} copied — update it on the site`, "success");
+        if (a.site_url) window.open(a.site_url, "_blank", "noopener,noreferrer");
+        nav(`/addresses/${r.address.id}`);
+      },
+      (e: Error) => toast(e.message, "error"),
+    );
+}
+
 function LeakBanner({ a, onPause }: { a: Address; onPause: () => void }) {
   const act = useSenderAction(a.id);
+  const replace = useReplace(a);
   const btn = "rounded border border-red-300 px-2 py-0.5 hover:bg-red-100 dark:border-red-800 dark:hover:bg-red-900/50";
   return (
     <div role="alert" className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
@@ -275,12 +294,53 @@ function LeakBanner({ a, onPause }: { a: Address; onPause: () => void }) {
         {hostOf(a.site_url)}. The site may have sold or leaked it.
       </p>
       <div className="mt-2 flex flex-wrap gap-2 text-xs">
+        <button className={`${btn} font-semibold`} onClick={replace} title="New address for this site, old one paused, site opened so you can change your e-mail">
+          Replace the address
+        </button>
         <button className={btn} onClick={() => act.mutate({ action: "block" })}>Block this sender</button>
         {a.status === "active" && <button className={btn} onClick={onPause}>Burn the address (reject all mail)</button>}
         <button className={btn} onClick={() => act.mutate({ action: "trust" })}>It's legit, trust this sender</button>
         <button className={btn} onClick={() => act.mutate({ action: "dismiss" })}>Dismiss</button>
       </div>
     </div>
+  );
+}
+
+function ProtectionCard({ a, onChange }: { a: Address; onChange: (b: Record<string, unknown>) => void }) {
+  const [max, setMax] = useState(a.max_messages ? String(a.max_messages) : "");
+  const replace = useReplace(a);
+  return (
+    <section className="card space-y-3 p-5" aria-labelledby="protection">
+      <h2 id="protection" className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">Protection</h2>
+      <div className="flex items-center justify-between gap-3">
+        <label htmlFor="lock-toggle" className="text-sm">
+          Only accept mail from {hostOf(a.site_url) ?? "the site"}
+          <span className="block text-xs text-zinc-500">{a.site_url ? "Other senders are rejected and logged as leaks." : "Set the site URL first."}</span>
+        </label>
+        <Toggle id="lock-toggle" checked={a.site_lock} onChange={(v) => onChange({ site_lock: v })} label="Lock to the site" />
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <label htmlFor="burn-code" className="text-sm">
+          Burn after the first code
+          <span className="block text-xs text-zinc-500">For one-shot sign-ups: the address stops accepting mail once its code arrived.</span>
+        </label>
+        <Toggle id="burn-code" checked={a.burn_after_code} onChange={(v) => onChange({ burn_after_code: v })} label="Burn after the first code" />
+      </div>
+      <form
+        className="flex items-end gap-2"
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          onChange({ max_messages: max ? Number(max) : null });
+        }}
+      >
+        <div className="flex-1">
+          <label htmlFor="max-msg" className="label">Burn after N mails</label>
+          <input id="max-msg" type="number" min={1} className="input py-1" placeholder="Unlimited" value={max} onChange={(e) => setMax(e.target.value)} />
+        </div>
+        <button className="btn-secondary">Save</button>
+      </form>
+      <button className="btn-secondary w-full" onClick={replace}>Replace with a fresh address…</button>
+    </section>
   );
 }
 
@@ -482,6 +542,12 @@ export function AddressDetailPage() {
           </div>
         </div>
         {a.status !== "active" && <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">This address is {a.status}: new mail is rejected.</p>}
+        {a.burned && a.status !== "active" && (
+          <p className="mt-1 text-sm text-zinc-500">
+            Paused automatically {timeAgo(a.burned.at)}:{" "}
+            {a.burned.reason === "after_code" ? "it received its verification code." : a.burned.reason === "max_messages" ? `it reached ${a.max_messages} mail(s).` : "panic button."}
+          </p>
+        )}
         {a.leak && <LeakBanner a={a} onPause={() => update.mutate({ status: "paused" })} />}
       </div>
 
@@ -562,9 +628,10 @@ export function AddressDetailPage() {
         </section>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-3">
         <StatsCard id={a.id} />
         <SendersCard a={a} />
+        <ProtectionCard a={a} onChange={(b) => update.mutate(b)} />
       </div>
 
       <section aria-labelledby="inbox" className="grid gap-4 xl:grid-cols-5">
