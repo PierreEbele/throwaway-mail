@@ -197,6 +197,17 @@ export const extractedItems = sqliteTable(
   (t) => [index("extracted_message_idx").on(t.messageId)],
 );
 
+/**
+ * On-the-fly addresses: mail to <name>.<site>@domain creates an address for <site>
+ * owned by the directory's user, without visiting the app first.
+ */
+export const directories = sqliteTable("directories", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull().unique(),
+  createdAt: integer("created_at").notNull(),
+});
+
 /** Smart folders: a named set of /v1/addresses filters shown in the sidebar. */
 export const savedSearches = sqliteTable(
   "saved_searches",

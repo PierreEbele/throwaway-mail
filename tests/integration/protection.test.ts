@@ -114,3 +114,22 @@ describe("smart folders", () => {
     expect((await user.get("/v1/saved-searches")).json.searches).toEqual([]);
   });
 });
+
+describe("directories", () => {
+  it("creates addresses on the fly for <dir>.<site>", async () => {
+    const { t, user } = await setup();
+    const other = loginAs(t, "v@example.org");
+    const shops = (await user.post("/v1/categories", { name: "Shops", auto_match: "amazon" })).json.category;
+    expect((await user.post("/v1/directories", { name: "dory" })).status).toBe(201);
+    expect((await other.post("/v1/directories", { name: "dory" })).status).toBe(409);
+    expect((await user.post("/v1/directories", { name: "x" })).status).toBe(400);
+
+    expect((await ingest(t, "dory.amazon.fr@mail.example.test", simpleEml({ text: "welcome" }))).json.action).toBe("store_only");
+    const list = (await user.get("/v1/addresses")).json.addresses;
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ email: "dory.amazon.fr@mail.example.test", site_name: "amazon.fr", site_url: "https://amazon.fr", category_id: shops.id });
+    await ingest(t, "dory.amazon.fr@mail.example.test", simpleEml({ text: "again" }));
+    expect((await user.get("/v1/addresses")).json.addresses[0].message_count).toBe(2);
+    expect((await ingest(t, "nobody.site@mail.example.test", simpleEml({ text: "x" }))).json.action).toBe("reject");
+  });
+});

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import PostalMime from "postal-mime";
 import { and, asc, eq, gt, isNotNull, sql } from "drizzle-orm";
 import type { Deps } from "../context.js";
-import { addresses, destinations, domains, extractedItems, leakEvents, messages, users, type Address, type Domain } from "../db/schema.js";
+import { addresses, destinations, directories, domains, extractedItems, leakEvents, messages, users, type Address, type Domain } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
 import { LOCAL_PART_RE, normalizeRecipient } from "../lib/email.js";
 import { sanitizeEmail } from "../lib/sanitize.js";
@@ -75,6 +75,38 @@ function resolveUnknown(deps: Deps, domain: Domain, local: string, senderDomain:
   return deps.db.select().from(addresses).where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, UNASSIGNED_LOCAL))).get() ?? null;
 }
 
+/** <dir>.<site>: auto-create an address for <site> owned by the directory's user. */
+function resolveDirectory(deps: Deps, domain: Domain, local: string): Address | null {
+  const m = /^([a-z0-9]{3,32})\.(.+)$/.exec(local);
+  if (!m || domain.status !== "active") return null;
+  const dir = deps.db.select().from(directories).where(eq(directories.name, m[1]!)).get();
+  if (!dir) return null;
+  const site = m[2]!;
+  const storedLocal = local;
+  if (!LOCAL_PART_RE.test(storedLocal)) return null;
+  const now = deps.now();
+  const siteUrl = /\.[a-z]{2,}$/.test(site) ? `https://${site}` : null;
+  deps.db
+    .insert(addresses)
+    .values({
+      id: newId("adr"),
+      userId: dir.userId,
+      domainId: domain.id,
+      localPart: storedLocal,
+      siteName: site,
+      siteUrl,
+      label: `directory ${dir.name}`,
+      categoryId: matchCategory(deps, dir.userId, site, siteUrl),
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing()
+    .run();
+  const a = deps.db.select().from(addresses).where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, storedLocal))).get() ?? null;
+  if (a) deps.bus.publish(a.userId, { type: "address.created", address_id: a.id });
+  return a;
+}
+
 /** Which destination (if any) mail for this address goes to right now. */
 export function forwardTarget(deps: Deps, address: Address): string | null {
   if (!address.forwardEnabled) return null;
@@ -120,7 +152,8 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
   }
 
   const sender = normalizeRecipient(input.envelopeFrom);
-  let address = deps.db.select().from(addresses).where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, rcpt.local))).get() ?? null;
+  let address =
+    deps.db.select().from(addresses).where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, rcpt.local))).get() ?? resolveDirectory(deps, domain, rcpt.local);
   // Domain whose previous catch-all is preserved: unknown addresses keep going to the old destination
   // and are queued in the owner's "To sort" box so they can be registered as sites.
   let preservedForward: string | null = null;

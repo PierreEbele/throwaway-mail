@@ -85,6 +85,13 @@
       "when": 1793729607199,
       "tag": "0011_saved_searches",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1793729701852,
+      "tag": "0012_directories",
+      "breakpoints": true
     }
   ]
 }
