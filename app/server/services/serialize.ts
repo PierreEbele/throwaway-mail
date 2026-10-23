@@ -49,6 +49,7 @@ export function addressOut(a: Address, domainName: string, counts?: { unread: nu
     trusted_senders: parseList(a.trustedSendersJson),
     block_promos: a.blockPromos,
     site_lock: a.siteLock,
+    feed_token: a.feedToken,
     max_messages: a.maxMessages,
     burn_after_code: a.burnAfterCode,
     burned: a.burnReason ? { reason: a.burnReason, at: a.burnedAt } : null,

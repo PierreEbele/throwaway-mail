@@ -131,6 +131,8 @@ export const addresses = sqliteTable(
     burnedAt: integer("burned_at"),
     /** Set when the "expires soon" reminder was sent for the current expires_at. */
     expiryRemindedAt: integer("expiry_reminded_at"),
+    /** Secret token of the address's RSS / JSON feed (null: feed disabled). */
+    feedToken: text("feed_token").unique(),
   },
   (t) => [uniqueIndex("addresses_domain_local_uq").on(t.domainId, t.localPart), index("addresses_user_idx").on(t.userId)],
 );

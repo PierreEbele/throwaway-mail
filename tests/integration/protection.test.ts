@@ -133,3 +133,23 @@ describe("directories", () => {
     expect((await ingest(t, "nobody.site@mail.example.test", simpleEml({ text: "x" }))).json.action).toBe("reject");
   });
 });
+
+describe("feeds", () => {
+  it("serves a private RSS / JSON feed only with the token", async () => {
+    const { t, user, mk } = await setup();
+    const a = await mk();
+    await ingest(t, a.email, simpleEml({ subject: "Login <code>", text: "Your verification code is 445566", from: "a@shop.com" }));
+    expect((await user.get(`/v1/addresses/${a.id}`)).json.address.feed_token).toBe(null);
+    const token = (await user.post(`/v1/addresses/${a.id}/feed`, { enabled: true })).json.address.feed_token;
+    expect(token).toMatch(/^[a-z0-9]{32}$/);
+    const rss = await t.app.request(`/feeds/${token}.rss`);
+    expect(rss.headers.get("content-type")).toContain("application/rss+xml");
+    const xml = await rss.text();
+    expect(xml).toContain("[445566] Login &lt;code&gt;");
+    const json = await (await t.app.request(`/feeds/${token}.json`)).json();
+    expect(json.items[0]._throwaway.code).toBe("445566");
+    expect((await t.app.request(`/feeds/${"x".repeat(32)}.rss`)).status).toBe(404);
+    await user.post(`/v1/addresses/${a.id}/feed`, { enabled: false });
+    expect((await t.app.request(`/feeds/${token}.json`)).status).toBe(404);
+  });
+});

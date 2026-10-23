@@ -25,6 +25,7 @@ import { registerCompat } from "./routes/compat.js";
 import { registerCategories } from "./routes/categories.js";
 import { registerExtras } from "./routes/extras.js";
 import { registerNotify } from "./routes/notify.js";
+import { registerFeeds } from "./routes/feeds.js";
 
 const APP_CSP = {
   defaultSrc: ["'self'"],
@@ -90,6 +91,7 @@ export function createApp(deps: Deps) {
   registerAuth(api);
   registerExtras(api);
   registerNotify(api);
+  registerFeeds(api);
   registerAddresses(api);
   registerDomains(api);
   registerDestinations(api);

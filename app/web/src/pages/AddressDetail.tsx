@@ -327,6 +327,31 @@ function LeakBanner({ a, onPause }: { a: Address; onPause: () => void }) {
   );
 }
 
+function FeedRow({ a }: { a: Address }) {
+  const qc = useQueryClient();
+  const set = (enabled: boolean) =>
+    post<{ address: Address }>(`/v1/addresses/${a.id}/feed`, { enabled }).then((r) => qc.setQueryData(["address", a.id], r.address));
+  const base = `${location.origin}/feeds/${a.feed_token}`;
+  return (
+    <div className="space-y-1 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span>
+          Private RSS / JSON feed
+          <span className="block text-xs text-zinc-500">For a feed reader or Home Assistant. Anyone with the link can read this address&apos;s mail.</span>
+        </span>
+        <Toggle id="feed-toggle" checked={!!a.feed_token} onChange={set} label="Private feed" />
+      </div>
+      {a.feed_token && (
+        <div className="flex flex-wrap items-center gap-1 text-xs">
+          <CopyButton text={`${base}.rss`} label="Copy RSS URL" />
+          <CopyButton text={`${base}.json`} label="Copy JSON URL" />
+          <button className="btn-ghost px-2 py-0.5 text-xs" onClick={() => set(true)} title="Invalidate the old URLs">Rotate</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProtectionCard({ a, onChange }: { a: Address; onChange: (b: Record<string, unknown>) => void }) {
   const [max, setMax] = useState(a.max_messages ? String(a.max_messages) : "");
   const replace = useReplace(a);
@@ -360,6 +385,7 @@ function ProtectionCard({ a, onChange }: { a: Address; onChange: (b: Record<stri
         </div>
         <button className="btn-secondary">Save</button>
       </form>
+      <FeedRow a={a} />
       <button className="btn-secondary w-full" onClick={replace}>Replace with a fresh address…</button>
     </section>
   );
