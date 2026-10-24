@@ -120,6 +120,19 @@ describe("forwarding", () => {
     expect((await ingest(t, addr.email, simpleEml({ text: "2" }))).json).toMatchObject({ action: "forward", forward_to: "me@personal.example" });
   });
 
+  it("forwards to several destinations", async () => {
+    const a = await verifiedDestination();
+    const b = (await admin.post(`/v1/destinations/${(await admin.post("/v1/destinations", { email: "partner@personal.example" })).json.destination.id}/refresh`)).json.destination;
+    const unverified = (await admin.post("/v1/destinations", { email: "later@personal.example" })).json.destination;
+    const r = await admin.patch(`/v1/addresses/${addr.id}`, { forward_enabled: true, destination_id: a.id, extra_destination_ids: [b.id, unverified.id] });
+    expect(r.json.address.extra_destination_ids.sort()).toEqual([b.id, unverified.id].sort());
+    const res = (await ingest(t, addr.email, simpleEml({ text: "multi" }))).json;
+    expect(res).toMatchObject({ action: "forward", forward_to: "me@personal.example", forward_to_all: ["me@personal.example", "partner@personal.example"] });
+    // a retried delivery gets the same answer
+    expect((await ingest(t, addr.email, simpleEml({ text: "multi", messageId: "<fixed@x>" }))).json.forward_to_all).toHaveLength(2);
+    expect((await ingest(t, addr.email, simpleEml({ text: "multi", messageId: "<fixed@x>" }))).json).toMatchObject({ duplicate: true, forward_to_all: ["me@personal.example", "partner@personal.example"] });
+  });
+
   it("toggling per address changes the result for the next mail only", async () => {
     const dest = await verifiedDestination();
     await admin.patch(`/v1/addresses/${addr.id}`, { forward_enabled: true, destination_id: dest.id });

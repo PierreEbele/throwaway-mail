@@ -199,6 +199,16 @@ export const extractedItems = sqliteTable(
   (t) => [index("extracted_message_idx").on(t.messageId)],
 );
 
+/** Extra forwarding destinations of an address (mail goes to every verified one). */
+export const addressDestinations = sqliteTable(
+  "address_destinations",
+  {
+    addressId: text("address_id").notNull().references(() => addresses.id, { onDelete: "cascade" }),
+    destinationId: text("destination_id").notNull().references(() => destinations.id, { onDelete: "cascade" }),
+  },
+  (t) => [uniqueIndex("address_destinations_uq").on(t.addressId, t.destinationId)],
+);
+
 /**
  * On-the-fly addresses: mail to <name>.<site>@domain creates an address for <site>
  * owned by the directory's user, without visiting the app first.

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import PostalMime from "postal-mime";
 import { and, asc, eq, gt, isNotNull, sql } from "drizzle-orm";
 import type { Deps } from "../context.js";
-import { addresses, destinations, directories, domains, extractedItems, leakEvents, messages, users, type Address, type Domain } from "../db/schema.js";
+import { addressDestinations, addresses, destinations, directories, domains, extractedItems, leakEvents, messages, users, type Address, type Domain } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
 import { LOCAL_PART_RE, normalizeRecipient } from "../lib/email.js";
 import { sanitizeEmail } from "../lib/sanitize.js";
@@ -18,6 +18,8 @@ export type IngestAction = "forward" | "store_only" | "reject";
 export interface IngestResult {
   action: IngestAction;
   forward_to?: string;
+  /** Every destination when there are several (forward_to is the first one, for older Workers). */
+  forward_to_all?: string[];
   reason?: string;
   message_id?: string;
   duplicate?: boolean;
@@ -107,6 +109,20 @@ function resolveDirectory(deps: Deps, domain: Domain, local: string): Address | 
   return a;
 }
 
+/** Every verified destination mail for this address goes to right now (extra destinations included). */
+export function forwardTargets(deps: Deps, address: Address): string[] {
+  if (!address.forwardEnabled) return [];
+  const extra = deps.db
+    .select({ email: destinations.email })
+    .from(addressDestinations)
+    .innerJoin(destinations, eq(destinations.id, addressDestinations.destinationId))
+    .where(and(eq(addressDestinations.addressId, address.id), eq(destinations.userId, address.userId), isNotNull(destinations.verifiedAt)))
+    .all()
+    .map((x) => x.email);
+  const main = forwardTarget(deps, address);
+  return [...new Set([...(main ? [main] : []), ...extra])];
+}
+
 /** Which destination (if any) mail for this address goes to right now. */
 export function forwardTarget(deps: Deps, address: Address): string | null {
   if (!address.forwardEnabled) return null;
@@ -192,7 +208,7 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     if (dup) {
       log.info("duplicate delivery (body hash)", { message_id: dup.id });
       return dup.forwarded && dup.forwardTo
-        ? { action: "forward", forward_to: dup.forwardTo, message_id: dup.id, duplicate: true }
+        ? { ...forwardResult(dup.forwardTo), message_id: dup.id, duplicate: true }
         : { action: "store_only", message_id: dup.id, duplicate: true };
     }
   }
@@ -206,7 +222,7 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     if (dup) {
       log.info("duplicate delivery", { message_id: dup.id });
       return dup.forwarded && dup.forwardTo
-        ? { action: "forward", forward_to: dup.forwardTo, message_id: dup.id, duplicate: true }
+        ? { ...forwardResult(dup.forwardTo), message_id: dup.id, duplicate: true }
         : { action: "store_only", message_id: dup.id, duplicate: true };
     }
   }
@@ -219,7 +235,8 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
   }
   const clean = email.html ? sanitizeEmail(email.html) : null;
   const auth = { spf: authResult(email.headers, "spf"), dkim: authResult(email.headers, "dkim"), dmarc: authResult(email.headers, "dmarc") };
-  const forwardTo = preservedForward ?? forwardTarget(deps, address);
+  const targets = preservedForward ? [preservedForward] : forwardTargets(deps, address);
+  const forwardTo = targets.length ? targets.join(", ") : null;
   const now = deps.now();
   const id = newId("msg");
   const headers = email.headers.map((h) => ({ key: h.key, value: h.value.slice(0, 2000) })).slice(0, 200);
@@ -366,5 +383,11 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
   // Never delay the Worker's answer on slow notification endpoints.
   void Promise.all(pushes).catch(() => {});
 
-  return forwardTo ? { action: "forward", forward_to: forwardTo, message_id: id } : { action: "store_only", message_id: id };
+  return forwardTo ? { ...forwardResult(forwardTo), message_id: id } : { action: "store_only", message_id: id };
+}
+
+/** messages.forward_to holds "a@x, b@y". */
+function forwardResult(stored: string): IngestResult {
+  const all = stored.split(",").map((x) => x.trim()).filter(Boolean);
+  return { action: "forward", forward_to: all[0], ...(all.length > 1 ? { forward_to_all: all } : {}) };
 }

@@ -1,7 +1,7 @@
 /**
  * Throwaway Mail — Cloudflare Email Worker.
  * Receives every mail of every managed domain (catch-all rule), hands it to the app, and applies the app's decision:
- *   forward → message.forward(forward_to)   reject → message.setReject()   store_only → nothing
+ *   forward → message.forward(each of forward_to_all, or forward_to)   reject → message.setReject()   store_only → nothing
  * If the app is unreachable / errors / times out, the mail is forwarded to FALLBACK_FORWARD (if set).
  */
 
@@ -25,6 +25,7 @@ export interface Env {
 interface Decision {
   action: "forward" | "store_only" | "reject";
   forward_to?: string;
+  forward_to_all?: string[];
   reason?: string;
 }
 
@@ -71,14 +72,19 @@ export async function handleEmail(message: EmailMessageLike, env: Env, fetchImpl
 
   switch (decision.action) {
     case "forward":
-      if (!decision.forward_to) return "stored";
-      try {
-        await message.forward(decision.forward_to);
-        return "forwarded";
-      } catch (err) {
-        // Stored in the app already; forwarding failure (e.g. destination unverified) must not bounce the mail.
-        console.error(JSON.stringify({ msg: "forward failed", err: String(err) }));
-        return "stored";
+      {
+        const targets = decision.forward_to_all?.length ? decision.forward_to_all : decision.forward_to ? [decision.forward_to] : [];
+        let ok = 0;
+        for (const to of targets) {
+          try {
+            await message.forward(to);
+            ok++;
+          } catch (err) {
+            // Stored in the app already; a forwarding failure (e.g. destination unverified) must not bounce the mail.
+            console.error(JSON.stringify({ msg: "forward failed", to, err: String(err) }));
+          }
+        }
+        return ok ? "forwarded" : "stored";
       }
     case "reject":
       message.setReject(decision.reason === "unknown_recipient" || decision.reason === "unknown_domain" ? "Unknown recipient" : "Recipient not accepting mail");

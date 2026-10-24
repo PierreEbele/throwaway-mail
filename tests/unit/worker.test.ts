@@ -11,11 +11,14 @@ function fakeMessage(to: string, raw: string) {
     raw: new Response(raw).body!,
     rejected: null as string | null,
     forwardedTo: null as string | null,
+    forwardedAll: [] as string[],
     setReject(reason: string) {
       m.rejected = reason;
     },
     async forward(rcpt: string) {
+      if (rcpt === "broken@me.example") throw new Error("destination not verified");
       m.forwardedTo = rcpt;
+      m.forwardedAll.push(rcpt);
     },
   };
   return m satisfies EmailMessageLike;
@@ -24,6 +27,17 @@ function fakeMessage(to: string, raw: string) {
 const env: Env = { APP_URL: "https://app.example", INGEST_SECRET: "test-ingest-secret-0123456789", FALLBACK_FORWARD: "fallback@me.example" };
 
 describe("email worker", () => {
+  it("forwards to every destination and survives one failing", async () => {
+    const answer = (body: unknown) => (async () => new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } })) as unknown as typeof fetch;
+    const m = fakeMessage("a@x.test", "Subject: hi\r\n\r\nx");
+    expect(await handleEmail(m, env, answer({ action: "forward", forward_to: "a@me.example", forward_to_all: ["a@me.example", "broken@me.example", "b@me.example"] }))).toBe("forwarded");
+    expect(m.forwardedAll).toEqual(["a@me.example", "b@me.example"]);
+    const old = fakeMessage("a@x.test", "Subject: hi\r\n\r\nx");
+    expect(await handleEmail(old, env, answer({ action: "forward", forward_to: "a@me.example" }))).toBe("forwarded");
+    const none = fakeMessage("a@x.test", "Subject: hi\r\n\r\nx");
+    expect(await handleEmail(none, env, answer({ action: "forward", forward_to: "broken@me.example" }))).toBe("stored");
+  });
+
   it("signs requests the app accepts and applies its decisions end to end", async () => {
     const t = makeTestApp();
     const admin = await setupAdmin(t);

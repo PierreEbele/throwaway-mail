@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Ctx, ApiRouter } from "../lib/http.js";
 import { parseTimestamp } from "../lib/http.js";
 import type { Deps } from "../context.js";
-import { addresses, categories, destinations, domains, extractedItems, messages, type Address, type User } from "../db/schema.js";
+import { addressDestinations, addresses, categories, destinations, domains, extractedItems, messages, type Address, type User } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
 import { LOCAL_PART_RE } from "../lib/email.js";
 import { readableLocalPart } from "../lib/words.js";
@@ -51,7 +51,8 @@ export function ownedAddress(deps: Deps, user: User, id: string) {
 }
 
 function out(deps: Deps, a: Address, domain: string) {
-  return addressOut(a, domain, counts(deps, [a.id]).get(a.id));
+  const extra = deps.db.select({ id: addressDestinations.destinationId }).from(addressDestinations).where(eq(addressDestinations.addressId, a.id)).all().map((x) => x.id);
+  return { ...addressOut(a, domain, counts(deps, [a.id]).get(a.id)), extra_destination_ids: extra };
 }
 
 function checkDestination(deps: Deps, user: User, id: string | null | undefined) {
@@ -249,6 +250,7 @@ export function registerAddresses(r: ApiRouter) {
         label: z.string().trim().max(120).nullable().optional(),
         forward_enabled: z.boolean().optional(),
         destination_id: z.string().nullable().optional(),
+        extra_destination_ids: z.array(z.string()).max(10).optional().describe("Additional destinations (replaces the list)"),
         status: z.enum(["active", "paused", "archived"]).optional(),
         expires_at: ExpiresAt.optional(),
         category_id: z.string().nullable().optional(),
@@ -264,7 +266,13 @@ export function registerAddresses(r: ApiRouter) {
       const user = c.get("user")!;
       const { a, domain } = ownedAddress(d, user, c.req.param("id")!);
       checkDestination(d, user, body.destination_id);
+      for (const id of body.extra_destination_ids ?? []) checkDestination(d, user, id);
       checkCategory(d, user, body.category_id);
+      if (body.extra_destination_ids) {
+        d.db.delete(addressDestinations).where(eq(addressDestinations.addressId, a.id)).run();
+        const ids = [...new Set(body.extra_destination_ids)];
+        if (ids.length) d.db.insert(addressDestinations).values(ids.map((destinationId) => ({ addressId: a.id, destinationId }))).run();
+      }
       const set: Partial<Address> = { updatedAt: d.now() };
       if (body.category_id !== undefined) set.categoryId = body.category_id;
       if (body.pinned !== undefined) set.pinned = body.pinned;

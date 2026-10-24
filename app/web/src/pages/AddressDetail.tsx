@@ -662,6 +662,30 @@ export function AddressDetailPage() {
               ))}
             </select>
           </div>
+          {(dests.data ?? []).length > 1 && (
+            <fieldset>
+              <legend className="label">Also forward to</legend>
+              <div className="space-y-1">
+                {(dests.data ?? [])
+                  .filter((d) => d.id !== (a.destination_id ?? verified[0]?.id))
+                  .map((d) => {
+                    const extra = a.extra_destination_ids ?? [];
+                    const on = extra.includes(d.id);
+                    return (
+                      <label key={d.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={on}
+                          onChange={() => update.mutate({ extra_destination_ids: on ? extra.filter((x) => x !== d.id) : [...extra, d.id] })}
+                        />
+                        {d.email}
+                        {!d.verified && <span className="text-xs text-zinc-500">(unverified, skipped)</span>}
+                      </label>
+                    );
+                  })}
+              </div>
+            </fieldset>
+          )}
           {forwardWarning && (
             <p className="text-sm text-amber-700 dark:text-amber-400">
               Forwarding is on but the destination is not verified, so mail is only stored. <Link to="/destinations" className="underline">Manage destinations</Link>
