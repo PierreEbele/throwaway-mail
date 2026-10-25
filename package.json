@@ -30,6 +30,7 @@
     "html-to-text": "^10.0.1",
     "jose": "^6.2.14",
     "openid-client": "^6.8.8",
+    "openpgp": "^6.3.2",
     "postal-mime": "^4.2.0",
     "sanitize-html": "^2.18.1",
     "zod": "^4.6.7"

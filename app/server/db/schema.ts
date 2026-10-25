@@ -66,6 +66,11 @@ export const destinations = sqliteTable(
     verifiedAt: integer("verified_at"),
     lastError: text("last_error"),
     createdAt: integer("created_at").notNull(),
+    /** Armored OpenPGP public key: forwarded mail is encrypted for it (PGP/MIME). */
+    pgpPublicKey: text("pgp_public_key"),
+    pgpFingerprint: text("pgp_fingerprint"),
+    /** Replace the visible subject of encrypted forwards with "...". */
+    pgpHideSubject: integer("pgp_hide_subject", { mode: "boolean" }).notNull().default(false),
   },
   (t) => [uniqueIndex("destinations_user_email_uq").on(t.userId, t.email)],
 );

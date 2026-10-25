@@ -3,7 +3,8 @@ import { z } from "zod";
 import type { ApiRouter, Ctx } from "../lib/http.js";
 import { destinations } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
-import { conflict, notFound } from "../lib/errors.js";
+import { badRequest, conflict, notFound } from "../lib/errors.js";
+import { inspectPublicKey } from "../services/pgp.js";
 import { refreshDestination, resendVerification, sharedWithOthers } from "../services/destinations.js";
 import { destinationOut } from "../services/serialize.js";
 import { CloudflareError } from "../cloudflare/index.js";
@@ -51,6 +52,34 @@ export function registerDestinations(r: ApiRouter) {
       }
       d.db.insert(destinations).values(row).run();
       return c.json({ destination: destinationOut(d.db.select().from(destinations).where(eq(destinations.id, row.id)).get()!) }, 201);
+    },
+  );
+
+  r.add(
+    {
+      method: "patch",
+      path: "/v1/destinations/:id",
+      summary: "Set or remove the OpenPGP public key used to encrypt mail forwarded to this destination",
+      tags: ["destinations"],
+      auth: "user",
+      body: z.object({ pgp_public_key: z.string().max(100_000).nullable().optional(), pgp_hide_subject: z.boolean().optional() }),
+    },
+    async (c, { body }) => {
+      const d = c.get("deps");
+      const row = owned(c);
+      const set: Partial<typeof destinations.$inferSelect> = {};
+      if (body.pgp_public_key === null || body.pgp_public_key?.trim() === "") Object.assign(set, { pgpPublicKey: null, pgpFingerprint: null });
+      else if (body.pgp_public_key) {
+        try {
+          const info = await inspectPublicKey(body.pgp_public_key.trim());
+          Object.assign(set, { pgpPublicKey: body.pgp_public_key.trim(), pgpFingerprint: info.fingerprint });
+        } catch (e) {
+          throw badRequest((e as Error).message);
+        }
+      }
+      if (body.pgp_hide_subject !== undefined) set.pgpHideSubject = body.pgp_hide_subject;
+      if (Object.keys(set).length) d.db.update(destinations).set(set).where(eq(destinations.id, row.id)).run();
+      return c.json({ destination: destinationOut(d.db.select().from(destinations).where(eq(destinations.id, row.id)).get()!) });
     },
   );
 

@@ -17,5 +17,10 @@ INGEST_TIMEOUT_MS = "5000"
 
 # Secret (not in this file):  npx wrangler secret put INGEST_SECRET   (same value as INGEST_SECRET in the app's .env)
 
+# Needed only for PGP-encrypted forwarding (destinations with a public key): the Worker sends the encrypted
+# copy itself. Cloudflare only delivers it to verified destination addresses.
+[[send_email]]
+name = "SEND_EMAIL"
+
 [observability]
 enabled = true

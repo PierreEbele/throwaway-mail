@@ -38,7 +38,10 @@ export interface Domain {
   owner?: { id: string; name: string | null; email: string } | null;
   previous_catch_all?: { enabled: boolean; actions: Array<{ type: string; value?: string[] }> } | null; catchall_forward_to?: string | null; dns_missing?: DnsRecord[]; created_at?: number; last_checked_at?: number | null;
 }
-export interface Destination { id: string; email: string; verified: boolean; verified_at: number | null; last_error: string | null; created_at: number }
+export interface Destination {
+  id: string; email: string; verified: boolean; verified_at: number | null; last_error: string | null; created_at: number;
+  pgp: { fingerprint: string; hide_subject: boolean } | null;
+}
 export interface ApiKey { id: string; name: string; prefix: string; created_at: number; last_used_at: number | null; revoked_at: number | null }
 export interface AuditEntry { id: string; user_id: string | null; action: string; target: string | null; meta: unknown; ip: string | null; created_at: number }
 export interface AddressStats {

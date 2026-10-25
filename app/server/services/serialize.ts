@@ -22,7 +22,15 @@ export function domainOut(d: Domain, full: boolean, owner?: { id: string; name: 
 }
 
 export function destinationOut(d: Destination) {
-  return { id: d.id, email: d.email, verified: !!d.verifiedAt, verified_at: d.verifiedAt, last_error: d.lastError, created_at: d.createdAt };
+  return {
+    id: d.id,
+    email: d.email,
+    verified: !!d.verifiedAt,
+    verified_at: d.verifiedAt,
+    last_error: d.lastError,
+    created_at: d.createdAt,
+    pgp: d.pgpFingerprint ? { fingerprint: d.pgpFingerprint, hide_subject: d.pgpHideSubject } : null,
+  };
 }
 
 export function addressOut(a: Address, domainName: string, counts?: { unread: number; total: number }) {

@@ -16,6 +16,8 @@ export interface EmailMessageLike {
 }
 
 export interface Env {
+  /** send_email binding: only needed for PGP-encrypted forwards. */
+  SEND_EMAIL?: { send(message: unknown): Promise<void> };
   APP_URL: string;
   INGEST_SECRET: string;
   FALLBACK_FORWARD?: string;
@@ -26,6 +28,8 @@ interface Decision {
   action: "forward" | "store_only" | "reject";
   forward_to?: string;
   forward_to_all?: string[];
+  /** PGP-encrypted copies to send as new messages (needs the SEND_EMAIL binding). */
+  send?: Array<{ from: string; to: string; raw_base64: string }>;
   reason?: string;
 }
 
@@ -43,7 +47,10 @@ async function sign(secret: string, prefix: string, body: Uint8Array): Promise<s
   return [...mac].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export async function handleEmail(message: EmailMessageLike, env: Env, fetchImpl: typeof fetch = fetch): Promise<Outcome> {
+/** Builds a cloudflare:email EmailMessage (injected so tests run outside workerd). */
+export type MakeEmail = (from: string, to: string, raw: string) => unknown;
+
+export async function handleEmail(message: EmailMessageLike, env: Env, fetchImpl: typeof fetch = fetch, makeEmail?: MakeEmail): Promise<Outcome> {
   const raw = new Uint8Array(await new Response(message.raw).arrayBuffer());
   const ts = String(Math.floor(Date.now() / 1000));
   const timeout = Number(env.INGEST_TIMEOUT_MS || 5000);
@@ -82,6 +89,16 @@ export async function handleEmail(message: EmailMessageLike, env: Env, fetchImpl
           } catch (err) {
             // Stored in the app already; a forwarding failure (e.g. destination unverified) must not bounce the mail.
             console.error(JSON.stringify({ msg: "forward failed", to, err: String(err) }));
+          }
+        }
+        for (const m of decision.send ?? []) {
+          try {
+            if (!env.SEND_EMAIL || !makeEmail) throw new Error("SEND_EMAIL binding missing (needed for PGP-encrypted forwarding)");
+            const raw = new TextDecoder().decode(Uint8Array.from(atob(m.raw_base64), (c) => c.charCodeAt(0)));
+            await env.SEND_EMAIL.send(makeEmail(m.from, m.to, raw));
+            ok++;
+          } catch (err) {
+            console.error(JSON.stringify({ msg: "encrypted send failed", to: m.to, err: String(err) }));
           }
         }
         return ok ? "forwarded" : "stored";
@@ -130,6 +147,8 @@ async function fallback(message: EmailMessageLike, env: Env): Promise<Outcome> {
 
 export default {
   async email(message: EmailMessageLike, env: Env): Promise<void> {
-    await handleEmail(message, env);
+    // Only resolvable inside workerd; loaded lazily so the module stays testable in Node.
+    const mod = (await import("cloudflare:email" as string).catch(() => null)) as { EmailMessage: new (from: string, to: string, raw: string) => unknown } | null;
+    await handleEmail(message, env, fetch, mod ? (from, to, raw) => new mod.EmailMessage(from, to, raw) : undefined);
   },
 };

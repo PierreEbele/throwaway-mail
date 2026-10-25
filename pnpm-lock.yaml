@@ -193,6 +193,9 @@ importers:
       openid-client:
         specifier: ^6.8.8
         version: 6.8.8
+      openpgp:
+        specifier: ^6.3.2
+        version: 6.3.2
       postal-mime:
         specifier: ^4.2.0
         version: 4.2.0
@@ -1597,6 +1600,15 @@ packages:
   openid-client@6.8.8:
     resolution: {integrity: sha512-ZsucJA5Ad04Uv7YN4ql+s4GXNmb9uAYQwyJTsJx7CH/MX3JZioLE2pVKi1SC+YrbSLA4Px3Gi30dMjgOZtb6pA==}
 
+  openpgp@6.3.2:
+    resolution: {integrity: sha512-wcZTzHz41LV8Y48zH/JlD1JT8YdNmpWOuMAjQ/podvvCwsjBEU37K3znJh4UQcj3hksE5z9TzvhbUbwzsGvlLQ==}
+    engines: {node: '>= 18.0.0', typescript: '>= 5.0.0'}
+    peerDependencies:
+      '@openpgp/web-stream-tools': ~0.3.0
+    peerDependenciesMeta:
+      '@openpgp/web-stream-tools':
+        optional: true
+
   parse-srcset@1.0.2:
     resolution: {integrity: sha512-/2qh0lav6CmI15FzA3i/2Bzk2zCgQhGMkvhOhKNcBVQ1ldgpbfiNTVslmooUmWJcADi1f1kIeynbDRVzNlfR6Q==}
 
@@ -2688,6 +2700,8 @@ snapshots:
     dependencies:
       jose: 6.2.14
       oauth4webapi: 3.8.8
+
+  openpgp@6.3.2: {}
 
   parse-srcset@1.0.2: {}
 

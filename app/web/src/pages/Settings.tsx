@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, patch, post } from "../api";
-import type { ApiKey, NotifyKind, NotifyTarget } from "../types";
+import type { ApiKey, Destination, NotifyKind, NotifyTarget } from "../types";
 import { useAuth } from "../auth";
 import { Badge, CopyButton, EmptyState, ErrorText, PageHeader, Spinner, confirmAction, useToast } from "../components/ui";
 import { useDestinations, useDomains } from "./Addresses";
@@ -60,6 +60,7 @@ export function DestinationsPage() {
                 </div>
                 <p className="text-xs text-zinc-500">{d.verified ? `Verified ${timeAgo(d.verified_at)}` : "Waiting for you to click the Cloudflare verification link"}</p>
                 {d.last_error && <p className="text-xs text-red-600">{d.last_error}</p>}
+                <PgpRow d={d} />
               </div>
               {!d.verified && (
                 <>
@@ -73,6 +74,41 @@ export function DestinationsPage() {
         </ul>
       )}
     </>
+  );
+}
+
+function PgpRow({ d }: { d: Destination }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [key, setKey] = useState("");
+  const save = (body: Record<string, unknown>) =>
+    patch(`/v1/destinations/${d.id}`, body).then(
+      () => { qc.invalidateQueries({ queryKey: ["destinations"] }); setOpen(false); setKey(""); },
+      (e: Error) => toast(e.message, "error"),
+    );
+  return (
+    <div className="mt-1 text-xs">
+      {d.pgp ? (
+        <p className="flex flex-wrap items-center gap-2 text-zinc-500">
+          🔒 Encrypted with <code className="font-mono" title={d.pgp.fingerprint}>{d.pgp.fingerprint.slice(-16).replace(/(.{4})/g, "$1 ").trim()}</code>
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={d.pgp.hide_subject} onChange={(e) => save({ pgp_hide_subject: e.target.checked })} /> hide subject
+          </label>
+          <button className="underline" onClick={() => setOpen(!open)}>change</button>
+          <button className="underline" onClick={() => confirmAction("Forward in clear again?") && save({ pgp_public_key: null })}>remove</button>
+        </p>
+      ) : (
+        <button className="text-zinc-500 underline" onClick={() => setOpen(!open)}>Encrypt forwarded mail with PGP…</button>
+      )}
+      {open && (
+        <div className="mt-2 space-y-2">
+          <textarea className="input h-28 font-mono text-xs" placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----" value={key} onChange={(e) => setKey(e.target.value)} aria-label="OpenPGP public key" />
+          <p className="text-zinc-500">The Worker then sends an encrypted PGP/MIME copy instead of forwarding (needs the SEND_EMAIL binding, see README).</p>
+          <button className="btn-primary px-2 py-1 text-xs" disabled={!key.trim()} onClick={() => save({ pgp_public_key: key })}>Save key</button>
+        </div>
+      )}
+    </div>
   );
 }
 

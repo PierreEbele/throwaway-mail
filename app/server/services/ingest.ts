@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import PostalMime from "postal-mime";
+import PostalMime, { type Email } from "postal-mime";
 import { and, asc, eq, gt, isNotNull, sql } from "drizzle-orm";
 import type { Deps } from "../context.js";
 import { addressDestinations, addresses, destinations, directories, domains, extractedItems, leakEvents, messages, users, type Address, type Domain } from "../db/schema.js";
@@ -10,6 +10,7 @@ import { authWarning } from "../lib/phishing.js";
 import { listInfo } from "../lib/listheaders.js";
 import { matchCategory } from "../routes/categories.js";
 import { notify } from "./notify.js";
+import { encryptForward } from "./pgp.js";
 import { runParser } from "../parser/index.js";
 import { baseDomain, listed, looksLikeLeak, parseList, senderDomain } from "../lib/senders.js";
 
@@ -20,6 +21,8 @@ export interface IngestResult {
   forward_to?: string;
   /** Every destination when there are several (forward_to is the first one, for older Workers). */
   forward_to_all?: string[];
+  /** PGP-encrypted copies the Worker must send itself (send_email binding), from `from`. */
+  send?: Array<{ from: string; to: string; raw_base64: string }>;
   reason?: string;
   message_id?: string;
   duplicate?: boolean;
@@ -208,7 +211,7 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     if (dup) {
       log.info("duplicate delivery (body hash)", { message_id: dup.id });
       return dup.forwarded && dup.forwardTo
-        ? { ...forwardResult(dup.forwardTo), message_id: dup.id, duplicate: true }
+        ? { ...(await forwardDecision(deps, address, dup.forwardTo, input.raw, email, rcpt.full)), message_id: dup.id, duplicate: true }
         : { action: "store_only", message_id: dup.id, duplicate: true };
     }
   }
@@ -222,7 +225,7 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     if (dup) {
       log.info("duplicate delivery", { message_id: dup.id });
       return dup.forwarded && dup.forwardTo
-        ? { ...forwardResult(dup.forwardTo), message_id: dup.id, duplicate: true }
+        ? { ...(await forwardDecision(deps, address, dup.forwardTo, input.raw, email, rcpt.full)), message_id: dup.id, duplicate: true }
         : { action: "store_only", message_id: dup.id, duplicate: true };
     }
   }
@@ -383,11 +386,49 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
   // Never delay the Worker's answer on slow notification endpoints.
   void Promise.all(pushes).catch(() => {});
 
-  return forwardTo ? { ...forwardResult(forwardTo), message_id: id } : { action: "store_only", message_id: id };
+  return forwardTo ? { ...(await forwardDecision(deps, address, forwardTo, input.raw, email, rcpt.full)), message_id: id } : { action: "store_only", message_id: id };
 }
 
-/** messages.forward_to holds "a@x, b@y". */
-function forwardResult(stored: string): IngestResult {
+/**
+ * messages.forward_to holds "a@x, b@y". Destinations with an OpenPGP key get an encrypted copy the Worker sends
+ * itself; the others are plain Cloudflare forwards.
+ */
+async function forwardDecision(deps: Deps, address: Address, stored: string, raw: Uint8Array, email: Email, alias: string): Promise<IngestResult> {
   const all = stored.split(",").map((x) => x.trim()).filter(Boolean);
-  return { action: "forward", forward_to: all[0], ...(all.length > 1 ? { forward_to_all: all } : {}) };
+  const keys = new Map(
+    deps.db
+      .select()
+      .from(destinations)
+      .where(and(eq(destinations.userId, address.userId), isNotNull(destinations.pgpPublicKey)))
+      .all()
+      .map((d) => [d.email, d]),
+  );
+  const plain = all.filter((e) => !keys.has(e));
+  const send: NonNullable<IngestResult["send"]> = [];
+  for (const to of all.filter((e) => keys.has(e))) {
+    const dest = keys.get(to)!;
+    try {
+      const mime = await encryptForward({
+        raw,
+        armoredKey: dest.pgpPublicKey!,
+        alias,
+        to,
+        subject: email.subject ?? null,
+        fromName: email.from?.name || null,
+        fromAddr: email.from?.address ?? null,
+        hideSubject: dest.pgpHideSubject,
+        now: deps.now(),
+      });
+      send.push({ from: alias, to, raw_base64: Buffer.from(mime, "utf8").toString("base64") });
+    } catch (err) {
+      // Never fall back to a clear-text forward for a destination that asked for encryption.
+      deps.logger.error("pgp encryption failed", { destination: dest.id, err: err as Error });
+    }
+  }
+  if (!plain.length && !send.length) return { action: "store_only" };
+  return {
+    action: "forward",
+    ...(plain.length ? { forward_to: plain[0], ...(plain.length > 1 ? { forward_to_all: plain } : {}) } : {}),
+    ...(send.length ? { send } : {}),
+  };
 }

@@ -135,6 +135,16 @@ npx wrangler deploy
 - `FALLBACK_FORWARD` should be an address already verified as a Cloudflare destination, or one per domain: `example.com=a@x.com,other.org=b@y.com,*=default@z.com`. When the app is unreachable, errors, or does not answer within 5 seconds, mail goes there. If it is empty, the Worker rejects with a temporary error so the sender gets a bounce instead of silent loss.
 - Watch it live with `npx wrangler tail`.
 
+### PGP-encrypted forwarding (optional)
+
+A destination can hold an OpenPGP public key (Destinations page). Mail forwarded to it is then wrapped in a
+PGP/MIME envelope by the app, and the Worker **sends** that encrypted copy itself instead of forwarding the
+original. This needs the `send_email` binding already declared in `worker/wrangler.toml` (`SEND_EMAIL`): redeploy
+the Worker after updating. Cloudflare only delivers it to verified destinations. If the binding is missing, the
+mail is stored but never forwarded in clear.
+
+The Worker also forwards to several destinations when an address has extra ones (`forward_to_all`).
+
 ## 5. Single sign-on (Authelia)
 
 Login is SSO only: there are no local passwords, setup tokens or invites. A user is created at their first sign-in. Members of `OIDC_ADMIN_GROUP` (default `admins`) are admins, and the role is re-synced at every sign-in. `OIDC_ALLOWED_GROUPS` can restrict who may sign in; otherwise Authelia's `authorization_policy` decides. Admins can disable a user in **Admin → Users**, which also signs them out and stops their API keys.
