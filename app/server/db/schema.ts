@@ -54,6 +54,8 @@ export const domains = sqliteTable("domains", {
   createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: integer("created_at").notNull(),
   lastCheckedAt: integer("last_checked_at"),
+  /** Last mail received for this domain (any outcome): shows whether MX / Worker still deliver. */
+  lastIngestAt: integer("last_ingest_at"),
 });
 
 export const destinations = sqliteTable(

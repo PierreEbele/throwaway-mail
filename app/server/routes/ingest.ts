@@ -1,3 +1,4 @@
+import { metrics } from "../services/metrics.js";
 import type { Hono } from "hono";
 import type { AppEnv } from "../context.js";
 import { HttpError } from "../lib/errors.js";
@@ -62,6 +63,7 @@ export function registerIngest(app: Hono<AppEnv>) {
       throw new HttpError(401, "bad_signature", "Signature mismatch");
     }
     const result = await ingestMessage(deps, { raw: body, envelopeFrom: from, envelopeTo: to });
+    metrics.ingest.inc({ action: result.duplicate ? "duplicate" : result.action, reason: result.reason ?? "" });
     return c.json(result);
   });
 }

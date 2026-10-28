@@ -1,0 +1,1 @@
+ALTER TABLE `domains` ADD `last_ingest_at` integer;

@@ -26,6 +26,8 @@ import { registerCategories } from "./routes/categories.js";
 import { registerExtras } from "./routes/extras.js";
 import { registerNotify } from "./routes/notify.js";
 import { registerFeeds } from "./routes/feeds.js";
+import { metrics, renderPrometheus } from "./services/metrics.js";
+import { healthGauges } from "./routes/admin.js";
 
 const APP_CSP = {
   defaultSrc: ["'self'"],
@@ -52,6 +54,7 @@ export function createApp(deps: Deps) {
     const start = performance.now();
     await next();
     const ms = Math.round(performance.now() - start);
+    metrics.http.inc({ status: `${String(c.res.status)[0]}xx` });
     const p = c.req.path;
     if (p !== "/healthz" && !p.startsWith("/assets/")) {
       log.info("request", { id: c.get("requestId"), method: c.req.method, path: p, status: c.res.status, ms, ip: clientIp(c) });
@@ -72,6 +75,14 @@ export function createApp(deps: Deps) {
     return c.json({ error: { code: "internal_error", message: "Internal server error" } }, 500);
   });
   app.notFound((c) => c.json({ error: { code: "not_found", message: "Route not found" } }, 404));
+
+  // Prometheus scrape endpoint, only when METRICS_TOKEN is set (Authorization: Bearer <token>).
+  app.get("/metrics", (c) => {
+    const token = deps.config.METRICS_TOKEN;
+    if (!token) return c.json({ error: { code: "not_found", message: "Route not found" } }, 404);
+    if (c.req.header("authorization") !== `Bearer ${token}`) return c.json({ error: { code: "unauthorized", message: "Bad metrics token" } }, 401);
+    return c.body(renderPrometheus(healthGauges(deps)), 200, { "content-type": "text/plain; version=0.0.4" });
+  });
 
   app.get("/healthz", (c) => {
     try {

@@ -251,6 +251,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <NavLink to="/admin/domains" className={navCls}><Icon d={ICONS.globe} /> Domains</NavLink>
             <NavLink to="/admin/users" className={navCls}><Icon d={ICONS.users} /> Users</NavLink>
             <NavLink to="/admin/audit" className={navCls}><Icon d={ICONS.log} /> Audit log</NavLink>
+            <NavLink to="/admin/health" className={navCls}><Icon d={ICONS.digest} /> Health</NavLink>
           </>
         )}
       </nav>

@@ -24,6 +24,8 @@ const EnvSchema = z.object({
   CF_ACCOUNT_ID: z.string().default(""),
   WORKER_NAME: z.string().default("throwaway-mail-ingest"),
   RETENTION_DAYS: z.coerce.number().int().min(0).default(30),
+  /** Enables GET /metrics (Prometheus) for clients sending Authorization: Bearer <METRICS_TOKEN>. */
+  METRICS_TOKEN: z.string().min(16).optional(),
   COOKIE_SECURE: z.string().optional(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().default(240),

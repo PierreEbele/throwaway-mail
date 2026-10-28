@@ -5,6 +5,7 @@ import { buildDeps } from "./build-deps.js";
 import { createApp } from "./app.js";
 import { runRetention } from "./services/retention.js";
 import { runExpiryReminders } from "./services/reminders.js";
+import { metrics } from "./services/metrics.js";
 import { backfillAuthResults } from "./services/maintenance.js";
 
 // Local (non-Docker) runs may keep settings in .env.
@@ -38,15 +39,19 @@ try {
 
 const retention = () => {
   try {
-    runRetention(deps);
+    const n = runRetention(deps);
+    metrics.job("retention", true, `${n} message(s) deleted`);
   } catch (e) {
+    metrics.job("retention", false, (e as Error).message);
     logger.error("retention failed", { err: e as Error });
   }
 };
 const reminders = () => {
   try {
-    runExpiryReminders(deps);
+    const n = runExpiryReminders(deps);
+    metrics.job("expiry_reminders", true, `${n} reminder(s) sent`);
   } catch (e) {
+    metrics.job("expiry_reminders", false, (e as Error).message);
     logger.error("expiry reminders failed", { err: e as Error });
   }
 };

@@ -9,7 +9,7 @@ import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/AuthPages";
 import { MailboxPage } from "./pages/Mailbox";
 import { AccountPage, DestinationsPage, KeysPage } from "./pages/Settings";
-import { AuditPage, DomainsPage, UsersPage } from "./pages/Admin";
+import { AuditPage, DomainsPage, UsersPage, HealthPage } from "./pages/Admin";
 import { ReviewPage } from "./pages/Review";
 import { DigestPage } from "./pages/Digest";
 import { ApiError } from "./api";
@@ -47,6 +47,7 @@ function App() {
       <Route path="/destinations" element={<Protected><DestinationsPage /></Protected>} />
       <Route path="/keys" element={<Protected><KeysPage /></Protected>} />
       <Route path="/account" element={<Protected><AccountPage /></Protected>} />
+      <Route path="/admin/health" element={<Protected admin><HealthPage /></Protected>} />
       <Route path="/admin/domains" element={<Protected admin><DomainsPage /></Protected>} />
       <Route path="/admin/users" element={<Protected admin><UsersPage /></Protected>} />
       <Route path="/admin/audit" element={<Protected admin><AuditPage /></Protected>} />

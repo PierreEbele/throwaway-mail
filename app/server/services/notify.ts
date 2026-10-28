@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import type { Deps } from "../context.js";
 import { notifyTargets, type NotifyTarget } from "../db/schema.js";
 import { parseList } from "../lib/senders.js";
+import { metrics } from "./metrics.js";
 
 export const NOTIFY_EVENTS = ["message.received", "code.received", "leak.detected", "address.expiring", "address.burned"] as const;
 export type NotifyEventType = (typeof NOTIFY_EVENTS)[number];
@@ -71,10 +72,12 @@ export async function sendTo(deps: Deps, t: NotifyTarget, e: NotifyEvent): Promi
     const res = await deps.fetch(url, { ...init, signal: AbortSignal.timeout(8000), redirect: "error" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     deps.db.update(notifyTargets).set({ lastOkAt: deps.now(), lastError: null }).where(eq(notifyTargets.id, t.id)).run();
+    metrics.notify.inc({ kind: t.kind, result: "ok" });
     return { ok: true };
   } catch (err) {
     const error = (err as Error).message.slice(0, 300);
     deps.db.update(notifyTargets).set({ lastError: error }).where(eq(notifyTargets.id, t.id)).run();
+    metrics.notify.inc({ kind: t.kind, result: "error" });
     deps.logger.warn("notification failed", { target: t.id, kind: t.kind, err: error });
     return { ok: false, error };
   }

@@ -170,6 +170,7 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     return { action: "reject", reason: "unknown_domain" };
   }
 
+  deps.db.update(domains).set({ lastIngestAt: deps.now() }).where(eq(domains.id, domain.id)).run();
   const sender = normalizeRecipient(input.envelopeFrom);
   let address =
     deps.db.select().from(addresses).where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, rcpt.local))).get() ?? resolveDirectory(deps, domain, rcpt.local);
