@@ -95,3 +95,17 @@ describe("addresses that never received mail", () => {
     expect((await user.get("/v1/stale-addresses?days=30")).json.addresses).toEqual([]);
   });
 });
+
+describe("category by name", () => {
+  it("assigns an existing category by name, or creates it on request", async () => {
+    const { user, mk } = await setup();
+    const shop = (await user.post("/v1/categories", { name: "Shopping" })).json.category;
+    expect((await mk("A", { category: "shopping" })).category_id).toBe(shop.id);
+    expect((await user.post("/v1/addresses", { site_name: "B", category: "Games" })).status).toBe(400);
+    const b = await mk("B", { category: "Games", create_category: true });
+    const games = (await user.get("/v1/categories")).json.categories.find((c: any) => c.name === "Games");
+    expect(b.category_id).toBe(games.id);
+    expect((await user.post("/v1/addresses", { site_name: "C", category: "Games", category_id: shop.id })).status).toBe(400);
+    expect((await user.patch(`/v1/addresses/${b.id}`, { category: "Shopping" })).json.address.category_id).toBe(shop.id);
+  });
+});

@@ -9,7 +9,7 @@ import { LOCAL_PART_RE } from "../lib/email.js";
 import { readableLocalPart } from "../lib/words.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { addressOut, itemsOut, messageOut, messageSummaryOut } from "../services/serialize.js";
-import { checkCategory, matchCategory } from "./categories.js";
+import { categoryByName, checkCategory, matchCategory } from "./categories.js";
 
 const SiteUrl = z
   .string()
@@ -143,6 +143,8 @@ export function registerAddresses(r: ApiRouter) {
         forward: z.boolean().optional(),
         destination_id: z.string().optional(),
         category_id: z.string().nullable().optional(),
+        category: z.string().optional().describe("Category name (case-insensitive), instead of category_id"),
+        create_category: z.boolean().default(false).describe("Create `category` if it does not exist yet"),
         expires_at: ExpiresAt.optional(),
         expires_in_days: z.number().int().min(1).max(3650).optional(),
       }),
@@ -150,7 +152,11 @@ export function registerAddresses(r: ApiRouter) {
     },
     (c, { body }) => {
       const d = c.get("deps");
-      const { a, domain } = createAddress(d, c.get("user")!, body);
+      const user = c.get("user")!;
+      if (body.category !== undefined && body.category_id !== undefined) throw badRequest("Pass category or category_id, not both");
+      const { category, create_category, ...rest } = body;
+      const category_id = category !== undefined ? categoryByName(d, user, category, create_category) : rest.category_id;
+      const { a, domain } = createAddress(d, user, { ...rest, category_id });
       const o = out(d, a, domain);
       return c.json({ id: a.id, email: o.email, address: o }, 201);
     },
@@ -254,6 +260,8 @@ export function registerAddresses(r: ApiRouter) {
         status: z.enum(["active", "paused", "archived"]).optional(),
         expires_at: ExpiresAt.optional(),
         category_id: z.string().nullable().optional(),
+        category: z.string().optional().describe("Category name, instead of category_id"),
+        create_category: z.boolean().default(false),
         pinned: z.boolean().optional(),
         block_promos: z.boolean().optional(),
         site_lock: z.boolean().optional(),
@@ -267,6 +275,8 @@ export function registerAddresses(r: ApiRouter) {
       const { a, domain } = ownedAddress(d, user, c.req.param("id")!);
       checkDestination(d, user, body.destination_id);
       for (const id of body.extra_destination_ids ?? []) checkDestination(d, user, id);
+      if (body.category !== undefined && body.category_id !== undefined) throw badRequest("Pass category or category_id, not both");
+      if (body.category !== undefined) body.category_id = categoryByName(d, user, body.category, body.create_category);
       checkCategory(d, user, body.category_id);
       if (body.extra_destination_ids) {
         d.db.delete(addressDestinations).where(eq(addressDestinations.addressId, a.id)).run();

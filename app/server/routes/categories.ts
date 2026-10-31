@@ -49,6 +49,27 @@ export function checkCategory(d: Deps, user: User, id: string | null | undefined
 }
 
 const Name = z.string().trim().min(1).max(40);
+
+/**
+ * Category id for `name` (case-insensitive). With `create`, a missing category is created (zinc, unpinned);
+ * otherwise an unknown name is a 400.
+ */
+export function categoryByName(d: Deps, user: User, name: string, create: boolean): string {
+  const wanted = name.trim();
+  if (!wanted || wanted.length > 40) throw badRequest("category must be 1–40 characters");
+  const existing = d.db
+    .select({ id: categories.id })
+    .from(categories)
+    .where(and(eq(categories.userId, user.id), sql`lower(${categories.name}) = ${wanted.toLowerCase()}`))
+    .get();
+  if (existing) return existing.id;
+  if (!create) throw badRequest(`Unknown category ${wanted} (pass create_category: true to create it)`);
+  const max = d.db.select({ p: sql<number>`coalesce(max(${categories.position}), -1)` }).from(categories).where(eq(categories.userId, user.id)).get()!.p;
+  const id = newId("cat");
+  d.db.insert(categories).values({ id, userId: user.id, name: wanted, color: "zinc", pinned: false, position: max + 1, createdAt: d.now() }).run();
+  d.bus.publish(user.id, { type: "category.changed" });
+  return id;
+}
 const Color = z.enum(CATEGORY_COLORS);
 const AutoMatch = z.string().trim().max(500).nullable().transform((v) => v || null);
 const Retention = z.number().int().min(1).max(3650).nullable();
