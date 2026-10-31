@@ -254,6 +254,18 @@ curl -s -N -H "Authorization: Bearer $KEY" $TM/v1/events                        
 
 Errors always look like `{"error":{"code":"bad_request","message":"…","details":[…]}}`. Rate limits answer `429` with `Retry-After`.
 
+### Node.js SDK
+
+`sdk/` contains a dependency-free TypeScript client (`@throwaway-mail/sdk`, Node.js 18+). See `sdk/README.md`.
+
+```ts
+import { ThrowawayMail } from "@throwaway-mail/sdk";
+
+const tm = new ThrowawayMail({ baseUrl: process.env.TM!, apiKey: process.env.KEY! });
+const addr = await tm.addresses.create({ site: "github.com", category: "Dev", createCategory: true });
+const { code } = await tm.addresses.waitForCode(addr.id, { since: Date.now(), timeoutMs: 120_000 });
+```
+
 ## 9. Backup and restore
 
 The database is one SQLite file (WAL mode) in the `data` volume. `scripts/backup.sh` makes a consistent online copy with `sqlite3 .backup`, checks its integrity, gzips it into `/data/backups`, and deletes copies older than `BACKUP_KEEP_DAYS` (14).
