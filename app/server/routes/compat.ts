@@ -4,7 +4,7 @@ import type { AppEnv } from "../context.js";
 import { resolveApiKey } from "../auth/tokens.js";
 import { RateLimiter } from "../auth/ratelimit.js";
 import { HttpError } from "../lib/errors.js";
-import { createAddress } from "./addresses.js";
+import { createAddress } from "../services/addresses.js";
 import { addressOut } from "../services/serialize.js";
 
 /**

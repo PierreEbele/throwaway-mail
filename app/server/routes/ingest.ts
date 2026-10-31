@@ -3,7 +3,7 @@ import type { Hono } from "hono";
 import type { AppEnv } from "../context.js";
 import { HttpError } from "../lib/errors.js";
 import { hmacHex, safeEqual } from "../lib/crypto.js";
-import { ingestMessage } from "../services/ingest.js";
+import { ingestMessage } from "../services/ingest/index.js";
 
 export const INGEST_HEADERS = {
   timestamp: "x-tm-timestamp",

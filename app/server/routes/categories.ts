@@ -1,79 +1,14 @@
-import { and, asc, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { ApiRouter } from "../lib/http.js";
-import type { Deps } from "../context.js";
-import { addresses, categories, directories, domains, messages, savedSearches, type Category, type User } from "../db/schema.js";
+import { addresses, categories, messages, type Category } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
-import { badRequest, conflict, notFound } from "../lib/errors.js";
-import { addressOut } from "../services/serialize.js";
-
-export const CATEGORY_COLORS = ["zinc", "red", "orange", "amber", "green", "teal", "blue", "indigo", "violet", "pink"] as const;
-
-const categoryOut = (c: Category, count = 0, unread = 0) => ({
-  id: c.id,
-  name: c.name,
-  color: c.color,
-  pinned: c.pinned,
-  hidden: c.hidden,
-  auto_match: c.autoMatch,
-  retention_days: c.retentionDays,
-  position: c.position,
-  created_at: c.createdAt,
-  address_count: count,
-  unread_count: unread,
-});
-
-/** First category (by position) whose keywords appear in the site name or URL. */
-export function matchCategory(d: Deps, userId: string, siteName: string, siteUrl: string | null): string | null {
-  const hay = `${siteName} ${siteUrl ?? ""}`.toLowerCase();
-  const rows = d.db.select().from(categories).where(eq(categories.userId, userId)).orderBy(asc(categories.position)).all();
-  for (const c of rows) {
-    const words = (c.autoMatch ?? "").split(",").map((w) => w.trim().toLowerCase()).filter(Boolean);
-    if (words.some((w) => hay.includes(w))) return c.id;
-  }
-  return null;
-}
-
-export function ownedCategory(d: Deps, user: User, id: string) {
-  const row = d.db.select().from(categories).where(and(eq(categories.id, id), eq(categories.userId, user.id))).get();
-  if (!row) throw notFound("Category");
-  return row;
-}
-
-/** Throws 400 unless `id` is null/undefined or one of the user's categories. */
-export function checkCategory(d: Deps, user: User, id: string | null | undefined) {
-  if (!id) return;
-  if (!d.db.select({ id: categories.id }).from(categories).where(and(eq(categories.id, id), eq(categories.userId, user.id))).get()) {
-    throw badRequest("Unknown category_id");
-  }
-}
-
+import { conflict } from "../lib/errors.js";
+import { CATEGORY_COLORS, categoryOut, ownedCategory } from "../services/categories.js";
 const Name = z.string().trim().min(1).max(40);
-
-/**
- * Category id for `name` (case-insensitive). With `create`, a missing category is created (zinc, unpinned);
- * otherwise an unknown name is a 400.
- */
-export function categoryByName(d: Deps, user: User, name: string, create: boolean): string {
-  const wanted = name.trim();
-  if (!wanted || wanted.length > 40) throw badRequest("category must be 1–40 characters");
-  const existing = d.db
-    .select({ id: categories.id })
-    .from(categories)
-    .where(and(eq(categories.userId, user.id), sql`lower(${categories.name}) = ${wanted.toLowerCase()}`))
-    .get();
-  if (existing) return existing.id;
-  if (!create) throw badRequest(`Unknown category ${wanted} (pass create_category: true to create it)`);
-  const max = d.db.select({ p: sql<number>`coalesce(max(${categories.position}), -1)` }).from(categories).where(eq(categories.userId, user.id)).get()!.p;
-  const id = newId("cat");
-  d.db.insert(categories).values({ id, userId: user.id, name: wanted, color: "zinc", pinned: false, position: max + 1, createdAt: d.now() }).run();
-  d.bus.publish(user.id, { type: "category.changed" });
-  return id;
-}
 const Color = z.enum(CATEGORY_COLORS);
 const AutoMatch = z.string().trim().max(500).nullable().transform((v) => v || null);
 const Retention = z.number().int().min(1).max(3650).nullable();
-
 export function registerCategories(r: ApiRouter) {
   r.add({ method: "get", path: "/v1/categories", summary: "List own address categories (pinned first)", tags: ["categories"], auth: "user" }, (c) => {
     const d = c.get("deps");
@@ -100,7 +35,6 @@ export function registerCategories(r: ApiRouter) {
     );
     return c.json({ categories: rows.map((x) => categoryOut(x, counts.get(x.id) ?? 0, unread.get(x.id) ?? 0)) });
   });
-
   r.add(
     {
       method: "post",
@@ -121,7 +55,6 @@ export function registerCategories(r: ApiRouter) {
       return c.json({ category: categoryOut(d.db.select().from(categories).where(eq(categories.id, row.id)).get()!) }, 201);
     },
   );
-
   r.add(
     {
       method: "patch",
@@ -151,7 +84,6 @@ export function registerCategories(r: ApiRouter) {
       return c.json({ category: categoryOut(d.db.select().from(categories).where(eq(categories.id, cat.id)).get()!) });
     },
   );
-
   r.add(
     {
       method: "post",
@@ -171,7 +103,6 @@ export function registerCategories(r: ApiRouter) {
       return c.json({ ok: true });
     },
   );
-
   r.add({ method: "delete", path: "/v1/categories/:id", summary: "Delete a category (its addresses become uncategorised)", tags: ["categories"], auth: "user" }, (c) => {
     const d = c.get("deps");
     const user = c.get("user")!;
@@ -181,141 +112,4 @@ export function registerCategories(r: ApiRouter) {
     d.bus.publish(user.id, { type: "category.changed" });
     return c.json({ ok: true });
   });
-
-  // --- Smart folders ---------------------------------------------------------------------------
-  const Params = z.record(z.string(), z.string().max(200)).refine((o) => Object.keys(o).length <= 12, "too many parameters");
-  const searchOut = (s: typeof savedSearches.$inferSelect) => ({ id: s.id, name: s.name, params: JSON.parse(s.paramsJson) as Record<string, string>, position: s.position, created_at: s.createdAt });
-
-  r.add({ method: "get", path: "/v1/saved-searches", summary: "List smart folders", tags: ["categories"], auth: "user" }, (c) => {
-    const d = c.get("deps");
-    return c.json({ searches: d.db.select().from(savedSearches).where(eq(savedSearches.userId, c.get("user")!.id)).orderBy(asc(savedSearches.position), asc(savedSearches.createdAt)).all().map(searchOut) });
-  });
-
-  r.add(
-    {
-      method: "post",
-      path: "/v1/saved-searches",
-      summary: "Save a smart folder (a set of /v1/addresses query parameters)",
-      tags: ["categories"],
-      auth: "user",
-      body: z.object({ name: Name, params: Params }),
-    },
-    (c, { body }) => {
-      const d = c.get("deps");
-      const user = c.get("user")!;
-      const max = d.db.select({ p: sql<number>`coalesce(max(${savedSearches.position}), -1)` }).from(savedSearches).where(eq(savedSearches.userId, user.id)).get()!.p;
-      const row = { id: newId("srch"), userId: user.id, name: body.name, paramsJson: JSON.stringify(body.params), position: max + 1, createdAt: d.now() };
-      d.db.insert(savedSearches).values(row).run();
-      d.bus.publish(user.id, { type: "category.changed" });
-      return c.json({ search: searchOut(row) }, 201);
-    },
-  );
-
-  r.add({ method: "delete", path: "/v1/saved-searches/:id", summary: "Delete a smart folder", tags: ["categories"], auth: "user" }, (c) => {
-    const d = c.get("deps");
-    const user = c.get("user")!;
-    const res = d.db.delete(savedSearches).where(and(eq(savedSearches.id, c.req.param("id")!), eq(savedSearches.userId, user.id))).run();
-    if (!res.changes) throw notFound("Smart folder");
-    d.bus.publish(user.id, { type: "category.changed" });
-    return c.json({ ok: true });
-  });
-
-  // --- Directories (on-the-fly addresses) --------------------------------------------------------
-  r.add({ method: "get", path: "/v1/directories", summary: "List own directories (<name>.<site>@domain creates addresses on the fly)", tags: ["addresses"], auth: "user" }, (c) => {
-    const d = c.get("deps");
-    const rows = d.db.select().from(directories).where(eq(directories.userId, c.get("user")!.id)).orderBy(asc(directories.name)).all();
-    return c.json({ directories: rows.map((x) => ({ id: x.id, name: x.name, created_at: x.createdAt })) });
-  });
-
-  r.add(
-    {
-      method: "post",
-      path: "/v1/directories",
-      summary: "Reserve a directory name",
-      description: "Mail to <name>.<anything>@<any active domain> then creates an address for site <anything> owned by you. Names are global (first come, first served), 3–32 chars a-z0-9, max 5 per user.",
-      tags: ["addresses"],
-      auth: "user",
-      body: z.object({ name: z.string().trim().toLowerCase().regex(/^[a-z0-9]{3,32}$/, "3–32 letters or digits") }),
-    },
-    (c, { body }) => {
-      const d = c.get("deps");
-      const user = c.get("user")!;
-      const mine = d.db.select({ n: sql<number>`count(*)` }).from(directories).where(eq(directories.userId, user.id)).get()!.n;
-      if (mine >= 5) throw badRequest("At most 5 directories per user");
-      if (d.db.select().from(directories).where(eq(directories.name, body.name)).get()) throw conflict(`Directory ${body.name} is taken`);
-      const row = { id: newId("dir"), userId: user.id, name: body.name, createdAt: d.now() };
-      d.db.insert(directories).values(row).run();
-      return c.json({ directory: { id: row.id, name: row.name, created_at: row.createdAt } }, 201);
-    },
-  );
-
-  r.add({ method: "delete", path: "/v1/directories/:id", summary: "Release a directory (addresses it created are kept)", tags: ["addresses"], auth: "user" }, (c) => {
-    const d = c.get("deps");
-    const res = d.db.delete(directories).where(and(eq(directories.id, c.req.param("id")!), eq(directories.userId, c.get("user")!.id))).run();
-    if (!res.changes) throw notFound("Directory");
-    return c.json({ ok: true });
-  });
-
-  // --- Addresses that never received any mail ---------------------------------------------------
-
-  const staleRows = (d: Deps, user: User, days: number) =>
-    d.db
-      .select({ a: addresses, domain: domains.name })
-      .from(addresses)
-      .innerJoin(domains, eq(domains.id, addresses.domainId))
-      .where(
-        and(
-          eq(addresses.userId, user.id),
-          eq(addresses.isUnassigned, false),
-          sql`${addresses.status} != 'archived'`,
-          eq(addresses.pinned, false),
-          isNull(addresses.lastMessageAt),
-          isNull(addresses.staleDismissedAt),
-          lt(addresses.createdAt, d.now() - days * 86400_000),
-          sql`not exists (select 1 from ${messages} where ${messages.addressId} = ${addresses.id})`,
-        ),
-      )
-      .orderBy(asc(addresses.createdAt))
-      .all();
-
-  r.add(
-    {
-      method: "get",
-      path: "/v1/stale-addresses",
-      summary: "Addresses that never received any mail after `days` days (pinned and dismissed ones excluded)",
-      tags: ["addresses"],
-      auth: "user",
-      query: z.object({ days: z.coerce.number().int().min(1).max(3650).default(30) }),
-    },
-    (c, { query }) => {
-      const d = c.get("deps");
-      return c.json({ days: query.days, addresses: staleRows(d, c.get("user")!, query.days).map((x) => addressOut(x.a, x.domain)) });
-    },
-  );
-
-  r.add(
-    {
-      method: "post",
-      path: "/v1/stale-addresses",
-      summary: "Archive, delete or keep (dismiss) addresses that never received mail",
-      tags: ["addresses"],
-      auth: "user",
-      body: z.object({ action: z.enum(["archive", "delete", "keep"]), ids: z.array(z.string()).min(1).max(1000), days: z.number().int().min(1).max(3650).default(30) }),
-    },
-    (c, { body }) => {
-      const d = c.get("deps");
-      const user = c.get("user")!;
-      // Only act on addresses that are still stale: a mail may have arrived since the list was shown.
-      const allowed = new Set(staleRows(d, user, body.days).map((x) => x.a.id));
-      const ids = body.ids.filter((id) => allowed.has(id));
-      if (ids.length) {
-        const where = and(eq(addresses.userId, user.id), inArray(addresses.id, ids));
-        if (body.action === "delete") d.db.delete(addresses).where(where).run();
-        else if (body.action === "archive") d.db.update(addresses).set({ status: "archived", updatedAt: d.now() }).where(where).run();
-        else d.db.update(addresses).set({ staleDismissedAt: d.now() }).where(where).run();
-        for (const id of ids) d.bus.publish(user.id, { type: body.action === "delete" ? "address.deleted" : "address.updated", address_id: id });
-      }
-      return c.json({ affected: ids.length, skipped: body.ids.length - ids.length });
-    },
-  );
 }

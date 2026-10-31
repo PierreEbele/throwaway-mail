@@ -86,7 +86,7 @@ describe("display sanitiser", async () => {
 });
 
 describe("authentication results", async () => {
-  const { authResult } = await import("../../app/server/services/ingest.js");
+  const { authResult } = await import("../../app/server/services/ingest/index.js");
   // Exactly what Cloudflare wrote for the test mail on 2026-11-01
   const cf = [
     {

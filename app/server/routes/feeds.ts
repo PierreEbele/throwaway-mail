@@ -5,7 +5,7 @@ import { addresses, domains, extractedItems, messages } from "../db/schema.js";
 import { randomString } from "../lib/crypto.js";
 import { notFound } from "../lib/errors.js";
 import { addressOut, itemsOut } from "../services/serialize.js";
-import { ownedAddress } from "./addresses.js";
+import { ownedAddress } from "../services/addresses.js";
 
 const esc = (s: string) => s.replace(/[<>&'"]/g, (ch) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[ch]!);
 

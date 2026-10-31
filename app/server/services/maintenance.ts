@@ -1,7 +1,7 @@
 import { eq, isNotNull } from "drizzle-orm";
 import type { Deps } from "../context.js";
 import { messages } from "../db/schema.js";
-import { authResult } from "./ingest.js";
+import { authResult } from "./ingest/index.js";
 
 /** Recompute stored SPF results with the current parser (fixes mails stored before the HELO/MAIL FROM fix). Idempotent. */
 export function backfillAuthResults(deps: Deps): number {
