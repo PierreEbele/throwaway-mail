@@ -52,7 +52,8 @@ export function registerIngest(app: Hono<AppEnv>) {
     const sig = (c.req.header(INGEST_HEADERS.signature) ?? "").toLowerCase();
     const from = c.req.header(INGEST_HEADERS.from) ?? "";
     const to = c.req.header(INGEST_HEADERS.to) ?? "";
-    if (!/^\d+$/.test(ts) || !/^[0-9a-f]{64}$/.test(sig) || !to) throw new HttpError(401, "bad_signature", "Missing or malformed signature headers");
+    if (!/^\d+$/.test(ts) || !/^[0-9a-f]{64}$/.test(sig) || !to)
+      throw new HttpError(401, "bad_signature", "Missing or malformed signature headers");
     const skew = Math.abs(Math.floor(deps.now() / 1000) - Number(ts));
     if (skew > 300) throw new HttpError(401, "stale_timestamp", "Timestamp outside the allowed 5 minute window");
 

@@ -50,7 +50,11 @@ export async function encryptForward(opts: {
   now: number;
 }): Promise<string> {
   const publicKey = await openpgp.readKey({ armoredKey: opts.armoredKey });
-  const encrypted = await openpgp.encrypt({ message: await openpgp.createMessage({ binary: opts.raw }), encryptionKeys: publicKey, format: "armored" });
+  const encrypted = await openpgp.encrypt({
+    message: await openpgp.createMessage({ binary: opts.raw }),
+    encryptionKeys: publicKey,
+    format: "armored",
+  });
   const boundary = `tm-pgp-${randomString(20).toLowerCase()}`;
   const domain = opts.alias.split("@")[1] ?? "localhost";
   const display = header(`${opts.fromName || opts.fromAddr || "Unknown sender"} (via Throwaway Mail)`).replace(/"/g, "'");

@@ -1,7 +1,8 @@
 import { createHmac } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import type { Deps } from "../context.js";
-import { notifyTargets, type NotifyTarget } from "../db/schema.js";
+import { notifyTargets, users, type NotifyTarget } from "../db/schema.js";
+import { checkOutboundUrl } from "../lib/outbound.js";
 import { parseList } from "../lib/senders.js";
 import { metrics } from "./metrics.js";
 
@@ -16,17 +17,6 @@ export interface NotifyEvent {
   url?: string;
   /** Extra fields sent as-is to webhooks. */
   data?: Record<string, unknown>;
-}
-
-/** Hosts a non-admin may not target: loopback, link-local, private ranges, LAN-only names. */
-export function isPrivateHost(host: string): boolean {
-  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
-  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".lan") || h.endsWith(".internal") || h.endsWith(".home.arpa")) return true;
-  if (!h.includes(".")) return !h.includes(":") ? true : /^(::1?|fe80:|fc|fd)/.test(h);
-  const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(h);
-  if (!m) return false;
-  const [a, b] = [Number(m[1]), Number(m[2])];
-  return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
 }
 
 export function webhookSignature(secret: string, ts: string, body: string) {
@@ -47,9 +37,17 @@ function request(t: NotifyTarget, e: NotifyEvent, now: number): { url: string; i
       return { url: t.url!, init: { method: "POST", headers, body: e.body } };
     }
     case "gotify":
-      return json(`${t.url!.replace(/\/$/, "")}/message`, { title: e.title, message: e.body + (e.url ? `\n${e.url}` : ""), priority: e.type === "leak.detected" ? 8 : 5 }, { "x-gotify-key": t.token ?? "" });
+      return json(
+        `${t.url!.replace(/\/$/, "")}/message`,
+        { title: e.title, message: e.body + (e.url ? `\n${e.url}` : ""), priority: e.type === "leak.detected" ? 8 : 5 },
+        { "x-gotify-key": t.token ?? "" },
+      );
     case "telegram":
-      return json(`https://api.telegram.org/bot${t.token}/sendMessage`, { chat_id: t.chatId, text: `${e.title}\n${e.body}${e.url ? `\n${e.url}` : ""}`, disable_web_page_preview: true });
+      return json(`https://api.telegram.org/bot${t.token}/sendMessage`, {
+        chat_id: t.chatId,
+        text: `${e.title}\n${e.body}${e.url ? `\n${e.url}` : ""}`,
+        disable_web_page_preview: true,
+      });
     case "webhook": {
       const body = JSON.stringify({ type: e.type, title: e.title, body: e.body, url: e.url ?? null, sent_at: now, ...e.data });
       const ts = String(Math.floor(now / 1000));
@@ -57,7 +55,12 @@ function request(t: NotifyTarget, e: NotifyEvent, now: number): { url: string; i
         url: t.url!,
         init: {
           method: "POST",
-          headers: { "content-type": "application/json", "x-tm-event": e.type, "x-tm-timestamp": ts, ...(t.secret ? { "x-tm-signature": webhookSignature(t.secret, ts, body) } : {}) },
+          headers: {
+            "content-type": "application/json",
+            "x-tm-event": e.type,
+            "x-tm-timestamp": ts,
+            ...(t.secret ? { "x-tm-signature": webhookSignature(t.secret, ts, body) } : {}),
+          },
           body,
         },
       };
@@ -69,6 +72,9 @@ function request(t: NotifyTarget, e: NotifyEvent, now: number): { url: string; i
 export async function sendTo(deps: Deps, t: NotifyTarget, e: NotifyEvent): Promise<{ ok: boolean; error?: string }> {
   const { url, init } = request(t, e, deps.now());
   try {
+    // Re-checked at every send: the target's DNS may have changed since it was saved.
+    const owner = deps.db.select({ role: users.role }).from(users).where(eq(users.id, t.userId)).get();
+    await checkOutboundUrl(url, { resolve: deps.resolve, allowPrivate: owner?.role === "admin" });
     const res = await deps.fetch(url, { ...init, signal: AbortSignal.timeout(8000), redirect: "error" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     deps.db.update(notifyTargets).set({ lastOkAt: deps.now(), lastError: null }).where(eq(notifyTargets.id, t.id)).run();

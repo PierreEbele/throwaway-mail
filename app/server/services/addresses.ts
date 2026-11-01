@@ -38,13 +38,22 @@ export function ownedAddress(deps: Deps, user: User, id: string) {
 }
 
 export function addressWithCounts(deps: Deps, a: Address, domain: string) {
-  const extra = deps.db.select({ id: addressDestinations.destinationId }).from(addressDestinations).where(eq(addressDestinations.addressId, a.id)).all().map((x) => x.id);
+  const extra = deps.db
+    .select({ id: addressDestinations.destinationId })
+    .from(addressDestinations)
+    .where(eq(addressDestinations.addressId, a.id))
+    .all()
+    .map((x) => x.id);
   return { ...addressOut(a, domain, messageCounts(deps, [a.id]).get(a.id)), extra_destination_ids: extra };
 }
 
 export function checkDestination(deps: Deps, user: User, id: string | null | undefined) {
   if (!id) return;
-  const d = deps.db.select().from(destinations).where(and(eq(destinations.id, id), eq(destinations.userId, user.id))).get();
+  const d = deps.db
+    .select()
+    .from(destinations)
+    .where(and(eq(destinations.id, id), eq(destinations.userId, user.id)))
+    .get();
   if (!d) throw badRequest("Unknown destination_id");
 }
 
@@ -73,7 +82,11 @@ export interface NewAddress {
 /** Creates an address for `user`. Shared by `POST /v1/addresses` and the alias-service compatibility API. */
 export function createAddress(d: Deps, user: User, body: NewAddress): { a: Address; domain: string } {
   const domain = body.domain
-    ? d.db.select().from(domains).where(or(eq(domains.name, body.domain), eq(domains.id, body.domain))).get()
+    ? d.db
+        .select()
+        .from(domains)
+        .where(or(eq(domains.name, body.domain), eq(domains.id, body.domain)))
+        .get()
     : d.db.select().from(domains).where(eq(domains.status, "active")).orderBy(asc(domains.createdAt)).get();
   if (!domain) throw badRequest(body.domain ? `Unknown domain ${body.domain}` : "No active domain is configured yet");
   if (domain.status !== "active") throw badRequest(`Domain ${domain.name} is not active yet`);

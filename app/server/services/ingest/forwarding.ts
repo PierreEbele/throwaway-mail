@@ -23,7 +23,11 @@ export function forwardTargets(deps: Deps, address: Address): string[] {
 export function forwardTarget(deps: Deps, address: Address): string | null {
   if (!address.forwardEnabled) return null;
   const dest = address.destinationId
-    ? deps.db.select().from(destinations).where(and(eq(destinations.id, address.destinationId), eq(destinations.userId, address.userId))).get()
+    ? deps.db
+        .select()
+        .from(destinations)
+        .where(and(eq(destinations.id, address.destinationId), eq(destinations.userId, address.userId)))
+        .get()
     : deps.db
         .select()
         .from(destinations)
@@ -37,8 +41,18 @@ export function forwardTarget(deps: Deps, address: Address): string | null {
  * messages.forward_to holds "a@x, b@y". Destinations with an OpenPGP key get an encrypted copy the Worker sends
  * itself; the others are plain Cloudflare forwards.
  */
-export async function forwardDecision(deps: Deps, address: Address, stored: string, raw: Uint8Array, email: Email, alias: string): Promise<IngestResult> {
-  const all = stored.split(",").map((x) => x.trim()).filter(Boolean);
+export async function forwardDecision(
+  deps: Deps,
+  address: Address,
+  stored: string,
+  raw: Uint8Array,
+  email: Email,
+  alias: string,
+): Promise<IngestResult> {
+  const all = stored
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
   const keys = new Map(
     deps.db
       .select()

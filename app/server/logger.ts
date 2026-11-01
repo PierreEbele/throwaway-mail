@@ -10,7 +10,11 @@ export interface Logger {
 }
 
 /** Structured JSON-lines logger. Never pass mail bodies or codes at info level. */
-export function createLogger(level: Level = "info", base: Record<string, unknown> = {}, sink: (line: string) => void = (l) => process.stdout.write(l + "\n")): Logger {
+export function createLogger(
+  level: Level = "info",
+  base: Record<string, unknown> = {},
+  sink: (line: string) => void = (l) => process.stdout.write(l + "\n"),
+): Logger {
   const min = ORDER[level];
   const write = (lvl: Level, msg: string, fields?: Record<string, unknown>) => {
     if (ORDER[lvl] < min) return;

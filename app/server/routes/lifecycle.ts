@@ -1,12 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { ApiRouter } from "../lib/http.js";
+import { DAY } from "../lib/time.js";
 import { addresses } from "../db/schema.js";
 import { addressOut } from "../services/serialize.js";
 import { checkCategory } from "../services/categories.js";
 import { createAddress, ownedAddress } from "../services/addresses.js";
-
-const DAY = 86400_000;
 
 /** Replacing, extending and mass-pausing addresses. */
 export function registerLifecycle(r: ApiRouter) {
@@ -15,7 +14,8 @@ export function registerLifecycle(r: ApiRouter) {
       method: "post",
       path: "/v1/addresses/:id/replace",
       summary: "Create a fresh address for the same site and pause the old one",
-      description: "Copies site, category, forwarding, pin and protections. The old address is paused (mail rejected) and its leak warning cleared.",
+      description:
+        "Copies site, category, forwarding, pin and protections. The old address is paused (mail rejected) and its leak warning cleared.",
       tags: ["addresses"],
       auth: "user",
       body: z.object({ archive_old: z.boolean().default(false) }),
@@ -35,16 +35,32 @@ export function registerLifecycle(r: ApiRouter) {
       });
       d.db
         .update(addresses)
-        .set({ pinned: old.pinned, blockPromos: old.blockPromos, siteLock: old.siteLock, blockedSendersJson: old.blockedSendersJson, trustedSendersJson: old.trustedSendersJson })
+        .set({
+          pinned: old.pinned,
+          blockPromos: old.blockPromos,
+          siteLock: old.siteLock,
+          blockedSendersJson: old.blockedSendersJson,
+          trustedSendersJson: old.trustedSendersJson,
+        })
         .where(eq(addresses.id, a.id))
         .run();
       d.db
         .update(addresses)
-        .set({ status: body.archive_old ? "archived" : "paused", pinned: false, leakSender: null, leakAt: null, label: `replaced by ${a.localPart}@${domain}`, updatedAt: d.now() })
+        .set({
+          status: body.archive_old ? "archived" : "paused",
+          pinned: false,
+          leakSender: null,
+          leakAt: null,
+          label: `replaced by ${a.localPart}@${domain}`,
+          updatedAt: d.now(),
+        })
         .where(eq(addresses.id, old.id))
         .run();
       d.bus.publish(user.id, { type: "address.updated", address_id: old.id });
-      return c.json({ address: addressOut(d.db.select().from(addresses).where(eq(addresses.id, a.id)).get()!, domain), replaced_id: old.id }, 201);
+      return c.json(
+        { address: addressOut(d.db.select().from(addresses).where(eq(addresses.id, a.id)).get()!, domain), replaced_id: old.id },
+        201,
+      );
     },
   );
 
@@ -88,7 +104,11 @@ export function registerLifecycle(r: ApiRouter) {
         checkCategory(d, user, body.category_id);
         const conds = [eq(addresses.userId, user.id), eq(addresses.status, "active"), eq(addresses.isUnassigned, false)];
         if (body.category_id) conds.push(eq(addresses.categoryId, body.category_id));
-        affected = d.db.update(addresses).set({ status: "paused", burnReason: "panic", burnedAt: now, updatedAt: now }).where(and(...conds)).run().changes;
+        affected = d.db
+          .update(addresses)
+          .set({ status: "paused", burnReason: "panic", burnedAt: now, updatedAt: now })
+          .where(and(...conds))
+          .run().changes;
       } else {
         affected = d.db
           .update(addresses)

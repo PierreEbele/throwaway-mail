@@ -9,7 +9,23 @@ export interface LinkCandidate {
   method: "anchor" | "text";
 }
 
-const REDIRECT_PARAMS = ["url", "u", "q", "redirect", "redirect_url", "redirect_uri", "redirectUrl", "target", "dest", "destination", "link", "r", "to", "goto", "next"];
+const REDIRECT_PARAMS = [
+  "url",
+  "u",
+  "q",
+  "redirect",
+  "redirect_url",
+  "redirect_uri",
+  "redirectUrl",
+  "target",
+  "dest",
+  "destination",
+  "link",
+  "r",
+  "to",
+  "goto",
+  "next",
+];
 
 /** Unwrap obvious tracking redirects (param holding a full http(s) URL). */
 export function unwrapRedirect(url: string, depth = 0): string {
@@ -81,7 +97,8 @@ export function extractLinks(input: { text?: string | null; html?: string | null
       method,
     };
     const prev = found.get(url);
-    if (!prev || prev.score < score || (!prev.label && label)) found.set(url, prev && prev.score > score ? { ...prev, label: prev.label ?? cand.label } : cand);
+    if (!prev || prev.score < score || (!prev.label && label))
+      found.set(url, prev && prev.score > score ? { ...prev, label: prev.label ?? cand.label } : cand);
   };
 
   if (input.html) {
@@ -90,7 +107,10 @@ export function extractLinks(input: { text?: string | null; html?: string | null
     let m: RegExpExecArray | null;
     while ((m = re.exec(html))) {
       const href = m[1] ?? m[2] ?? m[3] ?? "";
-      const label = decodeEntities(m[4]!.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim().slice(0, 120);
+      const label = decodeEntities(m[4]!.replace(/<[^>]+>/g, " "))
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 120);
       add(href, label, "anchor");
     }
   }

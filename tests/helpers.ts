@@ -29,7 +29,8 @@ export function makeTestApp(env: Record<string, string> = {}) {
   });
   const db = openDatabase(":memory:", path.join(__dirname, "..", "app/server/db/migrations"));
   const cf = new MockCloudflareClient();
-  const deps = buildDeps(config, silentLogger, { db, cf });
+  // Tests never touch real DNS: every name resolves to a public documentation address.
+  const deps = buildDeps(config, silentLogger, { db, cf, resolve: async () => ["93.184.216.34"] });
   const app = createApp(deps);
   return { app, deps, cf };
 }

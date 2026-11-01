@@ -15,7 +15,9 @@ const SiteUrl = z
   .pipe(z.union([z.literal(""), z.string().url()]))
   .transform((v) => v || null);
 
-const ExpiresAt = z.union([z.number().int().positive(), z.string().datetime({ offset: true }), z.null()]).transform((v) => (typeof v === "string" ? Date.parse(v) : v));
+const ExpiresAt = z
+  .union([z.number().int().positive(), z.string().datetime({ offset: true }), z.null()])
+  .transform((v) => (typeof v === "string" ? Date.parse(v) : v));
 
 export function registerAddresses(r: ApiRouter) {
   r.add(
@@ -23,7 +25,8 @@ export function registerAddresses(r: ApiRouter) {
       method: "post",
       path: "/v1/addresses",
       summary: "Create an address for a site",
-      description: "The local part defaults to a readable random string (word-word-1234). `domain` is a domain name or id; defaults to the first active domain.",
+      description:
+        "The local part defaults to a readable random string (word-word-1234). `domain` is a domain name or id; defaults to the first active domain.",
       tags: ["addresses"],
       auth: "user",
       body: z.object({
@@ -71,7 +74,13 @@ export function registerAddresses(r: ApiRouter) {
         pinned: z.enum(["true", "false"]).optional(),
         unread: z.enum(["true"]).optional().describe("Only addresses with unread mail"),
         has_code: z.enum(["true"]).optional().describe("Only addresses that received a verification code"),
-        since_hours: z.coerce.number().int().min(1).max(24 * 365).optional().describe("Only addresses that received mail in the last N hours"),
+        since_hours: z.coerce
+          .number()
+          .int()
+          .min(1)
+          .max(24 * 365)
+          .optional()
+          .describe("Only addresses that received mail in the last N hours"),
         leak: z.enum(["true"]).optional().describe("Only addresses with a leak warning"),
         hide_hidden: z.enum(["true", "false"]).optional().describe("Exclude addresses whose category is hidden (used by the Inbox)"),
         limit: z.coerce.number().int().min(1).max(1000).default(500),
@@ -88,15 +97,22 @@ export function registerAddresses(r: ApiRouter) {
       if (query.category === "none") conds.push(isNull(addresses.categoryId));
       else if (query.category) conds.push(eq(addresses.categoryId, query.category));
       if (query.pinned) conds.push(eq(addresses.pinned, query.pinned === "true"));
-      if (query.unread) conds.push(sql`exists (select 1 from ${messages} where ${messages.addressId} = ${addresses.id} and ${messages.readAt} is null and ${messages.archivedAt} is null)`);
+      if (query.unread)
+        conds.push(
+          sql`exists (select 1 from ${messages} where ${messages.addressId} = ${addresses.id} and ${messages.readAt} is null and ${messages.archivedAt} is null)`,
+        );
       if (query.has_code) {
         const since = query.since_hours ? d.now() - query.since_hours * 3600_000 : 0;
-        conds.push(sql`exists (select 1 from ${messages} join ${extractedItems} on ${extractedItems.messageId} = ${messages.id} where ${messages.addressId} = ${addresses.id} and ${extractedItems.kind} = 'code' and ${extractedItems.rank} = 0 and ${messages.receivedAt} >= ${since})`);
+        conds.push(
+          sql`exists (select 1 from ${messages} join ${extractedItems} on ${extractedItems.messageId} = ${messages.id} where ${messages.addressId} = ${addresses.id} and ${extractedItems.kind} = 'code' and ${extractedItems.rank} = 0 and ${messages.receivedAt} >= ${since})`,
+        );
       }
       if (query.since_hours) conds.push(gt(addresses.lastMessageAt, d.now() - query.since_hours * 3600_000));
       if (query.leak) conds.push(isNotNull(addresses.leakAt));
       if (query.hide_hidden === "true") {
-        conds.push(sql`(${addresses.categoryId} is null or not exists (select 1 from ${categories} where ${categories.id} = ${addresses.categoryId} and ${categories.hidden} = 1))`);
+        conds.push(
+          sql`(${addresses.categoryId} is null or not exists (select 1 from ${categories} where ${categories.id} = ${addresses.categoryId} and ${categories.hidden} = 1))`,
+        );
       }
       if (query.site) {
         const s = `%${query.site.toLowerCase()}%`;
@@ -124,7 +140,10 @@ export function registerAddresses(r: ApiRouter) {
         .limit(query.limit)
         .offset(query.offset)
         .all();
-      const cnt = messageCounts(d, rows.map((x) => x.a.id));
+      const cnt = messageCounts(
+        d,
+        rows.map((x) => x.a.id),
+      );
       return c.json({ addresses: rows.map((x) => addressOut(x.a, x.domain, cnt.get(x.a.id))) });
     },
   );
@@ -173,7 +192,11 @@ export function registerAddresses(r: ApiRouter) {
       if (body.extra_destination_ids) {
         d.db.delete(addressDestinations).where(eq(addressDestinations.addressId, a.id)).run();
         const ids = [...new Set(body.extra_destination_ids)];
-        if (ids.length) d.db.insert(addressDestinations).values(ids.map((destinationId) => ({ addressId: a.id, destinationId }))).run();
+        if (ids.length)
+          d.db
+            .insert(addressDestinations)
+            .values(ids.map((destinationId) => ({ addressId: a.id, destinationId })))
+            .run();
       }
       const set: Partial<Address> = { updatedAt: d.now() };
       if (body.category_id !== undefined) set.categoryId = body.category_id;
@@ -190,18 +213,28 @@ export function registerAddresses(r: ApiRouter) {
       if (body.destination_id !== undefined) set.destinationId = body.destination_id;
       if (body.status !== undefined) set.status = body.status;
       if (body.expires_at !== undefined) Object.assign(set, { expiresAt: body.expires_at, expiryRemindedAt: null });
-      d.db.update(addresses).set(set).where(and(eq(addresses.id, a.id), eq(addresses.userId, user.id))).run();
+      d.db
+        .update(addresses)
+        .set(set)
+        .where(and(eq(addresses.id, a.id), eq(addresses.userId, user.id)))
+        .run();
       d.bus.publish(user.id, { type: "address.updated", address_id: a.id });
       return c.json({ address: addressWithCounts(d, d.db.select().from(addresses).where(eq(addresses.id, a.id)).get()!, domain) });
     },
   );
 
-  r.add({ method: "delete", path: "/v1/addresses/:id", summary: "Delete an address and all its messages", tags: ["addresses"], auth: "user" }, (c) => {
-    const d = c.get("deps");
-    const user = c.get("user")!;
-    const { a } = ownedAddress(d, user, c.req.param("id")!);
-    d.db.delete(addresses).where(and(eq(addresses.id, a.id), eq(addresses.userId, user.id))).run();
-    d.bus.publish(user.id, { type: "address.deleted", address_id: a.id });
-    return c.json({ ok: true });
-  });
+  r.add(
+    { method: "delete", path: "/v1/addresses/:id", summary: "Delete an address and all its messages", tags: ["addresses"], auth: "user" },
+    (c) => {
+      const d = c.get("deps");
+      const user = c.get("user")!;
+      const { a } = ownedAddress(d, user, c.req.param("id")!);
+      d.db
+        .delete(addresses)
+        .where(and(eq(addresses.id, a.id), eq(addresses.userId, user.id)))
+        .run();
+      d.bus.publish(user.id, { type: "address.deleted", address_id: a.id });
+      return c.json({ ok: true });
+    },
+  );
 }

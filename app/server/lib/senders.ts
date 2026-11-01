@@ -1,6 +1,19 @@
 /** Helpers for comparing a sender with the site an address was created for. */
 
-const MULTI_PART_TLDS = new Set(["co.uk", "org.uk", "ac.uk", "gov.uk", "com.au", "net.au", "co.jp", "co.nz", "com.br", "co.za", "com.mx", "co.in"]);
+const MULTI_PART_TLDS = new Set([
+  "co.uk",
+  "org.uk",
+  "ac.uk",
+  "gov.uk",
+  "com.au",
+  "net.au",
+  "co.jp",
+  "co.nz",
+  "com.br",
+  "co.za",
+  "com.mx",
+  "co.in",
+]);
 
 /** "mail.news.example.co.uk" -> "example.co.uk". Good enough without a public-suffix list. */
 export function baseDomain(host: string): string {

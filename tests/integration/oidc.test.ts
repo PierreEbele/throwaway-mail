@@ -21,7 +21,9 @@ async function ssoLogin(t: TestApp, returnTo = "/", tamperState = false, host?: 
   const authorize = await fetch(start.headers.get("location")!, { redirect: "manual" });
   const callback = new URL(authorize.headers.get("location")!);
   expect(callback.pathname).toBe("/v1/auth/oidc/callback");
-  const res = await t.app.request(callback.pathname + callback.search, { headers: { cookie: tamperState ? "tm_oidc_state=forged" : stateCookie } });
+  const res = await t.app.request(callback.pathname + callback.search, {
+    headers: { cookie: tamperState ? "tm_oidc_state=forged" : stateCookie },
+  });
   const client = new Client(t);
   const sc = res.headers.get("set-cookie") ?? "";
   const m = /tm_session=([^;]+)/.exec(sc);

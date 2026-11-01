@@ -2,7 +2,15 @@ import { parseList } from "../lib/senders.js";
 import type { Address, Destination, Domain, ExtractedItem, Message, User } from "../db/schema.js";
 
 export function userOut(u: User) {
-  return { id: u.id, email: u.email, name: u.name, role: u.role, disabled: u.disabled, created_at: u.createdAt, last_login_at: u.lastLoginAt };
+  return {
+    id: u.id,
+    email: u.email,
+    name: u.name,
+    role: u.role,
+    disabled: u.disabled,
+    created_at: u.createdAt,
+    last_login_at: u.lastLoginAt,
+  };
 }
 
 export function domainOut(d: Domain, full: boolean, owner?: { id: string; name: string | null; email: string } | null) {
@@ -73,7 +81,9 @@ export function itemsOut(items: ExtractedItem[]) {
   const best = codes.find((c) => c.rank === 0);
   return {
     code: best ? { value: best.value, confidence: best.confidence, method: best.method, raw: best.label } : null,
-    alternatives: codes.filter((c) => c !== best).map((c) => ({ value: c.value, confidence: c.confidence, method: c.method, raw: c.label })),
+    alternatives: codes
+      .filter((c) => c !== best)
+      .map((c) => ({ value: c.value, confidence: c.confidence, method: c.method, raw: c.label })),
     links: links.map((l) => ({ url: l.value, label: l.label, confidence: l.confidence, method: l.method })),
   };
 }
@@ -91,12 +101,17 @@ export function messageSummaryOut(m: Message, items: ExtractedItem[]) {
     read_at: m.readAt,
     archived_at: m.archivedAt,
     forwarded: m.forwarded,
-    attachments: m.attachmentsJson ? (JSON.parse(m.attachmentsJson) as Array<{ filename: string | null; mime_type: string; size: number; inline: boolean }>) : [],
+    attachments: m.attachmentsJson
+      ? (JSON.parse(m.attachmentsJson) as Array<{ filename: string | null; mime_type: string; size: number; inline: boolean }>)
+      : [],
     preview,
     trackers_removed: m.trackersRemoved,
     auth_warning: m.authWarning,
     is_bulk: m.isBulk,
-    unsubscribe: m.unsubscribeUrl || m.unsubscribeMailto ? { url: m.unsubscribeUrl, mailto: m.unsubscribeMailto, one_click: m.unsubscribeOneClick, done_at: m.unsubscribedAt } : null,
+    unsubscribe:
+      m.unsubscribeUrl || m.unsubscribeMailto
+        ? { url: m.unsubscribeUrl, mailto: m.unsubscribeMailto, one_click: m.unsubscribeOneClick, done_at: m.unsubscribedAt }
+        : null,
     code: ex.code?.value ?? null,
     has_links: ex.links.length > 0,
   };

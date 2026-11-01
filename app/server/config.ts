@@ -18,7 +18,10 @@ const EnvSchema = z.object({
   MIGRATIONS_DIR: z.string().default("./app/server/db/migrations"),
   WEB_DIST_DIR: z.string().default("./dist/web"),
   INGEST_SECRET: z.string().min(16, "INGEST_SECRET must be at least 16 characters").default("dev-ingest-secret-change-me"),
-  MAX_INGEST_BYTES: z.coerce.number().int().default(25 * 1024 * 1024),
+  MAX_INGEST_BYTES: z.coerce
+    .number()
+    .int()
+    .default(25 * 1024 * 1024),
   CF_MOCK: bool,
   CF_API_TOKEN: z.string().default(""),
   CF_ACCOUNT_ID: z.string().default(""),
@@ -73,7 +76,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     isProd,
     cookieSecure,
     databasePath: parsed.DATABASE_PATH ?? path.join(parsed.DATA_DIR, "throwaway.db"),
-    oidcAllowedGroups: parsed.OIDC_ALLOWED_GROUPS.split(",").map((g) => g.trim()).filter(Boolean),
+    oidcAllowedGroups: parsed.OIDC_ALLOWED_GROUPS.split(",")
+      .map((g) => g.trim())
+      .filter(Boolean),
     oidcRedirectUri: `${parsed.APP_URL.replace(/\/$/, "")}/v1/auth/oidc/callback`,
     /** Every public origin of the app; the first one is the primary (APP_URL). */
     appOrigins: [parsed.APP_URL, ...parsed.APP_EXTRA_URLS.split(",")]

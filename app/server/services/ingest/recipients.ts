@@ -31,7 +31,13 @@ function resolveUnknown(deps: Deps, domain: Domain, local: string, senderDomain:
       updatedAt: now,
     };
     deps.db.insert(addresses).values(row).onConflictDoNothing().run();
-    return deps.db.select().from(addresses).where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, local))).get() ?? null;
+    return (
+      deps.db
+        .select()
+        .from(addresses)
+        .where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, local)))
+        .get() ?? null
+    );
   }
   // "inbox" (or auto_create with an unusable local part): the domain owner's unassigned box.
   deps.db
@@ -48,7 +54,13 @@ function resolveUnknown(deps: Deps, domain: Domain, local: string, senderDomain:
     })
     .onConflictDoNothing()
     .run();
-  return deps.db.select().from(addresses).where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, UNASSIGNED_LOCAL))).get() ?? null;
+  return (
+    deps.db
+      .select()
+      .from(addresses)
+      .where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, UNASSIGNED_LOCAL)))
+      .get() ?? null
+  );
 }
 
 /** <dir>.<site>: auto-create an address for <site> owned by the directory's user. */
@@ -78,7 +90,12 @@ function resolveDirectory(deps: Deps, domain: Domain, local: string): Address | 
     })
     .onConflictDoNothing()
     .run();
-  const a = deps.db.select().from(addresses).where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, storedLocal))).get() ?? null;
+  const a =
+    deps.db
+      .select()
+      .from(addresses)
+      .where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, storedLocal)))
+      .get() ?? null;
   if (a) deps.bus.publish(a.userId, { type: "address.created", address_id: a.id });
   return a;
 }
@@ -91,7 +108,12 @@ export interface Recipient {
 
 /** Finds (or, depending on the domain's policy, creates) the address a mail is for. Null: reject. */
 export function resolveRecipient(deps: Deps, domain: Domain, local: string, senderDomain: string | null): Recipient | null {
-  const known = deps.db.select().from(addresses).where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, local))).get() ?? resolveDirectory(deps, domain, local);
+  const known =
+    deps.db
+      .select()
+      .from(addresses)
+      .where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, local)))
+      .get() ?? resolveDirectory(deps, domain, local);
   if (known) return { address: known, preservedForward: null };
   // Domain whose previous catch-all is preserved: unknown addresses keep going to the old destination
   // and are queued in the owner's "To sort" box so they can be registered as sites.

@@ -48,7 +48,15 @@ const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice
 
 export function registerCompat(app: Hono<AppEnv>, limiter: RateLimiter) {
   // Token auth only (no cookies), so any origin may call it: the Bitwarden web vault and desktop app need CORS.
-  app.use("/api/*", cors({ origin: "*", allowMethods: ["POST", "OPTIONS"], allowHeaders: ["Authentication", "Authorization", "Content-Type"], maxAge: 86400 }));
+  app.use(
+    "/api/*",
+    cors({
+      origin: "*",
+      allowMethods: ["POST", "OPTIONS"],
+      allowHeaders: ["Authentication", "Authorization", "Content-Type"],
+      maxAge: 86400,
+    }),
+  );
   app.use("/api/*", async (c, next) => {
     if (c.req.method === "OPTIONS") return next();
     const r = limiter.hit(`compat:${c.req.header("authentication") || c.req.header("authorization") || "anon"}`);
@@ -67,7 +75,10 @@ export function registerCompat(app: Hono<AppEnv>, limiter: RateLimiter) {
       label: note || "Bitwarden",
     });
     const o = addressOut(a, domain);
-    return c.json({ id: a.id, alias: o.email, email: o.email, creation_timestamp: Math.floor(a.createdAt / 1000), enabled: true, note: a.label }, 201);
+    return c.json(
+      { id: a.id, alias: o.email, email: o.email, creation_timestamp: Math.floor(a.createdAt / 1000), enabled: true, note: a.label },
+      201,
+    );
   });
 
   app.post("/api/v1/aliases", async (c) => {
@@ -82,7 +93,20 @@ export function registerCompat(app: Hono<AppEnv>, limiter: RateLimiter) {
       label: description || "Bitwarden",
     });
     const o = addressOut(a, domain);
-    return c.json({ data: { id: a.id, email: o.email, local_part: a.localPart, domain, description: a.label, active: true, created_at: new Date(a.createdAt).toISOString() } }, 201);
+    return c.json(
+      {
+        data: {
+          id: a.id,
+          email: o.email,
+          local_part: a.localPart,
+          domain,
+          description: a.label,
+          active: true,
+          created_at: new Date(a.createdAt).toISOString(),
+        },
+      },
+      201,
+    );
   });
 
   app.all("/api/*", (c) => c.json({ error: { code: "not_found", message: "Route not found" } }, 404));

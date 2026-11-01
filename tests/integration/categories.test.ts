@@ -6,7 +6,8 @@ async function setup() {
   const admin = await setupAdmin(t);
   await addDomain(admin, "mail.example.test");
   const user = loginAs(t, "u@example.org");
-  const mk = async (site: string, extra: Record<string, unknown> = {}) => (await user.post("/v1/addresses", { site_name: site, ...extra })).json.address;
+  const mk = async (site: string, extra: Record<string, unknown> = {}) =>
+    (await user.post("/v1/addresses", { site_name: site, ...extra })).json.address;
   return { t, admin, user, mk };
 }
 
@@ -29,7 +30,10 @@ describe("categories and pins", () => {
     expect((await user.get(`/v1/addresses?category=${shop.id}`)).json.addresses.map((x: any) => x.site_name)).toEqual(["Amazon"]);
     expect((await user.get("/v1/addresses?category=none")).json.addresses.map((x: any) => x.site_name)).toEqual(["Nowhere"]);
 
-    expect((await user.patch(`/v1/categories/${work.id}`, { name: "Boulot", pinned: false })).json.category).toMatchObject({ name: "Boulot", pinned: false });
+    expect((await user.patch(`/v1/categories/${work.id}`, { name: "Boulot", pinned: false })).json.category).toMatchObject({
+      name: "Boulot",
+      pinned: false,
+    });
     expect((await user.del(`/v1/categories/${shop.id}`)).status).toBe(200);
     expect((await user.get(`/v1/addresses/${a.id}`)).json.address.category_id).toBeNull();
   });
@@ -87,7 +91,10 @@ describe("addresses that never received mail", () => {
     const stale = (await user.get("/v1/stale-addresses?days=30")).json.addresses.map((x: any) => x.site_name);
     expect(stale.sort()).toEqual(["Silent 1", "Silent 2", "Silent 3"]);
 
-    expect((await user.post("/v1/stale-addresses", { action: "archive", ids: [silent1.id, used.id] })).json).toEqual({ affected: 1, skipped: 1 });
+    expect((await user.post("/v1/stale-addresses", { action: "archive", ids: [silent1.id, used.id] })).json).toEqual({
+      affected: 1,
+      skipped: 1,
+    });
     expect((await user.get(`/v1/addresses/${silent1.id}`)).json.address.status).toBe("archived");
     expect((await user.post("/v1/stale-addresses", { action: "delete", ids: [silent2.id] })).json.affected).toBe(1);
     expect((await user.get(`/v1/addresses/${silent2.id}`)).status).toBe(404);

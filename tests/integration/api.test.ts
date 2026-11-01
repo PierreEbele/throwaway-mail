@@ -237,7 +237,9 @@ describe("retention and docs", () => {
   it("serves the OpenAPI document", async () => {
     const r = await t.app.request("/openapi.json");
     const doc = (await r.json()) as any;
-    expect(doc.paths["/v1/addresses/{id}/code"].get.parameters.map((p: any) => p.name)).toEqual(expect.arrayContaining(["id", "wait", "since"]));
+    expect(doc.paths["/v1/addresses/{id}/code"].get.parameters.map((p: any) => p.name)).toEqual(
+      expect.arrayContaining(["id", "wait", "since"]),
+    );
     expect(doc.paths["/v1/addresses"].post.requestBody).toBeTruthy();
   });
   it("sets a strict CSP", async () => {

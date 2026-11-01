@@ -14,17 +14,22 @@ describe("trackers", () => {
   });
 
   it("strips tracking parameters only", () => {
-    expect(cleanLink("https://shop.com/p?id=4&utm_source=nl&utm_medium=email&fbclid=x")).toEqual({ url: "https://shop.com/p?id=4", changed: true });
+    expect(cleanLink("https://shop.com/p?id=4&utm_source=nl&utm_medium=email&fbclid=x")).toEqual({
+      url: "https://shop.com/p?id=4",
+      changed: true,
+    });
     expect(cleanLink("https://shop.com/p?id=4").changed).toBe(false);
     expect(cleanLink("mailto:a@b.c").changed).toBe(false);
   });
 
   it("counts what it removed", () => {
-    const r = sanitizeEmail('<p><a href="https://s.com/?utm_campaign=x">Go</a><img src="https://t.com/p.gif" width="1" height="1"><img src="https://s.com/hero.jpg"></p>');
+    const r = sanitizeEmail(
+      '<p><a href="https://s.com/?utm_campaign=x">Go</a><img src="https://t.com/p.gif" width="1" height="1"><img src="https://s.com/hero.jpg"></p>',
+    );
     expect(r.trackers).toBe(2);
     expect(r.html).not.toContain("t.com/p.gif");
     expect(r.html).toContain('href="https://s.com/"');
-    expect(r.html).toContain("data-blocked-src=\"https://s.com/hero.jpg\"");
+    expect(r.html).toContain('data-blocked-src="https://s.com/hero.jpg"');
   });
 });
 
@@ -49,7 +54,11 @@ describe("phishing", () => {
 describe("list headers", () => {
   it("parses List-Unsubscribe and bulk markers", () => {
     const h = (o: Record<string, string>) => Object.entries(o).map(([key, value]) => ({ key, value }));
-    expect(listInfo(h({ "list-unsubscribe": "<mailto:u@x.com>, <https://x.com/u?id=1>", "list-unsubscribe-post": "List-Unsubscribe=One-Click" }))).toEqual({
+    expect(
+      listInfo(
+        h({ "list-unsubscribe": "<mailto:u@x.com>, <https://x.com/u?id=1>", "list-unsubscribe-post": "List-Unsubscribe=One-Click" }),
+      ),
+    ).toEqual({
       url: "https://x.com/u?id=1",
       mailto: "mailto:u@x.com",
       oneClick: true,

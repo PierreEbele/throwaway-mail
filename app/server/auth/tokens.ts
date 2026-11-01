@@ -10,7 +10,10 @@ export function createSession(deps: Deps, userId: string) {
   const csrfToken = randomToken(24);
   const now = deps.now();
   const expiresAt = now + deps.config.SESSION_TTL_DAYS * 86400_000;
-  deps.db.insert(sessions).values({ id: sha256(token), userId, csrfToken, createdAt: now, expiresAt }).run();
+  deps.db
+    .insert(sessions)
+    .values({ id: sha256(token), userId, csrfToken, createdAt: now, expiresAt })
+    .run();
   return { token, csrfToken, expiresAt };
 }
 

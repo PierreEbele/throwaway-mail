@@ -38,7 +38,11 @@ export class LiveCloudflareClient implements CloudflareClient {
     if (!res.ok || !json?.success) {
       const err = json?.errors?.[0];
       const msg = err ? `${err.message} (code ${err.code})` : `HTTP ${res.status}`;
-      throw new CloudflareError(`Cloudflare API error on ${method} ${path.replace(/\/accounts\/[^/]+/, "/accounts/…")}: ${msg}`, res.status, err?.code);
+      throw new CloudflareError(
+        `Cloudflare API error on ${method} ${path.replace(/\/accounts\/[^/]+/, "/accounts/…")}: ${msg}`,
+        res.status,
+        err?.code,
+      );
     }
     return json.result;
   }
@@ -72,7 +76,10 @@ export class LiveCloudflareClient implements CloudflareClient {
 
   async getCatchAll(zoneId: string): Promise<CatchAllRule | null> {
     try {
-      const r = await this.call<{ enabled?: boolean; actions?: Array<{ type: string; value?: string[] }> }>("GET", `/zones/${zoneId}/email/routing/rules/catch_all`);
+      const r = await this.call<{ enabled?: boolean; actions?: Array<{ type: string; value?: string[] }> }>(
+        "GET",
+        `/zones/${zoneId}/email/routing/rules/catch_all`,
+      );
       if (!r) return null;
       return { enabled: !!r.enabled, actions: r.actions ?? [] };
     } catch (e) {
@@ -108,7 +115,13 @@ export class LiveCloudflareClient implements CloudflareClient {
     for (const r of required) {
       const key = `${r.type} ${r.name}`;
       if (!cache.has(key)) {
-        cache.set(key, await this.call<DnsRecord[]>("GET", `/zones/${zoneId}/dns_records?per_page=100&type=${encodeURIComponent(r.type)}&name=${encodeURIComponent(r.name)}`));
+        cache.set(
+          key,
+          await this.call<DnsRecord[]>(
+            "GET",
+            `/zones/${zoneId}/dns_records?per_page=100&type=${encodeURIComponent(r.type)}&name=${encodeURIComponent(r.name)}`,
+          ),
+        );
       }
       if (!cache.get(key)!.some((e) => norm(e.content) === norm(r.content))) missing.push(r);
     }
@@ -121,7 +134,11 @@ export class LiveCloudflareClient implements CloudflareClient {
 
   async createDestination(email: string): Promise<DestinationInfo> {
     try {
-      const r = await this.call<{ id?: string; tag?: string; email: string; verified: string | null }>("POST", `/accounts/${this.accountId}/email/routing/addresses`, { email });
+      const r = await this.call<{ id?: string; tag?: string; email: string; verified: string | null }>(
+        "POST",
+        `/accounts/${this.accountId}/email/routing/addresses`,
+        { email },
+      );
       return this.toDest(r);
     } catch (e) {
       // Already exists at account level (e.g. another user added it): reuse it.

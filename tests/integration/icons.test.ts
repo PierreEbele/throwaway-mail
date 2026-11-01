@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loginAs, makeTestApp } from "../helpers.js";
-import { iconHost } from "../../app/server/services/icons.js";
+import { iconHost, pruneIconCache } from "../../app/server/services/icons.js";
 
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
 
@@ -39,5 +39,20 @@ describe("site icons", () => {
     expect((await user.get("/v1/icons/unknown.example")).status).toBe(404);
     expect(fetchMock).toHaveBeenCalledTimes(2); // le raté est mémorisé
     expect((await user.get("/v1/icons/not_a_host")).status).toBe(404);
+  });
+});
+
+describe("icon cache pruning", () => {
+  it("removes expired logos and misses only", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tm-icons-"));
+    const icons = path.join(dir, "icons");
+    fs.mkdirSync(icons);
+    const old = (Date.now() - 40 * 86400_000) / 1000;
+    for (const f of ["old.com.ico", "fresh.com.ico", "gone.com.miss"]) fs.writeFileSync(path.join(icons, f), "x");
+    fs.utimesSync(path.join(icons, "old.com.ico"), old, old);
+    fs.utimesSync(path.join(icons, "gone.com.miss"), old, old);
+    const deps = { config: { DATA_DIR: dir }, now: () => Date.now() } as unknown as Parameters<typeof pruneIconCache>[0];
+    expect(await pruneIconCache(deps)).toBe(2);
+    expect(fs.readdirSync(icons)).toEqual(["fresh.com.ico"]);
   });
 });

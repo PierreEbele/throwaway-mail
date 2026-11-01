@@ -4,7 +4,10 @@ type Labels = Record<string, string>;
 
 class Counter {
   private values = new Map<string, number>();
-  constructor(readonly name: string, readonly help: string) {}
+  constructor(
+    readonly name: string,
+    readonly help: string,
+  ) {}
   inc(labels: Labels = {}, by = 1) {
     const k = JSON.stringify(Object.entries(labels).sort());
     this.values.set(k, (this.values.get(k) ?? 0) + by);
@@ -35,7 +38,9 @@ export function renderPrometheus(gauges: Array<{ name: string; help: string; val
   for (const c of [metrics.ingest, metrics.http, metrics.notify]) {
     out.push(`# HELP ${c.name} ${c.help}`, `# TYPE ${c.name} counter`);
     for (const [labels, v] of c.entries()) {
-      const l = Object.entries(labels).map(([k, x]) => `${k}="${esc(x)}"`).join(",");
+      const l = Object.entries(labels)
+        .map(([k, x]) => `${k}="${esc(x)}"`)
+        .join(",");
       out.push(`${c.name}${l ? `{${l}}` : ""} ${v}`);
     }
   }
@@ -45,7 +50,9 @@ export function renderPrometheus(gauges: Array<{ name: string; help: string; val
       out.push(`# HELP ${g.name} ${g.help}`, `# TYPE ${g.name} gauge`);
       seen.add(g.name);
     }
-    const l = Object.entries(g.labels ?? {}).map(([k, x]) => `${k}="${esc(x)}"`).join(",");
+    const l = Object.entries(g.labels ?? {})
+      .map(([k, x]) => `${k}="${esc(x)}"`)
+      .join(",");
     out.push(`${g.name}${l ? `{${l}}` : ""} ${g.value}`);
   }
   return out.join("\n") + "\n";

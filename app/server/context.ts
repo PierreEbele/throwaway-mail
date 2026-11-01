@@ -6,6 +6,7 @@ import type { EventBus } from "./services/events.js";
 import type { ParserStrategy } from "./parser/index.js";
 import type { User } from "./db/schema.js";
 import type { OidcService } from "./auth/oidc.js";
+import type { Resolver } from "./lib/outbound.js";
 
 export interface Deps {
   config: Config;
@@ -18,6 +19,8 @@ export interface Deps {
   oidc: OidcService;
   /** Outbound HTTP (notifications, webhooks); replaced in tests. */
   fetch: typeof fetch;
+  /** DNS resolution used to refuse outbound requests to private addresses; replaced in tests. */
+  resolve: Resolver;
 }
 
 export interface SessionInfo {

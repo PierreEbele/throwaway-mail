@@ -11,7 +11,13 @@ function loadBackground(t: ReturnType<typeof makeTestApp>, store: Record<string,
   const browser = {
     storage: {
       local: {
-        get: async (keys: string | string[]) => Object.fromEntries([keys].flat().filter((k) => k in store).map((k) => [k, structuredClone(store[k])])),
+        get: async (keys: string | string[]) =>
+          Object.fromEntries(
+            [keys]
+              .flat()
+              .filter((k) => k in store)
+              .map((k) => [k, structuredClone(store[k])]),
+          ),
         set: async (o: Record<string, unknown>) => void Object.assign(store, structuredClone(o)),
         remove: async (keys: string[]) => keys.forEach((k) => delete store[k]),
       },
@@ -20,7 +26,11 @@ function loadBackground(t: ReturnType<typeof makeTestApp>, store: Record<string,
     menus: { create() {}, onClicked: { addListener() {} } },
     tabs: { onActivated: { addListener() {} }, onUpdated: { addListener() {} }, get: async () => ({}), query: async () => [] },
     action: { setBadgeText: async () => {}, setBadgeBackgroundColor: async () => {} },
-    runtime: { onMessage: { addListener: (f: any) => (onMessage = f) }, onStartup: { addListener() {} }, onInstalled: { addListener() {} } },
+    runtime: {
+      onMessage: { addListener: (f: any) => (onMessage = f) },
+      onStartup: { addListener() {} },
+      onInstalled: { addListener() {} },
+    },
     permissions: { contains: async () => true },
     scripting: {
       executeScript: async (o: any) => {
@@ -30,7 +40,12 @@ function loadBackground(t: ReturnType<typeof makeTestApp>, store: Record<string,
     },
   };
   const sandbox: Record<string, unknown> = {
-    URL, URLSearchParams, crypto, structuredClone, browser, console,
+    URL,
+    URLSearchParams,
+    crypto,
+    structuredClone,
+    browser,
+    console,
     fetch: (url: string, init: RequestInit) => {
       const u = new URL(url);
       return t.app.request(u.pathname + u.search, init);
@@ -38,7 +53,10 @@ function loadBackground(t: ReturnType<typeof makeTestApp>, store: Record<string,
   };
   vm.createContext(sandbox);
   for (const f of ["generator.js", "throwaway.js", "background.js"]) {
-    vm.runInContext(fs.readFileSync(path.join(__dirname, "../../extension", f), "utf8").replace(/^const (\w+) =/m, "globalThis.$1 ="), sandbox);
+    vm.runInContext(
+      fs.readFileSync(path.join(__dirname, "../../extension", f), "utf8").replace(/^const (\w+) =/m, "globalThis.$1 ="),
+      sandbox,
+    );
   }
   const send = (msg: unknown, url = "https://shop.example.org/register") => onMessage(msg, { tab: { id: 1, url } });
   return { send, filled };

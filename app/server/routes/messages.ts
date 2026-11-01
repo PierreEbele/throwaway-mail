@@ -31,24 +31,40 @@ export function registerMessages(r: ApiRouter) {
       if (query.archived === "false") conds.push(isNull(messages.archivedAt));
       if (query.archived === "true") conds.push(isNotNull(messages.archivedAt));
       if (query.before) conds.push(lt(messages.receivedAt, query.before));
-      const rows = d.db.select().from(messages).where(and(...conds)).orderBy(desc(messages.receivedAt)).limit(query.limit).all();
-      const items = itemsFor(d, rows.map((m) => m.id));
+      const rows = d.db
+        .select()
+        .from(messages)
+        .where(and(...conds))
+        .orderBy(desc(messages.receivedAt))
+        .limit(query.limit)
+        .all();
+      const items = itemsFor(
+        d,
+        rows.map((m) => m.id),
+      );
       return c.json({ messages: rows.map((m) => messageSummaryOut(m, items.get(m.id) ?? [])) });
     },
   );
 
   const ownedMessage = (c: Ctx) => {
     const d = c.get("deps");
-    const m = d.db.select().from(messages).where(and(eq(messages.id, c.req.param("id")!), eq(messages.userId, c.get("user")!.id))).get();
+    const m = d.db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.id, c.req.param("id")!), eq(messages.userId, c.get("user")!.id)))
+      .get();
     if (!m) throw notFound("Message");
     return m;
   };
 
-  r.add({ method: "get", path: "/v1/messages/:id", summary: "Get a message with extracted codes and links", tags: ["messages"], auth: "user" }, (c) => {
-    const d = c.get("deps");
-    const m = ownedMessage(c);
-    return c.json({ message: messageOut(m, itemsFor(d, [m.id]).get(m.id) ?? []) });
-  });
+  r.add(
+    { method: "get", path: "/v1/messages/:id", summary: "Get a message with extracted codes and links", tags: ["messages"], auth: "user" },
+    (c) => {
+      const d = c.get("deps");
+      const m = ownedMessage(c);
+      return c.json({ message: messageOut(m, itemsFor(d, [m.id]).get(m.id) ?? []) });
+    },
+  );
 
   r.add(
     {
@@ -113,9 +129,17 @@ export function registerMessages(r: ApiRouter) {
         body.action === "delete"
           ? d.db.delete(messages).where(where).run()
           : body.action === "read"
-            ? d.db.update(messages).set({ readAt: now }).where(and(where, isNull(messages.readAt))).run()
+            ? d.db
+                .update(messages)
+                .set({ readAt: now })
+                .where(and(where, isNull(messages.readAt)))
+                .run()
             : body.action === "archive"
-              ? d.db.update(messages).set({ archivedAt: now, readAt: sql`coalesce(${messages.readAt}, ${now})` }).where(and(where, isNull(messages.archivedAt))).run()
+              ? d.db
+                  .update(messages)
+                  .set({ archivedAt: now, readAt: sql`coalesce(${messages.readAt}, ${now})` })
+                  .where(and(where, isNull(messages.archivedAt)))
+                  .run()
               : d.db.update(messages).set({ archivedAt: null }).where(where).run();
       d.bus.publish(user.id, { type: "address.updated", address_id: a.id });
       return c.json({ ok: true, affected: res.changes });
@@ -138,7 +162,10 @@ export function registerMessages(r: ApiRouter) {
         since: z.string().optional(),
         require: z.enum(["code", "any"]).default("any"),
       }),
-      responses: { 200: "{ code, alternatives, links, message_id, received_at, confidence, subject, from }", 204: "Nothing arrived before the timeout" },
+      responses: {
+        200: "{ code, alternatives, links, message_id, received_at, confidence, subject, from }",
+        204: "Nothing arrived before the timeout",
+      },
     },
     async (c, { query }) => {
       const d = c.get("deps");
@@ -147,7 +174,11 @@ export function registerMessages(r: ApiRouter) {
       let sinceTs: number | null = null;
       let sinceId: string | null = null;
       if (query.since) {
-        const ref = d.db.select().from(messages).where(and(eq(messages.id, query.since), eq(messages.userId, user.id))).get();
+        const ref = d.db
+          .select()
+          .from(messages)
+          .where(and(eq(messages.id, query.since), eq(messages.userId, user.id)))
+          .get();
         if (ref) {
           sinceTs = ref.receivedAt;
           sinceId = ref.id;
@@ -159,10 +190,23 @@ export function registerMessages(r: ApiRouter) {
       const find = () => {
         const conds: SQL[] = [eq(messages.addressId, a.id), eq(messages.userId, user.id)];
         if (sinceTs !== null) {
-          conds.push(sinceId ? or(gt(messages.receivedAt, sinceTs), and(eq(messages.receivedAt, sinceTs), gt(messages.id, sinceId)))! : gt(messages.receivedAt, sinceTs));
+          conds.push(
+            sinceId
+              ? or(gt(messages.receivedAt, sinceTs), and(eq(messages.receivedAt, sinceTs), gt(messages.id, sinceId)))!
+              : gt(messages.receivedAt, sinceTs),
+          );
         }
-        const rows = d.db.select().from(messages).where(and(...conds)).orderBy(desc(messages.receivedAt)).limit(25).all();
-        const items = itemsFor(d, rows.map((m) => m.id));
+        const rows = d.db
+          .select()
+          .from(messages)
+          .where(and(...conds))
+          .orderBy(desc(messages.receivedAt))
+          .limit(25)
+          .all();
+        const items = itemsFor(
+          d,
+          rows.map((m) => m.id),
+        );
         for (const m of rows) {
           if (sinceId && m.id === sinceId) continue;
           const ex = itemsOut(items.get(m.id) ?? []);

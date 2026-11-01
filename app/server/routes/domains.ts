@@ -20,7 +20,11 @@ const full = (d: Deps, dom: Domain) => domainOut(dom, true, ownerOf(d, dom));
 function transferDomain(d: Deps, dom: Domain, newOwnerId: string) {
   d.db.transaction((tx) => {
     tx.update(domains).set({ createdBy: newOwnerId }).where(eq(domains.id, dom.id)).run();
-    const boxes = tx.select({ id: addresses.id }).from(addresses).where(and(eq(addresses.domainId, dom.id), eq(addresses.isUnassigned, true))).all();
+    const boxes = tx
+      .select({ id: addresses.id })
+      .from(addresses)
+      .where(and(eq(addresses.domainId, dom.id), eq(addresses.isUnassigned, true)))
+      .all();
     for (const b of boxes) {
       tx.update(addresses).set({ userId: newOwnerId }).where(eq(addresses.id, b.id)).run();
       tx.update(messages).set({ userId: newOwnerId }).where(eq(messages.addressId, b.id)).run();
@@ -29,12 +33,17 @@ function transferDomain(d: Deps, dom: Domain, newOwnerId: string) {
 }
 
 export function registerDomains(r: ApiRouter) {
-  r.add({ method: "get", path: "/v1/domains", summary: "List domains (admins also see Cloudflare details)", tags: ["domains"], auth: "user" }, (c) => {
-    const d = c.get("deps");
-    const isAdmin = c.get("user")!.role === "admin";
-    const rows = d.db.select().from(domains).orderBy(asc(domains.createdAt)).all();
-    return c.json({ domains: rows.filter((x) => isAdmin || x.status === "active").map((x) => (isAdmin ? full(d, x) : domainOut(x, false))) });
-  });
+  r.add(
+    { method: "get", path: "/v1/domains", summary: "List domains (admins also see Cloudflare details)", tags: ["domains"], auth: "user" },
+    (c) => {
+      const d = c.get("deps");
+      const isAdmin = c.get("user")!.role === "admin";
+      const rows = d.db.select().from(domains).orderBy(asc(domains.createdAt)).all();
+      return c.json({
+        domains: rows.filter((x) => isAdmin || x.status === "active").map((x) => (isAdmin ? full(d, x) : domainOut(x, false))),
+      });
+    },
+  );
 
   r.add(
     {
@@ -48,14 +57,20 @@ export function registerDomains(r: ApiRouter) {
         unknown_policy: z.enum(["reject", "inbox", "auto_create"]).default("reject"),
         owner_id: z.string().optional(),
       }),
-      description: "owner_id: user who receives the domain's \"To sort\" box (default: you).",
+      description: 'owner_id: user who receives the domain\'s "To sort" box (default: you).',
       responses: { 201: "Domain created (status reflects the Cloudflare setup result)" },
     },
     async (c, { body }) => {
       const d = c.get("deps");
       if (d.db.select().from(domains).where(eq(domains.name, body.name)).get()) throw conflict(`${body.name} already exists`);
       if (body.owner_id && !d.db.select().from(users).where(eq(users.id, body.owner_id)).get()) throw badRequest("Unknown owner_id");
-      const row = { id: newId("dom"), name: body.name, unknownPolicy: body.unknown_policy, createdBy: body.owner_id ?? c.get("user")!.id, createdAt: d.now() };
+      const row = {
+        id: newId("dom"),
+        name: body.name,
+        unknownPolicy: body.unknown_policy,
+        createdBy: body.owner_id ?? c.get("user")!.id,
+        createdAt: d.now(),
+      };
       d.db.insert(domains).values(row).run();
       audit(d, row.createdBy, "domain.added", row.id, { name: row.name }, clientIp(c));
       const result = await setupDomain(d, d.db.select().from(domains).where(eq(domains.id, row.id)).get()!);
@@ -86,7 +101,9 @@ export function registerDomains(r: ApiRouter) {
       const set: Partial<typeof dom> = {};
       if (body.unknown_policy) set.unknownPolicy = body.unknown_policy;
       if (body.forward_unknown !== undefined) {
-        const previous = dom.previousCatchAllJson ? (JSON.parse(dom.previousCatchAllJson) as { actions: Array<{ type: string; value?: string[] }> }) : null;
+        const previous = dom.previousCatchAllJson
+          ? (JSON.parse(dom.previousCatchAllJson) as { actions: Array<{ type: string; value?: string[] }> })
+          : null;
         const fwd = previous?.actions.find((a) => a.type === "forward")?.value?.[0] ?? null;
         if (body.forward_unknown && !fwd) throw badRequest("This domain had no forwarding catch-all before the app");
         set.catchallForwardTo = body.forward_unknown ? fwd : null;
@@ -102,14 +119,27 @@ export function registerDomains(r: ApiRouter) {
     },
   );
 
-  r.add({ method: "post", path: "/v1/domains/:id/verify", summary: "Re-check / re-apply the Cloudflare configuration", tags: ["domains"], auth: "admin" }, async (c) => {
-    const d = c.get("deps");
-    const dom = d.db.select().from(domains).where(eq(domains.id, c.req.param("id")!)).get();
-    if (!dom) throw notFound("Domain");
-    const result = await setupDomain(d, dom);
-    audit(d, c.get("user")!.id, "domain.verified", dom.id, { status: result.status }, clientIp(c));
-    return c.json({ domain: full(d, result) });
-  });
+  r.add(
+    {
+      method: "post",
+      path: "/v1/domains/:id/verify",
+      summary: "Re-check / re-apply the Cloudflare configuration",
+      tags: ["domains"],
+      auth: "admin",
+    },
+    async (c) => {
+      const d = c.get("deps");
+      const dom = d.db
+        .select()
+        .from(domains)
+        .where(eq(domains.id, c.req.param("id")!))
+        .get();
+      if (!dom) throw notFound("Domain");
+      const result = await setupDomain(d, dom);
+      audit(d, c.get("user")!.id, "domain.verified", dom.id, { status: result.status }, clientIp(c));
+      return c.json({ domain: full(d, result) });
+    },
+  );
 
   r.add(
     {

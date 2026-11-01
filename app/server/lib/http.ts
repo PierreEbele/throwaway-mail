@@ -73,7 +73,12 @@ export class ApiRouter {
     const paths: Record<string, Record<string, unknown>> = {};
     for (const s of this.specs) {
       const p = s.path.replace(/:(\w+)/g, "{$1}");
-      const params: unknown[] = [...s.path.matchAll(/:(\w+)/g)].map((m) => ({ name: m[1], in: "path", required: true, schema: { type: "string" } }));
+      const params: unknown[] = [...s.path.matchAll(/:(\w+)/g)].map((m) => ({
+        name: m[1],
+        in: "path",
+        required: true,
+        schema: { type: "string" },
+      }));
       if (s.query) {
         const js = toJson(s.query) as { properties?: Record<string, unknown>; required?: string[] };
         for (const [name, schema] of Object.entries(js.properties ?? {})) {
@@ -84,9 +89,15 @@ export class ApiRouter {
       const responses: Record<string, unknown> = {};
       for (const [code, desc] of Object.entries(s.responses ?? { 200: "OK" })) responses[code] = { description: desc };
       if (s.auth !== "none") {
-        responses["401"] = { description: "Not authenticated", content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } } };
+        responses["401"] = {
+          description: "Not authenticated",
+          content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+        };
       }
-      responses["400"] = { description: "Validation error", content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } } };
+      responses["400"] = {
+        description: "Validation error",
+        content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+      };
       (paths[p] ??= {})[s.method] = {
         summary: s.summary,
         description: s.description,
@@ -105,7 +116,12 @@ export class ApiRouter {
       components: {
         securitySchemes: {
           bearerAuth: { type: "http", scheme: "bearer", description: "API key created on the API keys page (tm_…)" },
-          cookieAuth: { type: "apiKey", in: "cookie", name: "tm_session", description: "Browser session; unsafe methods also need X-CSRF-Token" },
+          cookieAuth: {
+            type: "apiKey",
+            in: "cookie",
+            name: "tm_session",
+            description: "Browser session; unsafe methods also need X-CSRF-Token",
+          },
         },
         schemas: {
           Error: {

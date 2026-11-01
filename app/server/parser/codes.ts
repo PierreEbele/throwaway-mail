@@ -1,4 +1,12 @@
-import { STRONG_KEYWORDS, WEAK_KEYWORDS, ORDER_CONTEXT_RE, PHONE_CONTEXT_RE, UNIT_AFTER_RE, UPPERCASE_STOPWORDS, STREET_AFTER_RE } from "./keywords.js";
+import {
+  STRONG_KEYWORDS,
+  WEAK_KEYWORDS,
+  ORDER_CONTEXT_RE,
+  PHONE_CONTEXT_RE,
+  UNIT_AFTER_RE,
+  UPPERCASE_STOPWORDS,
+  STREET_AFTER_RE,
+} from "./keywords.js";
 
 export interface CodeCandidate {
   value: string; // normalised (separators removed)
@@ -121,7 +129,8 @@ export function extractCodes(input: CodeInput): CodeCandidate[] {
     const lineTrim = line.trim().replace(/^[:\-–—•*>\s]+|[.\s]+$/g, "");
 
     // Hard rejections
-    if (/[$€£¥]\s?$/.test(before) || /^\s?(?:€|eur\b|usd\b|\$|dollars?|euros?|chf\b|gbp\b)/i.test(after) || /^[.,]\d{2}\b/.test(after)) continue;
+    if (/[$€£¥]\s?$/.test(before) || /^\s?(?:€|eur\b|usd\b|\$|dollars?|euros?|chf\b|gbp\b)/i.test(after) || /^[.,]\d{2}\b/.test(after))
+      continue;
     if (/(?:©|\(c\)|copyright)\s*$/i.test(before.slice(-15))) continue;
 
     let score = 0;

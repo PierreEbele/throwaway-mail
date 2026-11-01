@@ -15,10 +15,19 @@ const keyOut = (k: typeof apiKeys.$inferSelect) => ({
 });
 
 export function registerKeys(r: ApiRouter) {
-  r.add({ method: "get", path: "/v1/keys", summary: "List own API keys (secrets are never returned)", tags: ["keys"], auth: "user" }, (c) => {
-    const rows = c.get("deps").db.select().from(apiKeys).where(eq(apiKeys.userId, c.get("user")!.id)).orderBy(desc(apiKeys.createdAt)).all();
-    return c.json({ keys: rows.map(keyOut) });
-  });
+  r.add(
+    { method: "get", path: "/v1/keys", summary: "List own API keys (secrets are never returned)", tags: ["keys"], auth: "user" },
+    (c) => {
+      const rows = c
+        .get("deps")
+        .db.select()
+        .from(apiKeys)
+        .where(eq(apiKeys.userId, c.get("user")!.id))
+        .orderBy(desc(apiKeys.createdAt))
+        .all();
+      return c.json({ keys: rows.map(keyOut) });
+    },
+  );
 
   r.add(
     {

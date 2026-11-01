@@ -9,7 +9,8 @@ import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { refreshDestination } from "../services/destinations.js";
 import { addressOut } from "../services/serialize.js";
 
-const SENDER_NOISE = /^(?:mail|email|e|em|mg|news|newsletter|noreply|no-reply|notifications?|notify|info|bounce|bounces|send|mailer|mx|smtp|accounts?|account|members?|hello|team|support|mkt|marketing|click|links?)\./;
+const SENDER_NOISE =
+  /^(?:mail|email|e|em|mg|news|newsletter|noreply|no-reply|notifications?|notify|info|bounce|bounces|send|mailer|mx|smtp|accounts?|account|members?|hello|team|support|mkt|marketing|click|links?)\./;
 
 /** "noreply@mail.github.com" → { siteName: "Github", siteUrl: "https://github.com" } */
 export function suggestSite(senderDomain: string | null): { siteName: string; siteUrl: string | null } {
@@ -49,7 +50,11 @@ function boxFor(deps: Deps, user: User, recipient: string) {
 
 /** Make sure the user has a destination row for this mailbox (it is already verified in Cloudflare when it was a catch-all target). */
 async function ensureDestination(deps: Deps, user: User, email: string) {
-  let dest = deps.db.select().from(destinations).where(and(eq(destinations.userId, user.id), eq(destinations.email, email))).get();
+  let dest = deps.db
+    .select()
+    .from(destinations)
+    .where(and(eq(destinations.userId, user.id), eq(destinations.email, email)))
+    .get();
   if (!dest) {
     const row = { id: newId("dst"), userId: user.id, email, createdAt: deps.now() };
     deps.db.insert(destinations).values(row).run();
@@ -65,7 +70,8 @@ export function registerReview(r: ApiRouter) {
       method: "get",
       path: "/v1/review",
       summary: "Mail received on unknown addresses, grouped by recipient, with a suggested site",
-      description: "Only domain owners have review boxes. Each item can be registered as an address (its past mail moves along), blocked, or dismissed.",
+      description:
+        "Only domain owners have review boxes. Each item can be registered as an address (its past mail moves along), blocked, or dismissed.",
       tags: ["review"],
       auth: "user",
     },
@@ -91,7 +97,13 @@ export function registerReview(r: ApiRouter) {
       const items = rows.map((row) => {
         const box = boxes.find((b) => b.box.id === row.addressId)!;
         const recent = d.db
-          .select({ id: messages.id, from: messages.fromAddr, subject: messages.subject, receivedAt: messages.receivedAt, forwarded: messages.forwarded })
+          .select({
+            id: messages.id,
+            from: messages.fromAddr,
+            subject: messages.subject,
+            receivedAt: messages.receivedAt,
+            forwarded: messages.forwarded,
+          })
           .from(messages)
           .where(and(eq(messages.addressId, row.addressId), eq(messages.envelopeTo, row.recipient)))
           .orderBy(sql`${messages.receivedAt} desc`)
@@ -138,7 +150,13 @@ export function registerReview(r: ApiRouter) {
       const user = c.get("user")!;
       const { box, domain, rcpt } = boxFor(d, user, body.recipient);
       if (!LOCAL_PART_RE.test(rcpt.local)) throw badRequest(`"${rcpt.local}" cannot be used as an address name`);
-      if (d.db.select().from(addresses).where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, rcpt.local))).get()) {
+      if (
+        d.db
+          .select()
+          .from(addresses)
+          .where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, rcpt.local)))
+          .get()
+      ) {
         throw conflict(`${rcpt.full} already exists`);
       }
       // Default: keep the behaviour the old catch-all had (forwarding to the same mailbox).
@@ -198,15 +216,27 @@ export function registerReview(r: ApiRouter) {
     },
   );
 
-  r.add({ method: "get", path: "/v1/review/count", summary: "Number of caught recipients waiting (for the menu badge)", tags: ["review"], auth: "user" }, (c) => {
-    const d = c.get("deps");
-    const ids = boxesOf(d, c.get("user")!).map((b) => b.box.id);
-    if (!ids.length) return c.json({ count: 0, unread: 0 });
-    const row = d.db
-      .select({ count: sql<number>`count(distinct ${messages.envelopeTo})`, unread: sql<number>`count(distinct case when ${messages.readAt} is null then ${messages.envelopeTo} end)` })
-      .from(messages)
-      .where(inArray(messages.addressId, ids))
-      .get()!;
-    return c.json({ count: row.count, unread: row.unread });
-  });
+  r.add(
+    {
+      method: "get",
+      path: "/v1/review/count",
+      summary: "Number of caught recipients waiting (for the menu badge)",
+      tags: ["review"],
+      auth: "user",
+    },
+    (c) => {
+      const d = c.get("deps");
+      const ids = boxesOf(d, c.get("user")!).map((b) => b.box.id);
+      if (!ids.length) return c.json({ count: 0, unread: 0 });
+      const row = d.db
+        .select({
+          count: sql<number>`count(distinct ${messages.envelopeTo})`,
+          unread: sql<number>`count(distinct case when ${messages.readAt} is null then ${messages.envelopeTo} end)`,
+        })
+        .from(messages)
+        .where(inArray(messages.addressId, ids))
+        .get()!;
+      return c.json({ count: row.count, unread: row.unread });
+    },
+  );
 }

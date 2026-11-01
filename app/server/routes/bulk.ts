@@ -33,18 +33,37 @@ export function registerBulk(r: ApiRouter) {
       } else if (body.action === "delete") {
         affected = d.db.delete(addresses).where(where).run().changes;
       } else if (body.action === "read") {
-        const ids = d.db.select({ id: addresses.id }).from(addresses).where(where).all().map((x) => x.id);
-        if (ids.length) affected = d.db.update(messages).set({ readAt: now }).where(and(inArray(messages.addressId, ids), isNull(messages.readAt))).run().changes;
+        const ids = d.db
+          .select({ id: addresses.id })
+          .from(addresses)
+          .where(where)
+          .all()
+          .map((x) => x.id);
+        if (ids.length)
+          affected = d.db
+            .update(messages)
+            .set({ readAt: now })
+            .where(and(inArray(messages.addressId, ids), isNull(messages.readAt)))
+            .run().changes;
       } else {
         const set: Partial<Address> =
-          body.action === "pin" ? { pinned: true }
-          : body.action === "unpin" ? { pinned: false }
-          : body.action === "archive" ? { status: "archived" }
-          : body.action === "pause" ? { status: "paused" }
-          : { status: "active" };
-        affected = d.db.update(addresses).set({ ...set, updatedAt: now }).where(where).run().changes;
+          body.action === "pin"
+            ? { pinned: true }
+            : body.action === "unpin"
+              ? { pinned: false }
+              : body.action === "archive"
+                ? { status: "archived" }
+                : body.action === "pause"
+                  ? { status: "paused" }
+                  : { status: "active" };
+        affected = d.db
+          .update(addresses)
+          .set({ ...set, updatedAt: now })
+          .where(where)
+          .run().changes;
       }
-      for (const id of body.ids) d.bus.publish(user.id, { type: body.action === "delete" ? "address.deleted" : "address.updated", address_id: id });
+      for (const id of body.ids)
+        d.bus.publish(user.id, { type: body.action === "delete" ? "address.deleted" : "address.updated", address_id: id });
       d.bus.publish(user.id, { type: "category.changed" });
       return c.json({ affected });
     },

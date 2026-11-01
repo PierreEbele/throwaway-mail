@@ -21,7 +21,9 @@ describe("existing catch-all is preserved", () => {
     expect(dom.previous_catch_all).toEqual({ enabled: true, actions: [{ type: "forward", value: ["me@personal.example"] }] });
     expect(zoneOf(dom).catchAllWorker).toBe("throwaway-mail-ingest");
 
-    const r = await ingest(t, `shop123@${DOMAIN}`, simpleEml({ text: "Welcome", from: "Shop <news@mail.shop.example>" }), { from: "bounce@mail.shop.example" });
+    const r = await ingest(t, `shop123@${DOMAIN}`, simpleEml({ text: "Welcome", from: "Shop <news@mail.shop.example>" }), {
+      from: "bounce@mail.shop.example",
+    });
     expect(r.json).toMatchObject({ action: "forward", forward_to: "me@personal.example" });
     // re-checking the domain later does not lose the remembered rule
     const again = (await admin.post(`/v1/domains/${dom.id}/verify`)).json.domain;
@@ -36,7 +38,12 @@ describe("existing catch-all is preserved", () => {
     const review = (await admin.get("/v1/review")).json;
     expect(review.total).toBe(2);
     const shop = review.items.find((i: any) => i.recipient === `shop123@${DOMAIN}`);
-    expect(shop).toMatchObject({ count: 2, forwarded_to: "me@personal.example", suggestion: { siteName: "Shop", siteUrl: "https://shop.example" }, registrable: true });
+    expect(shop).toMatchObject({
+      count: 2,
+      forwarded_to: "me@personal.example",
+      suggestion: { siteName: "Shop", siteUrl: "https://shop.example" },
+      registrable: true,
+    });
     expect((await admin.get("/v1/review/count")).json.count).toBe(2);
 
     const reg = await admin.post("/v1/review/register", { recipient: `shop123@${DOMAIN}`, site_name: "Shop", site_url: "shop.example" });
@@ -46,7 +53,10 @@ describe("existing catch-all is preserved", () => {
     const dests = (await admin.get("/v1/destinations")).json.destinations;
     expect(dests).toMatchObject([{ email: "me@personal.example", verified: true }]);
     // next mail goes through the registered address, still forwarded
-    expect((await ingest(t, `shop123@${DOMAIN}`, simpleEml({ text: "d" }))).json).toMatchObject({ action: "forward", forward_to: "me@personal.example" });
+    expect((await ingest(t, `shop123@${DOMAIN}`, simpleEml({ text: "d" }))).json).toMatchObject({
+      action: "forward",
+      forward_to: "me@personal.example",
+    });
     expect((await admin.get("/v1/review")).json.items.map((i: any) => i.recipient)).toEqual([`forum@${DOMAIN}`]);
   });
 
@@ -54,7 +64,9 @@ describe("existing catch-all is preserved", () => {
     await addDomain(admin, DOMAIN);
     await ingest(t, `spam@${DOMAIN}`, simpleEml({ text: "x" }));
     await ingest(t, `old@${DOMAIN}`, simpleEml({ text: "y" }));
-    expect((await admin.post("/v1/review/register", { recipient: `spam@${DOMAIN}`, site_name: "Spammer", block: true })).json.address.status).toBe("paused");
+    expect(
+      (await admin.post("/v1/review/register", { recipient: `spam@${DOMAIN}`, site_name: "Spammer", block: true })).json.address.status,
+    ).toBe("paused");
     expect((await ingest(t, `spam@${DOMAIN}`, simpleEml({ text: "x2" }))).json.action).toBe("reject");
     expect((await admin.post("/v1/review/dismiss", { recipient: `old@${DOMAIN}` })).json.deleted).toBe(1);
     expect((await admin.get("/v1/review")).json.items).toEqual([]);

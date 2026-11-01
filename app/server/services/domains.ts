@@ -37,7 +37,8 @@ export async function setupDomain(deps: Deps, domain: Domain): Promise<Domain> {
       } else {
         update.status = "active";
         update.statusDetail = `Email Routing enabled; catch-all → Worker "${deps.config.WORKER_NAME}".`;
-        if (zone.name !== domain.name) update.statusDetail += ` Note: ${domain.name} is a sub-domain of the ${zone.name} zone; Cloudflare's catch-all only exists at the zone level.`;
+        if (zone.name !== domain.name)
+          update.statusDetail += ` Note: ${domain.name} is a sub-domain of the ${zone.name} zone; Cloudflare's catch-all only exists at the zone level.`;
       }
     }
   } catch (e) {

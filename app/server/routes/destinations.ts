@@ -21,10 +21,19 @@ export function registerDestinations(r: ApiRouter) {
     return row;
   };
 
-  r.add({ method: "get", path: "/v1/destinations", summary: "List own forwarding destinations", tags: ["destinations"], auth: "user" }, (c) => {
-    const rows = c.get("deps").db.select().from(destinations).where(eq(destinations.userId, c.get("user")!.id)).orderBy(asc(destinations.createdAt)).all();
-    return c.json({ destinations: rows.map(destinationOut) });
-  });
+  r.add(
+    { method: "get", path: "/v1/destinations", summary: "List own forwarding destinations", tags: ["destinations"], auth: "user" },
+    (c) => {
+      const rows = c
+        .get("deps")
+        .db.select()
+        .from(destinations)
+        .where(eq(destinations.userId, c.get("user")!.id))
+        .orderBy(asc(destinations.createdAt))
+        .all();
+      return c.json({ destinations: rows.map(destinationOut) });
+    },
+  );
 
   r.add(
     {
@@ -39,10 +48,24 @@ export function registerDestinations(r: ApiRouter) {
     async (c, { body }) => {
       const d = c.get("deps");
       const user = c.get("user")!;
-      if (d.db.select().from(destinations).where(and(eq(destinations.userId, user.id), eq(destinations.email, body.email))).get()) {
+      if (
+        d.db
+          .select()
+          .from(destinations)
+          .where(and(eq(destinations.userId, user.id), eq(destinations.email, body.email)))
+          .get()
+      ) {
         throw conflict("This destination already exists");
       }
-      const row = { id: newId("dst"), userId: user.id, email: body.email, createdAt: d.now(), cfDestinationId: null as string | null, verifiedAt: null as number | null, lastError: null as string | null };
+      const row = {
+        id: newId("dst"),
+        userId: user.id,
+        email: body.email,
+        createdAt: d.now(),
+        cfDestinationId: null as string | null,
+        verifiedAt: null as number | null,
+        lastError: null as string | null,
+      };
       try {
         const info = await d.cf.createDestination(body.email);
         row.cfDestinationId = info.id;
@@ -68,7 +91,8 @@ export function registerDestinations(r: ApiRouter) {
       const d = c.get("deps");
       const row = owned(c);
       const set: Partial<typeof destinations.$inferSelect> = {};
-      if (body.pgp_public_key === null || body.pgp_public_key?.trim() === "") Object.assign(set, { pgpPublicKey: null, pgpFingerprint: null });
+      if (body.pgp_public_key === null || body.pgp_public_key?.trim() === "")
+        Object.assign(set, { pgpPublicKey: null, pgpFingerprint: null });
       else if (body.pgp_public_key) {
         try {
           const info = await inspectPublicKey(body.pgp_public_key.trim());
@@ -83,21 +107,44 @@ export function registerDestinations(r: ApiRouter) {
     },
   );
 
-  r.add({ method: "post", path: "/v1/destinations/:id/refresh", summary: "Refresh verification state from Cloudflare", tags: ["destinations"], auth: "user" }, async (c) => {
-    return c.json({ destination: destinationOut(await refreshDestination(c.get("deps"), owned(c))) });
-  });
+  r.add(
+    {
+      method: "post",
+      path: "/v1/destinations/:id/refresh",
+      summary: "Refresh verification state from Cloudflare",
+      tags: ["destinations"],
+      auth: "user",
+    },
+    async (c) => {
+      return c.json({ destination: destinationOut(await refreshDestination(c.get("deps"), owned(c))) });
+    },
+  );
 
-  r.add({ method: "post", path: "/v1/destinations/:id/resend", summary: "Re-send the verification e-mail", tags: ["destinations"], auth: "user" }, async (c) => {
-    return c.json({ destination: destinationOut(await resendVerification(c.get("deps"), owned(c))) });
-  });
+  r.add(
+    {
+      method: "post",
+      path: "/v1/destinations/:id/resend",
+      summary: "Re-send the verification e-mail",
+      tags: ["destinations"],
+      auth: "user",
+    },
+    async (c) => {
+      return c.json({ destination: destinationOut(await resendVerification(c.get("deps"), owned(c))) });
+    },
+  );
 
-  r.add({ method: "delete", path: "/v1/destinations/:id", summary: "Remove a destination", tags: ["destinations"], auth: "user" }, async (c) => {
-    const d = c.get("deps");
-    const row = owned(c);
-    if (row.cfDestinationId && !sharedWithOthers(d, row)) {
-      await d.cf.deleteDestination(row.cfDestinationId).catch((e) => d.logger.warn("cloudflare destination delete failed", { err: (e as Error).message }));
-    }
-    d.db.delete(destinations).where(eq(destinations.id, row.id)).run();
-    return c.json({ ok: true });
-  });
+  r.add(
+    { method: "delete", path: "/v1/destinations/:id", summary: "Remove a destination", tags: ["destinations"], auth: "user" },
+    async (c) => {
+      const d = c.get("deps");
+      const row = owned(c);
+      if (row.cfDestinationId && !sharedWithOthers(d, row)) {
+        await d.cf
+          .deleteDestination(row.cfDestinationId)
+          .catch((e) => d.logger.warn("cloudflare destination delete failed", { err: (e as Error).message }));
+      }
+      d.db.delete(destinations).where(eq(destinations.id, row.id)).run();
+      return c.json({ ok: true });
+    },
+  );
 }

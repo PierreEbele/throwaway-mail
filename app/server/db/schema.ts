@@ -6,7 +6,9 @@ export const users = sqliteTable("users", {
   oidcSub: text("oidc_sub").notNull().unique(),
   email: text("email").notNull(),
   name: text("name"),
-  role: text("role", { enum: ["admin", "user"] }).notNull().default("user"),
+  role: text("role", { enum: ["admin", "user"] })
+    .notNull()
+    .default("user"),
   disabled: integer("disabled", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at").notNull(),
   lastLoginAt: integer("last_login_at"),
@@ -16,7 +18,9 @@ export const sessions = sqliteTable(
   "sessions",
   {
     id: text("id").primaryKey(), // sha256 of the cookie token
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     csrfToken: text("csrf_token").notNull(),
     createdAt: integer("created_at").notNull(),
     expiresAt: integer("expires_at").notNull(),
@@ -28,7 +32,9 @@ export const apiKeys = sqliteTable(
   "api_keys",
   {
     id: text("id").primaryKey(),
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     keyHash: text("key_hash").notNull().unique(),
     prefix: text("prefix").notNull(),
@@ -43,10 +49,14 @@ export const domains = sqliteTable("domains", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),
   cfZoneId: text("cf_zone_id"),
-  status: text("status", { enum: ["pending", "active", "error"] }).notNull().default("pending"),
+  status: text("status", { enum: ["pending", "active", "error"] })
+    .notNull()
+    .default("pending"),
   statusDetail: text("status_detail"),
   dnsMissingJson: text("dns_missing_json"),
-  unknownPolicy: text("unknown_policy", { enum: ["reject", "inbox", "auto_create"] }).notNull().default("reject"),
+  unknownPolicy: text("unknown_policy", { enum: ["reject", "inbox", "auto_create"] })
+    .notNull()
+    .default("reject"),
   /** Catch-all rule that existed in Cloudflare before the app took it over (JSON), restored when the domain is removed. */
   previousCatchAllJson: text("previous_catch_all_json"),
   /** While set, mail to unknown addresses keeps being forwarded here (the old catch-all) and is queued for review. */
@@ -62,7 +72,9 @@ export const destinations = sqliteTable(
   "destinations",
   {
     id: text("id").primaryKey(),
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
     cfDestinationId: text("cf_destination_id"),
     verifiedAt: integer("verified_at"),
@@ -81,7 +93,9 @@ export const categories = sqliteTable(
   "categories",
   {
     id: text("id").primaryKey(),
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     color: text("color").notNull().default("zinc"),
     pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
@@ -100,15 +114,21 @@ export const addresses = sqliteTable(
   "addresses",
   {
     id: text("id").primaryKey(),
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    domainId: text("domain_id").notNull().references(() => domains.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    domainId: text("domain_id")
+      .notNull()
+      .references(() => domains.id, { onDelete: "cascade" }),
     localPart: text("local_part").notNull(),
     siteName: text("site_name").notNull(),
     siteUrl: text("site_url"),
     label: text("label"),
     forwardEnabled: integer("forward_enabled", { mode: "boolean" }).notNull().default(false),
     destinationId: text("destination_id").references(() => destinations.id, { onDelete: "set null" }),
-    status: text("status", { enum: ["active", "paused", "archived"] }).notNull().default("active"),
+    status: text("status", { enum: ["active", "paused", "archived"] })
+      .notNull()
+      .default("active"),
     isUnassigned: integer("is_unassigned", { mode: "boolean" }).notNull().default(false),
     expiresAt: integer("expires_at"),
     createdAt: integer("created_at").notNull(),
@@ -148,8 +168,12 @@ export const messages = sqliteTable(
   "messages",
   {
     id: text("id").primaryKey(),
-    addressId: text("address_id").notNull().references(() => addresses.id, { onDelete: "cascade" }),
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    addressId: text("address_id")
+      .notNull()
+      .references(() => addresses.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     messageIdHeader: text("message_id_header"),
     envelopeFrom: text("envelope_from"),
     envelopeTo: text("envelope_to").notNull(),
@@ -195,7 +219,9 @@ export const extractedItems = sqliteTable(
   "extracted_items",
   {
     id: text("id").primaryKey(),
-    messageId: text("message_id").notNull().references(() => messages.id, { onDelete: "cascade" }),
+    messageId: text("message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
     kind: text("kind", { enum: ["code", "link"] }).notNull(),
     value: text("value").notNull(),
     confidence: real("confidence").notNull(),
@@ -210,8 +236,12 @@ export const extractedItems = sqliteTable(
 export const addressDestinations = sqliteTable(
   "address_destinations",
   {
-    addressId: text("address_id").notNull().references(() => addresses.id, { onDelete: "cascade" }),
-    destinationId: text("destination_id").notNull().references(() => destinations.id, { onDelete: "cascade" }),
+    addressId: text("address_id")
+      .notNull()
+      .references(() => addresses.id, { onDelete: "cascade" }),
+    destinationId: text("destination_id")
+      .notNull()
+      .references(() => destinations.id, { onDelete: "cascade" }),
   },
   (t) => [uniqueIndex("address_destinations_uq").on(t.addressId, t.destinationId)],
 );
@@ -222,7 +252,9 @@ export const addressDestinations = sqliteTable(
  */
 export const directories = sqliteTable("directories", {
   id: text("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull().unique(),
   createdAt: integer("created_at").notNull(),
 });
@@ -232,7 +264,9 @@ export const savedSearches = sqliteTable(
   "saved_searches",
   {
     id: text("id").primaryKey(),
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     /** JSON object of /v1/addresses query parameters. */
     paramsJson: text("params_json").notNull(),
@@ -247,7 +281,9 @@ export const notifyTargets = sqliteTable(
   "notify_targets",
   {
     id: text("id").primaryKey(),
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     kind: text("kind", { enum: ["ntfy", "gotify", "telegram", "webhook"] }).notNull(),
     name: text("name").notNull(),
     /** ntfy topic URL, Gotify server URL or webhook URL (unused for Telegram). */
@@ -273,8 +309,12 @@ export const leakEvents = sqliteTable(
   "leak_events",
   {
     id: text("id").primaryKey(),
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    addressId: text("address_id").notNull().references(() => addresses.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    addressId: text("address_id")
+      .notNull()
+      .references(() => addresses.id, { onDelete: "cascade" }),
     sender: text("sender").notNull(),
     senderDomain: text("sender_domain").notNull(),
     at: integer("at").notNull(),

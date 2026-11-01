@@ -49,7 +49,11 @@ export function registerStale(r: ApiRouter) {
       summary: "Archive, delete or keep (dismiss) addresses that never received mail",
       tags: ["addresses"],
       auth: "user",
-      body: z.object({ action: z.enum(["archive", "delete", "keep"]), ids: z.array(z.string()).min(1).max(1000), days: z.number().int().min(1).max(3650).default(30) }),
+      body: z.object({
+        action: z.enum(["archive", "delete", "keep"]),
+        ids: z.array(z.string()).min(1).max(1000),
+        days: z.number().int().min(1).max(3650).default(30),
+      }),
     },
     (c, { body }) => {
       const d = c.get("deps");
@@ -62,7 +66,8 @@ export function registerStale(r: ApiRouter) {
         if (body.action === "delete") d.db.delete(addresses).where(where).run();
         else if (body.action === "archive") d.db.update(addresses).set({ status: "archived", updatedAt: d.now() }).where(where).run();
         else d.db.update(addresses).set({ staleDismissedAt: d.now() }).where(where).run();
-        for (const id of ids) d.bus.publish(user.id, { type: body.action === "delete" ? "address.deleted" : "address.updated", address_id: id });
+        for (const id of ids)
+          d.bus.publish(user.id, { type: body.action === "delete" ? "address.deleted" : "address.updated", address_id: id });
       }
       return c.json({ affected: ids.length, skipped: body.ids.length - ids.length });
     },

@@ -8,7 +8,8 @@ async function setup() {
   const admin = await setupAdmin(t);
   await addDomain(admin, "mail.example.test");
   const user = loginAs(t, "u@example.org");
-  const mk = async (site: string, extra: Record<string, unknown> = {}) => (await user.post("/v1/addresses", { site_name: site, ...extra })).json.address;
+  const mk = async (site: string, extra: Record<string, unknown> = {}) =>
+    (await user.post("/v1/addresses", { site_name: site, ...extra })).json.address;
   return { t, user, mk };
 }
 

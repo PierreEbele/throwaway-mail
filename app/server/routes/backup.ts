@@ -9,32 +9,53 @@ import { CATEGORY_COLORS } from "../services/categories.js";
 
 /** Export and import of addresses and categories. */
 export function registerBackup(r: ApiRouter) {
-  r.add({ method: "get", path: "/v1/export", summary: "Export own categories and addresses as JSON (no messages)", tags: ["addresses"], auth: "user" }, (c) => {
-    const d = c.get("deps");
-    const user = c.get("user")!;
-    const cats = d.db.select().from(categories).where(eq(categories.userId, user.id)).orderBy(asc(categories.position)).all();
-    const catName = new Map(cats.map((x) => [x.id, x.name]));
-    const rows = d.db.select({ a: addresses, domain: domains.name }).from(addresses).innerJoin(domains, eq(domains.id, addresses.domainId)).where(and(eq(addresses.userId, user.id), eq(addresses.isUnassigned, false))).all();
-    c.header("content-disposition", `attachment; filename="throwaway-mail-export.json"`);
-    return c.json({
-      version: 1,
-      exported_at: new Date(d.now()).toISOString(),
-      categories: cats.map((x) => ({ name: x.name, color: x.color, pinned: x.pinned, hidden: x.hidden, auto_match: x.autoMatch, retention_days: x.retentionDays })),
-      addresses: rows.map(({ a, domain }) => ({
-        email: `${a.localPart}@${domain}`,
-        site_name: a.siteName,
-        site_url: a.siteUrl,
-        label: a.label,
-        status: a.status,
-        pinned: a.pinned,
-        category: a.categoryId ? (catName.get(a.categoryId) ?? null) : null,
-        expires_at: a.expiresAt,
-        blocked_senders: parseList(a.blockedSendersJson),
-        trusted_senders: parseList(a.trustedSendersJson),
-        created_at: a.createdAt,
-      })),
-    });
-  });
+  r.add(
+    {
+      method: "get",
+      path: "/v1/export",
+      summary: "Export own categories and addresses as JSON (no messages)",
+      tags: ["addresses"],
+      auth: "user",
+    },
+    (c) => {
+      const d = c.get("deps");
+      const user = c.get("user")!;
+      const cats = d.db.select().from(categories).where(eq(categories.userId, user.id)).orderBy(asc(categories.position)).all();
+      const catName = new Map(cats.map((x) => [x.id, x.name]));
+      const rows = d.db
+        .select({ a: addresses, domain: domains.name })
+        .from(addresses)
+        .innerJoin(domains, eq(domains.id, addresses.domainId))
+        .where(and(eq(addresses.userId, user.id), eq(addresses.isUnassigned, false)))
+        .all();
+      c.header("content-disposition", `attachment; filename="throwaway-mail-export.json"`);
+      return c.json({
+        version: 1,
+        exported_at: new Date(d.now()).toISOString(),
+        categories: cats.map((x) => ({
+          name: x.name,
+          color: x.color,
+          pinned: x.pinned,
+          hidden: x.hidden,
+          auto_match: x.autoMatch,
+          retention_days: x.retentionDays,
+        })),
+        addresses: rows.map(({ a, domain }) => ({
+          email: `${a.localPart}@${domain}`,
+          site_name: a.siteName,
+          site_url: a.siteUrl,
+          label: a.label,
+          status: a.status,
+          pinned: a.pinned,
+          category: a.categoryId ? (catName.get(a.categoryId) ?? null) : null,
+          expires_at: a.expiresAt,
+          blocked_senders: parseList(a.blockedSendersJson),
+          trusted_senders: parseList(a.trustedSendersJson),
+          created_at: a.createdAt,
+        })),
+      });
+    },
+  );
 
   const ImportCategory = z.object({
     name: z.string().trim().min(1).max(40),
@@ -64,7 +85,10 @@ export function registerBackup(r: ApiRouter) {
       summary: "Import categories and addresses from an export (existing ones are skipped)",
       tags: ["addresses"],
       auth: "user",
-      body: z.object({ categories: z.array(ImportCategory).max(500).default([]), addresses: z.array(ImportAddress).max(10_000).default([]) }),
+      body: z.object({
+        categories: z.array(ImportCategory).max(500).default([]),
+        addresses: z.array(ImportAddress).max(10_000).default([]),
+      }),
     },
     (c, { body }) => {
       const d = c.get("deps");
@@ -72,16 +96,46 @@ export function registerBackup(r: ApiRouter) {
       const now = d.now();
       const result = { categories_created: 0, addresses_created: 0, skipped: [] as Array<{ email: string; reason: string }> };
       d.db.transaction((tx) => {
-        const byName = new Map(tx.select().from(categories).where(eq(categories.userId, user.id)).all().map((x) => [x.name, x.id]));
-        let pos = tx.select({ p: sql<number>`coalesce(max(${categories.position}), -1)` }).from(categories).where(eq(categories.userId, user.id)).get()!.p;
+        const byName = new Map(
+          tx
+            .select()
+            .from(categories)
+            .where(eq(categories.userId, user.id))
+            .all()
+            .map((x) => [x.name, x.id]),
+        );
+        let pos = tx
+          .select({ p: sql<number>`coalesce(max(${categories.position}), -1)` })
+          .from(categories)
+          .where(eq(categories.userId, user.id))
+          .get()!.p;
         for (const cat of body.categories) {
           if (byName.has(cat.name)) continue;
           const id = newId("cat");
-          tx.insert(categories).values({ id, userId: user.id, name: cat.name, color: cat.color, pinned: cat.pinned, hidden: cat.hidden, autoMatch: cat.auto_match, retentionDays: cat.retention_days, position: ++pos, createdAt: now }).run();
+          tx.insert(categories)
+            .values({
+              id,
+              userId: user.id,
+              name: cat.name,
+              color: cat.color,
+              pinned: cat.pinned,
+              hidden: cat.hidden,
+              autoMatch: cat.auto_match,
+              retentionDays: cat.retention_days,
+              position: ++pos,
+              createdAt: now,
+            })
+            .run();
           byName.set(cat.name, id);
           result.categories_created++;
         }
-        const doms = new Map(tx.select().from(domains).all().map((x) => [x.name, x]));
+        const doms = new Map(
+          tx
+            .select()
+            .from(domains)
+            .all()
+            .map((x) => [x.name, x]),
+        );
         for (const a of body.addresses) {
           const [local, dom] = a.email.split("@");
           const domain = dom ? doms.get(dom) : undefined;

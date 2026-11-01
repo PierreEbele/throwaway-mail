@@ -12,7 +12,15 @@ export function runExpiryReminders(deps: Deps): number {
     .select({ a: addresses, domain: domains.name })
     .from(addresses)
     .innerJoin(domains, eq(domains.id, addresses.domainId))
-    .where(and(isNotNull(addresses.expiresAt), gt(addresses.expiresAt, now), lte(addresses.expiresAt, now + EXPIRY_WARNING_MS), isNull(addresses.expiryRemindedAt), ne(addresses.status, "archived")))
+    .where(
+      and(
+        isNotNull(addresses.expiresAt),
+        gt(addresses.expiresAt, now),
+        lte(addresses.expiresAt, now + EXPIRY_WARNING_MS),
+        isNull(addresses.expiryRemindedAt),
+        ne(addresses.status, "archived"),
+      ),
+    )
     .all();
   for (const { a, domain } of rows) {
     deps.db.update(addresses).set({ expiryRemindedAt: now }).where(eq(addresses.id, a.id)).run();

@@ -45,7 +45,10 @@ export class OidcService {
   }
 
   private discover(): Promise<client.Configuration> {
-    if (!this.enabled) return Promise.reject(new HttpError(503, "sso_not_configured", "Single sign-on is not configured (OIDC_ISSUER / OIDC_CLIENT_SECRET)"));
+    if (!this.enabled)
+      return Promise.reject(
+        new HttpError(503, "sso_not_configured", "Single sign-on is not configured (OIDC_ISSUER / OIDC_CLIENT_SECRET)"),
+      );
     this.configPromise ??= client
       .discovery(
         new URL(this.config.OIDC_ISSUER!),

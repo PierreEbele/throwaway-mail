@@ -35,7 +35,11 @@ export async function resendVerification(deps: Deps, d: Destination): Promise<De
       .where(eq(destinations.id, d.id))
       .run();
   } catch (e) {
-    deps.db.update(destinations).set({ lastError: errMsg(e) }).where(eq(destinations.id, d.id)).run();
+    deps.db
+      .update(destinations)
+      .set({ lastError: errMsg(e) })
+      .where(eq(destinations.id, d.id))
+      .run();
   }
   return deps.db.select().from(destinations).where(eq(destinations.id, d.id)).get()!;
 }

@@ -24,13 +24,24 @@ function fakeMessage(to: string, raw: string) {
   return m satisfies EmailMessageLike;
 }
 
-const env: Env = { APP_URL: "https://app.example", INGEST_SECRET: "test-ingest-secret-0123456789", FALLBACK_FORWARD: "fallback@me.example" };
+const env: Env = {
+  APP_URL: "https://app.example",
+  INGEST_SECRET: "test-ingest-secret-0123456789",
+  FALLBACK_FORWARD: "fallback@me.example",
+};
 
 describe("email worker", () => {
   it("forwards to every destination and survives one failing", async () => {
-    const answer = (body: unknown) => (async () => new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } })) as unknown as typeof fetch;
+    const answer = (body: unknown) =>
+      (async () => new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } })) as unknown as typeof fetch;
     const m = fakeMessage("a@x.test", "Subject: hi\r\n\r\nx");
-    expect(await handleEmail(m, env, answer({ action: "forward", forward_to: "a@me.example", forward_to_all: ["a@me.example", "broken@me.example", "b@me.example"] }))).toBe("forwarded");
+    expect(
+      await handleEmail(
+        m,
+        env,
+        answer({ action: "forward", forward_to: "a@me.example", forward_to_all: ["a@me.example", "broken@me.example", "b@me.example"] }),
+      ),
+    ).toBe("forwarded");
     expect(m.forwardedAll).toEqual(["a@me.example", "b@me.example"]);
     const old = fakeMessage("a@x.test", "Subject: hi\r\n\r\nx");
     expect(await handleEmail(old, env, answer({ action: "forward", forward_to: "a@me.example" }))).toBe("forwarded");
@@ -65,7 +76,13 @@ describe("email worker", () => {
     const fetchSpy = vi.fn(async (_u: string, init: RequestInit) => {
       const h = new Headers(init.headers);
       const body = new Uint8Array(init.body as Uint8Array);
-      const expected = ingestSignature(env.INGEST_SECRET, h.get("x-tm-timestamp")!, h.get("x-tm-envelope-from")!, h.get("x-tm-envelope-to")!, body);
+      const expected = ingestSignature(
+        env.INGEST_SECRET,
+        h.get("x-tm-timestamp")!,
+        h.get("x-tm-envelope-from")!,
+        h.get("x-tm-envelope-to")!,
+        body,
+      );
       expect(h.get("x-tm-signature")).toBe(expected);
       return Response.json({ action: "store_only" });
     });

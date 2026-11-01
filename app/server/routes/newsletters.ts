@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { ApiRouter } from "../lib/http.js";
 import { addresses, messages } from "../db/schema.js";
 import { badRequest, notFound } from "../lib/errors.js";
-import { isPrivateHost } from "../services/notify.js";
+import { checkOutboundUrl } from "../lib/outbound.js";
 
 /** Newsletter handling (List-Unsubscribe). */
 export function registerNewsletters(r: ApiRouter) {
@@ -21,15 +21,25 @@ export function registerNewsletters(r: ApiRouter) {
     async (c, { body }) => {
       const d = c.get("deps");
       const user = c.get("user")!;
-      const m = d.db.select().from(messages).where(and(eq(messages.id, c.req.param("id")!), eq(messages.userId, user.id))).get();
+      const m = d.db
+        .select()
+        .from(messages)
+        .where(and(eq(messages.id, c.req.param("id")!), eq(messages.userId, user.id)))
+        .get();
       if (!m) throw notFound("Message");
-      if (body.block) d.db.update(addresses).set({ blockPromos: true, updatedAt: d.now() }).where(and(eq(addresses.id, m.addressId), eq(addresses.userId, user.id))).run();
       if (!m.unsubscribeUrl && !m.unsubscribeMailto) throw badRequest("This message has no List-Unsubscribe header");
+      if (body.block)
+        d.db
+          .update(addresses)
+          .set({ blockPromos: true, updatedAt: d.now() })
+          .where(and(eq(addresses.id, m.addressId), eq(addresses.userId, user.id)))
+          .run();
       let done = false;
       let error: string | null = null;
-      // The URL comes from the sender: https only, never towards the server's own network.
-      if (m.unsubscribeOneClick && m.unsubscribeUrl && !isPrivateHost(new URL(m.unsubscribeUrl).hostname)) {
+      if (m.unsubscribeOneClick && m.unsubscribeUrl) {
         try {
+          // The URL comes from the sender: https only, never towards the server's own network.
+          await checkOutboundUrl(m.unsubscribeUrl, { resolve: d.resolve, httpsOnly: true });
           const res = await d.fetch(m.unsubscribeUrl, {
             method: "POST",
             headers: { "content-type": "application/x-www-form-urlencoded" },

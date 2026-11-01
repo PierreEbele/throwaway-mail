@@ -24,7 +24,11 @@ export function registerFeeds(r: ApiRouter) {
       const d = c.get("deps");
       const user = c.get("user")!;
       const { a, domain } = ownedAddress(d, user, c.req.param("id")!);
-      d.db.update(addresses).set({ feedToken: body.enabled ? randomString(32).toLowerCase() : null }).where(eq(addresses.id, a.id)).run();
+      d.db
+        .update(addresses)
+        .set({ feedToken: body.enabled ? randomString(32).toLowerCase() : null })
+        .where(eq(addresses.id, a.id))
+        .run();
       return c.json({ address: addressOut(d.db.select().from(addresses).where(eq(addresses.id, a.id)).get()!, domain) });
     },
   );
@@ -41,11 +45,33 @@ export function registerFeeds(r: ApiRouter) {
       const d = c.get("deps");
       const m = /^([a-z0-9]{32})\.(rss|json)$/.exec(c.req.param("file")!);
       if (!m) throw notFound("Feed");
-      const row = d.db.select({ a: addresses, domain: domains.name }).from(addresses).innerJoin(domains, eq(domains.id, addresses.domainId)).where(eq(addresses.feedToken, m[1]!)).get();
+      const row = d.db
+        .select({ a: addresses, domain: domains.name })
+        .from(addresses)
+        .innerJoin(domains, eq(domains.id, addresses.domainId))
+        .where(eq(addresses.feedToken, m[1]!))
+        .get();
       if (!row) throw notFound("Feed");
       const { a, domain } = row;
-      const msgs = d.db.select().from(messages).where(and(eq(messages.addressId, a.id), isNull(messages.archivedAt))).orderBy(desc(messages.receivedAt)).limit(50).all();
-      const items = msgs.length ? d.db.select().from(extractedItems).where(inArray(extractedItems.messageId, msgs.map((x) => x.id))).all() : [];
+      const msgs = d.db
+        .select()
+        .from(messages)
+        .where(and(eq(messages.addressId, a.id), isNull(messages.archivedAt)))
+        .orderBy(desc(messages.receivedAt))
+        .limit(50)
+        .all();
+      const items = msgs.length
+        ? d.db
+            .select()
+            .from(extractedItems)
+            .where(
+              inArray(
+                extractedItems.messageId,
+                msgs.map((x) => x.id),
+              ),
+            )
+            .all()
+        : [];
       const base = d.config.APP_URL.replace(/\/$/, "");
       const entries = msgs.map((x) => {
         const ex = itemsOut(items.filter((i) => i.messageId === x.id));
@@ -63,7 +89,20 @@ export function registerFeeds(r: ApiRouter) {
       c.header("cache-control", "private, max-age=60");
       c.header("x-robots-tag", "noindex");
       if (m[2] === "json") {
-        return c.json({ version: "https://jsonfeed.org/version/1.1", title: `${a.siteName} — ${a.localPart}@${domain}`, home_page_url: `${base}/addresses/${a.id}`, items: entries.map((e) => ({ id: e.id, title: e.title, content_text: e.text, date_published: new Date(e.received_at).toISOString(), url: e.url, authors: e.from ? [{ name: e.from }] : [], _throwaway: { code: e.code, links: e.links } })) });
+        return c.json({
+          version: "https://jsonfeed.org/version/1.1",
+          title: `${a.siteName} — ${a.localPart}@${domain}`,
+          home_page_url: `${base}/addresses/${a.id}`,
+          items: entries.map((e) => ({
+            id: e.id,
+            title: e.title,
+            content_text: e.text,
+            date_published: new Date(e.received_at).toISOString(),
+            url: e.url,
+            authors: e.from ? [{ name: e.from }] : [],
+            _throwaway: { code: e.code, links: e.links },
+          })),
+        });
       }
       const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>${esc(`${a.siteName} — ${a.localPart}@${domain}`)}</title><link>${esc(`${base}/addresses/${a.id}`)}</link><description>Throwaway Mail feed</description>

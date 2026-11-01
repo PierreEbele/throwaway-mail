@@ -29,7 +29,12 @@ export class MockCloudflareClient implements CloudflareClient {
       if (zoneId.includes("catchall")) {
         z.catchAll = { enabled: true, actions: [{ type: "forward", value: ["me@personal.example"] }] };
         if (![...this.destinations.values()].some((d) => d.email === "me@personal.example")) {
-          this.destinations.set("mockdest_existing", { id: "mockdest_existing", email: "me@personal.example", verified: "2026-01-01T00:00:00Z", checks: 0 });
+          this.destinations.set("mockdest_existing", {
+            id: "mockdest_existing",
+            email: "me@personal.example",
+            verified: "2026-01-01T00:00:00Z",
+            checks: 0,
+          });
         }
       }
       this.zones.set(zoneId, z);

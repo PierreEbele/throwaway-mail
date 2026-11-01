@@ -72,7 +72,13 @@ export function registerAuth(r: ApiRouter) {
       const d = c.get("deps");
       try {
         const { url, state } = await d.oidc.start(query.return_to ?? "/", c.req.header("host"));
-        setCookie(c, STATE_COOKIE, state, { httpOnly: true, secure: d.config.cookieSecure, sameSite: "Lax", path: "/v1/auth/oidc", maxAge: 600 });
+        setCookie(c, STATE_COOKIE, state, {
+          httpOnly: true,
+          secure: d.config.cookieSecure,
+          sameSite: "Lax",
+          path: "/v1/auth/oidc",
+          maxAge: 600,
+        });
         return c.redirect(url, 302);
       } catch (e) {
         if (e instanceof HttpError) return loginRedirect(c, e.code, e.message);
@@ -97,12 +103,19 @@ export function registerAuth(r: ApiRouter) {
       const browserState = getCookie(c, STATE_COOKIE);
       deleteCookie(c, STATE_COOKIE, { path: "/v1/auth/oidc" });
       const idpError = url.searchParams.get("error");
-      if (idpError) return loginRedirect(c, idpError, url.searchParams.get("error_description") ?? "The identity provider refused the sign-in");
+      if (idpError)
+        return loginRedirect(c, idpError, url.searchParams.get("error_description") ?? "The identity provider refused the sign-in");
       try {
         const { identity, returnTo } = await d.oidc.finish(url, browserState);
         const user = upsertSsoUser(d, identity, clientIp(c));
         const s = createSession(d, user.id);
-        setCookie(c, SESSION_COOKIE, s.token, { httpOnly: true, secure: d.config.cookieSecure, sameSite: "Lax", path: "/", expires: new Date(s.expiresAt) });
+        setCookie(c, SESSION_COOKIE, s.token, {
+          httpOnly: true,
+          secure: d.config.cookieSecure,
+          sameSite: "Lax",
+          path: "/",
+          expires: new Date(s.expiresAt),
+        });
         d.logger.info("sso login", { user_id: user.id, role: user.role });
         return c.redirect(returnTo, 302);
       } catch (e) {
@@ -122,7 +135,14 @@ export function registerAuth(r: ApiRouter) {
     return c.json({ ok: true });
   });
 
-  r.add({ method: "get", path: "/v1/auth/me", summary: "Current user (and CSRF token for browser sessions)", tags: ["auth"], auth: "user" }, (c) => {
-    return c.json({ user: userOut(c.get("user")!), csrf_token: c.get("session")?.csrfToken ?? null, auth: c.get("apiKeyId") ? "api_key" : "session" });
-  });
+  r.add(
+    { method: "get", path: "/v1/auth/me", summary: "Current user (and CSRF token for browser sessions)", tags: ["auth"], auth: "user" },
+    (c) => {
+      return c.json({
+        user: userOut(c.get("user")!),
+        csrf_token: c.get("session")?.csrfToken ?? null,
+        auth: c.get("apiKeyId") ? "api_key" : "session",
+      });
+    },
+  );
 }

@@ -25,14 +25,21 @@ export function matchCategory(d: Deps, userId: string, siteName: string, siteUrl
   const hay = `${siteName} ${siteUrl ?? ""}`.toLowerCase();
   const rows = d.db.select().from(categories).where(eq(categories.userId, userId)).orderBy(asc(categories.position)).all();
   for (const c of rows) {
-    const words = (c.autoMatch ?? "").split(",").map((w) => w.trim().toLowerCase()).filter(Boolean);
+    const words = (c.autoMatch ?? "")
+      .split(",")
+      .map((w) => w.trim().toLowerCase())
+      .filter(Boolean);
     if (words.some((w) => hay.includes(w))) return c.id;
   }
   return null;
 }
 
 export function ownedCategory(d: Deps, user: User, id: string) {
-  const row = d.db.select().from(categories).where(and(eq(categories.id, id), eq(categories.userId, user.id))).get();
+  const row = d.db
+    .select()
+    .from(categories)
+    .where(and(eq(categories.id, id), eq(categories.userId, user.id)))
+    .get();
   if (!row) throw notFound("Category");
   return row;
 }
@@ -40,7 +47,13 @@ export function ownedCategory(d: Deps, user: User, id: string) {
 /** Throws 400 unless `id` is null/undefined or one of the user's categories. */
 export function checkCategory(d: Deps, user: User, id: string | null | undefined) {
   if (!id) return;
-  if (!d.db.select({ id: categories.id }).from(categories).where(and(eq(categories.id, id), eq(categories.userId, user.id))).get()) {
+  if (
+    !d.db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(and(eq(categories.id, id), eq(categories.userId, user.id)))
+      .get()
+  ) {
     throw badRequest("Unknown category_id");
   }
 }
@@ -59,9 +72,16 @@ export function categoryByName(d: Deps, user: User, name: string, create: boolea
     .get();
   if (existing) return existing.id;
   if (!create) throw badRequest(`Unknown category ${wanted} (pass create_category: true to create it)`);
-  const max = d.db.select({ p: sql<number>`coalesce(max(${categories.position}), -1)` }).from(categories).where(eq(categories.userId, user.id)).get()!.p;
+  const max = d.db
+    .select({ p: sql<number>`coalesce(max(${categories.position}), -1)` })
+    .from(categories)
+    .where(eq(categories.userId, user.id))
+    .get()!.p;
   const id = newId("cat");
-  d.db.insert(categories).values({ id, userId: user.id, name: wanted, color: "zinc", pinned: false, position: max + 1, createdAt: d.now() }).run();
+  d.db
+    .insert(categories)
+    .values({ id, userId: user.id, name: wanted, color: "zinc", pinned: false, position: max + 1, createdAt: d.now() })
+    .run();
   d.bus.publish(user.id, { type: "category.changed" });
   return id;
 }

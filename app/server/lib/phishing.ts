@@ -1,7 +1,20 @@
 /** Heuristics flagging mail that may impersonate the site an address was created for. */
 import { baseDomain, hostOf, senderDomain } from "./senders.js";
 
-const HOMOGLYPHS: Record<string, string> = { "0": "o", "1": "l", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b", "@": "a", $: "s", rn: "m", vv: "w", cl: "d" };
+const HOMOGLYPHS: Record<string, string> = {
+  "0": "o",
+  "1": "l",
+  "3": "e",
+  "4": "a",
+  "5": "s",
+  "7": "t",
+  "8": "b",
+  "@": "a",
+  $: "s",
+  rn: "m",
+  vv: "w",
+  cl: "d",
+};
 
 /** Normalises common look-alike characters so "paypa1" and "paypal" compare equal. */
 export function skeleton(s: string): string {
@@ -40,7 +53,11 @@ export function isLookalike(siteUrl: string | null, sender: string | null): bool
 export type AuthWarning = "auth_failed" | "lookalike" | null;
 
 /** "auth_failed" when DMARC fails (or SPF and DKIM both fail), "lookalike" for an imitation of the site's domain. */
-export function authWarning(siteUrl: string | null, sender: string | null, auth: { spf: string | null; dkim: string | null; dmarc: string | null }): AuthWarning {
+export function authWarning(
+  siteUrl: string | null,
+  sender: string | null,
+  auth: { spf: string | null; dkim: string | null; dmarc: string | null },
+): AuthWarning {
   if (isLookalike(siteUrl, sender)) return "lookalike";
   const bad = (v: string | null) => v === "fail" || v === "softfail" || v === "permerror";
   if (bad(auth.dmarc) || (bad(auth.spf) && bad(auth.dkim))) return "auth_failed";

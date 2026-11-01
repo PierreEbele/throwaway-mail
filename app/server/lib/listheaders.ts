@@ -17,6 +17,13 @@ export function listInfo(headers: Array<{ key: string; value: string }>): ListIn
   const mailto = targets.find((t) => /^mailto:/i.test(t)) ?? null;
   const oneClick = !!url && /list-unsubscribe=one-click/i.test(get("list-unsubscribe-post") ?? "");
   const precedence = (get("precedence") ?? "").toLowerCase();
-  const bulk = !!lu || !!get("list-id") || precedence === "bulk" || precedence === "list" || !!get("x-campaign") || !!get("x-mailchimp-campaign") || /bulk|marketing/i.test(get("x-ms-exchange-organization-scl") ?? "");
+  const bulk =
+    !!lu ||
+    !!get("list-id") ||
+    precedence === "bulk" ||
+    precedence === "list" ||
+    !!get("x-campaign") ||
+    !!get("x-mailchimp-campaign") ||
+    /bulk|marketing/i.test(get("x-ms-exchange-organization-scl") ?? "");
   return { url, mailto, oneClick, bulk };
 }

@@ -6,6 +6,7 @@ import { OidcService } from "./auth/oidc.js";
 import { EventBus } from "./services/events.js";
 import { LlmFallbackStrategy } from "./parser/index.js";
 import type { Logger } from "./logger.js";
+import { dnsResolver } from "./lib/outbound.js";
 
 export function buildDeps(config: Config, logger: Logger, overrides: Partial<Deps> = {}): Deps {
   const db = overrides.db ?? openDatabase(config.databasePath, config.MIGRATIONS_DIR);
@@ -26,6 +27,7 @@ export function buildDeps(config: Config, logger: Logger, overrides: Partial<Dep
     now: () => Date.now(),
     oidc: new OidcService(config, logger),
     fetch: (input, init) => fetch(input, init),
+    resolve: dnsResolver,
     ...overrides,
   };
 }

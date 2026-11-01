@@ -7,7 +7,8 @@ async function setup() {
   await addDomain(admin, "mail.example.test");
   const user = loginAs(t, "u@example.org");
   t.deps.fetch = (async () => new Response("ok")) as typeof fetch;
-  const mk = async (extra: Record<string, unknown> = {}) => (await user.post("/v1/addresses", { site_name: "Shop", site_url: "shop.com", ...extra })).json.address;
+  const mk = async (extra: Record<string, unknown> = {}) =>
+    (await user.post("/v1/addresses", { site_name: "Shop", site_url: "shop.com", ...extra })).json.address;
   return { t, user, mk };
 }
 
@@ -17,7 +18,10 @@ describe("address protections", () => {
     const a = await mk();
     await user.patch(`/v1/addresses/${a.id}`, { site_lock: true });
     expect((await ingest(t, a.email, simpleEml({ text: "hi", from: "news@shop.com" }))).json.action).toBe("store_only");
-    expect((await ingest(t, a.email, simpleEml({ text: "win", from: "x@casino.biz" }))).json).toMatchObject({ action: "reject", reason: "sender_not_site" });
+    expect((await ingest(t, a.email, simpleEml({ text: "win", from: "x@casino.biz" }))).json).toMatchObject({
+      action: "reject",
+      reason: "sender_not_site",
+    });
     const after = (await user.get(`/v1/addresses/${a.id}`)).json.address;
     expect(after.leak.sender).toBe("x@casino.biz");
     expect(after.message_count).toBe(1);
@@ -127,7 +131,12 @@ describe("directories", () => {
     expect((await ingest(t, "dory.amazon.fr@mail.example.test", simpleEml({ text: "welcome" }))).json.action).toBe("store_only");
     const list = (await user.get("/v1/addresses")).json.addresses;
     expect(list).toHaveLength(1);
-    expect(list[0]).toMatchObject({ email: "dory.amazon.fr@mail.example.test", site_name: "amazon.fr", site_url: "https://amazon.fr", category_id: shops.id });
+    expect(list[0]).toMatchObject({
+      email: "dory.amazon.fr@mail.example.test",
+      site_name: "amazon.fr",
+      site_url: "https://amazon.fr",
+      category_id: shops.id,
+    });
     await ingest(t, "dory.amazon.fr@mail.example.test", simpleEml({ text: "again" }));
     expect((await user.get("/v1/addresses")).json.addresses[0].message_count).toBe(2);
     expect((await ingest(t, "nobody.site@mail.example.test", simpleEml({ text: "x" }))).json.action).toBe("reject");

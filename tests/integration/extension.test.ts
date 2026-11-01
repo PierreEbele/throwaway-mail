@@ -9,7 +9,9 @@ function loadClient(t: ReturnType<typeof makeTestApp>, store: Record<string, unk
   const sandbox: Record<string, unknown> = {
     URL,
     URLSearchParams,
-    browser: { storage: { local: { get: async (keys: string[]) => Object.fromEntries(keys.filter((k) => k in store).map((k) => [k, store[k]])) } } },
+    browser: {
+      storage: { local: { get: async (keys: string[]) => Object.fromEntries(keys.filter((k) => k in store).map((k) => [k, store[k]])) } },
+    },
     fetch: (url: string, init: RequestInit) => {
       const u = new URL(url);
       expect(u.origin).toBe("https://mail.example.test");

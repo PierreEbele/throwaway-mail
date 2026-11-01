@@ -51,7 +51,12 @@ export function parseMessage(input: ParseInput): ParseResult {
   const best = candidates[0] && candidates[0].score >= CODE_THRESHOLD ? candidates[0] : null;
   const alternatives = candidates.filter((c) => c !== best && c.score >= ALTERNATIVE_THRESHOLD).slice(0, 4);
   const links = extractLinks({ text: input.text ?? (input.html ? null : text), html: input.html }).slice(0, 5);
-  return { code: best ? toParsed(best) : null, alternatives: alternatives.map(toParsed), links: links.map(toLink), strategy: "deterministic" };
+  return {
+    code: best ? toParsed(best) : null,
+    alternatives: alternatives.map(toParsed),
+    links: links.map(toLink),
+    strategy: "deterministic",
+  };
 }
 
 /** Pluggable strategy (e.g. LLM fallback). Called only when the deterministic parser found no code. */

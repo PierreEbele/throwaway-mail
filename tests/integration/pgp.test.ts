@@ -33,7 +33,9 @@ describe("PGP-encrypted forwarding", () => {
     const { t, admin, d, a } = await setup();
     const { publicKey, privateKey } = await keypair();
     await admin.patch(`/v1/destinations/${d.id}`, { pgp_public_key: publicKey, pgp_hide_subject: true });
-    const res = (await ingest(t, a.email, simpleEml({ subject: "Secret stuff", text: "Your code is 777888", from: "Shop <news@shop.com>" }))).json;
+    const res = (
+      await ingest(t, a.email, simpleEml({ subject: "Secret stuff", text: "Your code is 777888", from: "Shop <news@shop.com>" }))
+    ).json;
     expect(res.forward_to).toBeUndefined();
     expect(res.send).toHaveLength(1);
     const mime = Buffer.from(res.send[0].raw_base64, "base64").toString("utf8");
@@ -54,13 +56,22 @@ describe("PGP-encrypted forwarding", () => {
 
     // The Worker sends it through the binding
     const sent: Array<[string, string, string]> = [];
-    const msg: EmailMessageLike = { from: "x@y", to: a.email, rawSize: 1, raw: new Response("x").body!, setReject() {}, async forward() {} };
+    const msg: EmailMessageLike = {
+      from: "x@y",
+      to: a.email,
+      rawSize: 1,
+      raw: new Response("x").body!,
+      setReject() {},
+      async forward() {},
+    };
     const answer = (async () => new Response(JSON.stringify(res))) as unknown as typeof fetch;
     const env = { APP_URL: "https://a", INGEST_SECRET: "s".repeat(20), SEND_EMAIL: { send: async (m: any) => void sent.push(m) } };
     expect(await handleEmail(msg, env, answer, (from, to, raw) => [from, to, raw])).toBe("forwarded");
     expect(sent[0]![0]).toBe(a.email);
     expect(sent[0]![2]).toContain("BEGIN PGP MESSAGE");
     // without the binding: stored, never forwarded in clear
-    expect(await handleEmail({ ...msg, raw: new Response("x").body! }, { APP_URL: "https://a", INGEST_SECRET: "s".repeat(20) }, answer)).toBe("stored");
+    expect(
+      await handleEmail({ ...msg, raw: new Response("x").body! }, { APP_URL: "https://a", INGEST_SECRET: "s".repeat(20) }, answer),
+    ).toBe("stored");
   });
 });

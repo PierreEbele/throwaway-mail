@@ -23,7 +23,11 @@ function dbBytes(deps: Deps) {
   return total;
 }
 
-const count = (deps: Deps, table: SQLiteTable) => deps.db.select({ n: sql<number>`count(*)` }).from(table).get()!.n;
+const count = (deps: Deps, table: SQLiteTable) =>
+  deps.db
+    .select({ n: sql<number>`count(*)` })
+    .from(table)
+    .get()!.n;
 
 export function healthSnapshot(deps: Deps) {
   const now = deps.now();
@@ -34,16 +38,30 @@ export function healthSnapshot(deps: Deps) {
       users: count(deps, users),
       addresses: count(deps, addresses),
       messages: count(deps, messages),
-      messages_24h: deps.db.select({ n: sql<number>`count(*)` }).from(messages).where(sql`${messages.receivedAt} > ${now - 86400_000}`).get()!.n,
+      messages_24h: deps.db
+        .select({ n: sql<number>`count(*)` })
+        .from(messages)
+        .where(sql`${messages.receivedAt} > ${now - 86400_000}`)
+        .get()!.n,
       leaks: count(deps, leakEvents),
       notify_targets: count(deps, notifyTargets),
-      notify_failing: deps.db.select({ n: sql<number>`count(*)` }).from(notifyTargets).where(sql`${notifyTargets.lastError} is not null`).get()!.n,
+      notify_failing: deps.db
+        .select({ n: sql<number>`count(*)` })
+        .from(notifyTargets)
+        .where(sql`${notifyTargets.lastError} is not null`)
+        .get()!.n,
     },
     domains: deps.db
       .select()
       .from(domains)
       .all()
-      .map((d) => ({ name: d.name, status: d.status, last_ingest_at: d.lastIngestAt, last_checked_at: d.lastCheckedAt, dns_missing: d.dnsMissingJson ? (JSON.parse(d.dnsMissingJson) as unknown[]).length : 0 })),
+      .map((d) => ({
+        name: d.name,
+        status: d.status,
+        last_ingest_at: d.lastIngestAt,
+        last_checked_at: d.lastCheckedAt,
+        dns_missing: d.dnsMissingJson ? (JSON.parse(d.dnsMissingJson) as unknown[]).length : 0,
+      })),
     ingest: metrics.ingest.entries().map(([l, v]) => ({ ...l, count: v })),
     http: metrics.http.entries().map(([l, v]) => ({ ...l, count: v })),
     jobs: Object.fromEntries(metrics.jobs),
@@ -59,12 +77,26 @@ export function healthGauges(deps: Deps) {
     { name: "throwaway_uptime_seconds", help: "Process uptime", value: h.uptime_s },
     { name: "throwaway_db_bytes", help: "SQLite database size (with WAL)", value: h.db_bytes },
     ...Object.entries(h.counts).map(([k, v]) => ({ name: "throwaway_rows", help: "Row counts", value: v, labels: { kind: k } })),
-    ...h.domains.map((d) => ({ name: "throwaway_domain_last_ingest_timestamp_seconds", help: "Last mail received per domain", value: Math.round((d.last_ingest_at ?? 0) / 1000), labels: { domain: d.name } })),
+    ...h.domains.map((d) => ({
+      name: "throwaway_domain_last_ingest_timestamp_seconds",
+      help: "Last mail received per domain",
+      value: Math.round((d.last_ingest_at ?? 0) / 1000),
+      labels: { domain: d.name },
+    })),
   ];
 }
 
 export function registerAdmin(r: ApiRouter) {
-  r.add({ method: "get", path: "/v1/admin/health", summary: "Instance health: database, domains, jobs, ingest counters", tags: ["admin"], auth: "admin" }, (c) => c.json(healthSnapshot(c.get("deps"))));
+  r.add(
+    {
+      method: "get",
+      path: "/v1/admin/health",
+      summary: "Instance health: database, domains, jobs, ingest counters",
+      tags: ["admin"],
+      auth: "admin",
+    },
+    (c) => c.json(healthSnapshot(c.get("deps"))),
+  );
 
   r.add({ method: "get", path: "/v1/admin/users", summary: "List users", tags: ["admin"], auth: "admin" }, (c) => {
     const rows = c.get("deps").db.select().from(users).orderBy(users.createdAt).all();
@@ -106,7 +138,15 @@ export function registerAdmin(r: ApiRouter) {
     (c, { query }) => {
       const rows = c.get("deps").db.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(query.limit).all();
       return c.json({
-        entries: rows.map((e) => ({ id: e.id, user_id: e.userId, action: e.action, target: e.target, meta: e.metaJson ? JSON.parse(e.metaJson) : null, ip: e.ip, created_at: e.createdAt })),
+        entries: rows.map((e) => ({
+          id: e.id,
+          user_id: e.userId,
+          action: e.action,
+          target: e.target,
+          meta: e.metaJson ? JSON.parse(e.metaJson) : null,
+          ip: e.ip,
+          created_at: e.createdAt,
+        })),
       });
     },
   );

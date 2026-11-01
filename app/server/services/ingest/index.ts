@@ -93,7 +93,11 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     return { action: "reject", reason: "promotional_blocked" };
   }
   const clean = email.html ? sanitizeEmail(email.html) : null;
-  const auth = { spf: authResult(email.headers, "spf"), dkim: authResult(email.headers, "dkim"), dmarc: authResult(email.headers, "dmarc") };
+  const auth = {
+    spf: authResult(email.headers, "spf"),
+    dkim: authResult(email.headers, "dkim"),
+    dmarc: authResult(email.headers, "dmarc"),
+  };
   const targets = preservedForward ? [preservedForward] : forwardTargets(deps, address);
   const forwardTo = targets.length ? targets.join(", ") : null;
   const now = deps.now();
@@ -173,7 +177,13 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     if (leak) recordLeak(tx, address, email.from!.address!.toLowerCase(), now);
   });
 
-  log.info("stored message", { message_id: id, address_id: address.id, size: input.raw.byteLength, has_code: !!parsed.code, action: forwardTo ? "forward" : "store_only" });
+  log.info("stored message", {
+    message_id: id,
+    address_id: address.id,
+    size: input.raw.byteLength,
+    has_code: !!parsed.code,
+    action: forwardTo ? "forward" : "store_only",
+  });
   log.debug("parsed", { message_id: id, code: parsed.code?.value, links: parsed.links.length });
 
   deps.bus.publish(address.userId, {
@@ -197,5 +207,7 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     at: now,
   });
 
-  return forwardTo ? { ...(await forwardDecision(deps, address, forwardTo, input.raw, email, rcpt.full)), message_id: id } : { action: "store_only", message_id: id };
+  return forwardTo
+    ? { ...(await forwardDecision(deps, address, forwardTo, input.raw, email, rcpt.full)), message_id: id }
+    : { action: "store_only", message_id: id };
 }
