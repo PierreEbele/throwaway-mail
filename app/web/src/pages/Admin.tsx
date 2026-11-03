@@ -1,4 +1,3 @@
-import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, patch, post } from "../api";
 import type { AuditEntry, Domain, Role, User } from "../types";
@@ -8,19 +7,13 @@ import { Badge, EmptyState, ErrorText, PageHeader, Spinner, confirmAction, useTo
 import { useDomains } from "./Addresses";
 import { fullDate, timeAgo } from "../util";
 
-const POLICY_HELP: Record<Domain["unknown_policy"], string> = {
-  reject: "Reject mail for addresses that do not exist",
-  inbox: "Keep it in your “Unassigned” inbox",
-  auto_create: "Create the address automatically (catch-all style)",
-};
+import { AddDomainForm, POLICY_HELP } from "./admin/AddDomainForm";
+import { MailboxPanel } from "./admin/MailboxPanel";
 
 export function DomainsPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const domains = useDomains();
-  const [name, setName] = useState("");
-  const [policy, setPolicy] = useState<Domain["unknown_policy"]>("reject");
-  const [ownerId, setOwnerId] = useState("");
   const usersQ = useQuery({ queryKey: ["admin-users"], queryFn: () => get<{ users: User[] }>("/v1/admin/users").then((r) => r.users) });
   const setOwner = useMutation({
     mutationFn: ({ id, owner }: { id: string; owner: string }) => patch(`/v1/domains/${id}`, { owner_id: owner }),
@@ -33,14 +26,6 @@ export function DomainsPage() {
   const inv = () => {
     qc.invalidateQueries({ queryKey: ["domains"] });
   };
-  const add = useMutation({
-    mutationFn: () => post<{ domain: Domain }>("/v1/domains", { name, unknown_policy: policy, owner_id: ownerId || undefined }),
-    onSuccess: (r) => {
-      setName("");
-      inv();
-      toast(`${r.domain.name}: ${r.domain.status}`, r.domain.status === "active" ? "success" : "info");
-    },
-  });
   const verify = useMutation({
     mutationFn: (id: string) => post<{ domain: Domain }>(`/v1/domains/${id}/verify`),
     onSuccess: (r) => {
@@ -68,66 +53,14 @@ export function DomainsPage() {
     <>
       <PageHeader
         title="Domains"
-        subtitle="Shared by all users. Adding a domain enables Cloudflare Email Routing and points its catch-all rule at the Worker."
+        subtitle="Shared by all users. Mail arrives through Cloudflare Email Routing (catch-all rule → Worker) or is polled from an IMAP catch-all mailbox and forwarded over SMTP."
       />
-      <form
-        className="card mb-6 grid gap-3 p-4 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-end"
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          add.mutate();
-        }}
-      >
-        <div>
-          <label htmlFor="dom-name" className="label">
-            Domain name
-          </label>
-          <input
-            id="dom-name"
-            required
-            className="input"
-            placeholder="mail.example.com"
-            value={name}
-            onChange={(e) => setName(e.target.value.trim().toLowerCase())}
-          />
-        </div>
-        <div>
-          <label htmlFor="dom-policy" className="label">
-            Unknown addresses
-          </label>
-          <select id="dom-policy" className="input" value={policy} onChange={(e) => setPolicy(e.target.value as Domain["unknown_policy"])}>
-            {Object.keys(POLICY_HELP).map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="dom-owner" className="label">
-            Owner
-          </label>
-          <select id="dom-owner" className="input" value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
-            <option value="">Me</option>
-            {usersQ.data?.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name ?? u.email}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button className="btn-primary" disabled={add.isPending}>
-          {add.isPending ? "Configuring Cloudflare…" : "Add domain"}
-        </button>
-        <p className="text-xs text-zinc-500 sm:col-span-4">
-          Unknown addresses: {POLICY_HELP[policy]}. The owner receives the domain's “To sort” box.
-        </p>
-        <div className="sm:col-span-4">
-          <ErrorText error={add.error} />
-        </div>
-      </form>
+      <AddDomainForm users={usersQ.data} />
       {domains.isLoading && <Spinner />}
       {domains.data?.length === 0 && (
-        <EmptyState title="No domains yet">Add the first domain above. Its DNS must already be on Cloudflare.</EmptyState>
+        <EmptyState title="No domains yet">
+          Add the first domain above: on Cloudflare, or with any provider offering a catch-all IMAP mailbox.
+        </EmptyState>
       )}
       <ul className="space-y-3">
         {domains.data?.map((d) => (
@@ -136,6 +69,7 @@ export function DomainsPage() {
               <div className="flex items-center gap-2">
                 <span className="font-mono font-medium">{d.name}</span>
                 <Badge value={d.status} />
+                {d.transport === "imap" && <span className="text-xs text-zinc-500">IMAP mailbox</span>}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <label className="sr-only" htmlFor={`own-${d.id}`}>
@@ -173,18 +107,21 @@ export function DomainsPage() {
                     </option>
                   ))}
                 </select>
-                <button
-                  className="btn-secondary"
-                  onClick={() => verify.mutate(d.id)}
-                  disabled={verify.isPending && verify.variables === d.id}
-                >
-                  Re-check
-                </button>
+                {d.transport === "cloudflare" && (
+                  <button
+                    className="btn-secondary"
+                    onClick={() => verify.mutate(d.id)}
+                    disabled={verify.isPending && verify.variables === d.id}
+                  >
+                    Re-check
+                  </button>
+                )}
                 <button
                   className="btn-ghost text-red-600"
                   onClick={() =>
-                    confirmAction(`Remove ${d.name}? Only possible when it has no addresses. Cloudflare settings are left untouched.`) &&
-                    remove.mutate(d.id)
+                    confirmAction(
+                      `Remove ${d.name}? Only possible when it has no addresses. ${d.transport === "imap" ? "Polling stops; the mailbox is left as it is." : "Cloudflare settings are left untouched."}`,
+                    ) && remove.mutate(d.id)
                   }
                 >
                   Remove
@@ -262,9 +199,13 @@ export function DomainsPage() {
                 </table>
               </div>
             )}
-            <p className="mt-2 text-xs text-zinc-500">
-              Zone {d.cf_zone_id ?? "—"} · last checked {timeAgo(d.last_checked_at)}
-            </p>
+            {d.mailbox ? (
+              <MailboxPanel domain={{ ...d, mailbox: d.mailbox }} />
+            ) : (
+              <p className="mt-2 text-xs text-zinc-500">
+                Zone {d.cf_zone_id ?? "—"} · last checked {timeAgo(d.last_checked_at)}
+              </p>
+            )}
           </li>
         ))}
       </ul>
@@ -394,7 +335,16 @@ interface Health {
   retention_days: number;
   metrics_enabled: boolean;
   counts: Record<string, number>;
-  domains: Array<{ name: string; status: string; last_ingest_at: number | null; last_checked_at: number | null; dns_missing: number }>;
+  domains: Array<{
+    name: string;
+    transport: "cloudflare" | "imap";
+    status: string;
+    last_ingest_at: number | null;
+    last_checked_at: number | null;
+    last_poll_at: number | null;
+    last_poll_error: string | null;
+    dns_missing: number;
+  }>;
   ingest: Array<{ action: string; reason: string; count: number }>;
   jobs: Record<string, { at: number; ok: boolean; detail: string }>;
 }
@@ -437,7 +387,7 @@ export function HealthPage() {
                   <th className="py-1">Domain</th>
                   <th>Status</th>
                   <th>Last mail</th>
-                  <th>Last DNS check</th>
+                  <th>Last check / poll</th>
                 </tr>
               </thead>
               <tbody>
@@ -452,11 +402,18 @@ export function HealthPage() {
                       </td>
                       <td
                         className={quiet ? "text-amber-700 dark:text-amber-400" : ""}
-                        title={quiet ? "No mail for 7 days: check MX records and the Worker" : undefined}
+                        title={
+                          quiet
+                            ? `No mail for 7 days: check ${d.transport === "imap" ? "the mailbox" : "MX records and the Worker"}`
+                            : undefined
+                        }
                       >
                         {timeAgo(d.last_ingest_at)}
                       </td>
-                      <td>{timeAgo(d.last_checked_at)}</td>
+                      <td>
+                        {d.transport === "imap" ? `poll ${timeAgo(d.last_poll_at)}` : timeAgo(d.last_checked_at)}
+                        {d.last_poll_error && <span className="ml-1 text-xs text-red-600">{d.last_poll_error}</span>}
+                      </td>
                     </tr>
                   );
                 })}
@@ -498,7 +455,8 @@ export function HealthPage() {
                 {Object.keys(h.jobs).length === 0 && <li className="text-zinc-500">No run yet.</li>}
               </ul>
               <p className="mt-3 text-xs text-zinc-500">
-                Retention: {h.retention_days ? `${h.retention_days} days` : "off"} · Cloudflare: {h.cloudflare} · Prometheus /metrics:{" "}
+                Retention: {h.retention_days ? `${h.retention_days} days` : "off"} · Cloudflare:{" "}
+                {h.cloudflare === "unconfigured" ? "not configured (IMAP domains only)" : h.cloudflare} · Prometheus /metrics:{" "}
                 {h.metrics_enabled ? "on" : "off (set METRICS_TOKEN)"}
               </p>
             </section>

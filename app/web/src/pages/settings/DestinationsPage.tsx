@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { del, patch, post } from "../../api";
 import type { Destination } from "../../types";
@@ -7,19 +8,32 @@ import { LockIcon } from "../../components/icons";
 import { invalidate } from "../../queries";
 import { timeAgo } from "../../util";
 import { useDestinations } from "../Addresses";
+import { useAuth } from "../../auth";
 
 export function DestinationsPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const dests = useDestinations();
+  const { cloudflareMode } = useAuth();
+  const [params] = useSearchParams();
+  const linkResult = params.get("verified");
   const [email, setEmail] = useState("");
+  // Without Cloudflare the app always sends the link itself; with it, the user may still choose to.
+  const [byApp, setByApp] = useState(false);
+  const appOnly = cloudflareMode === "unconfigured";
   const inv = () => invalidate(qc, ["destinations"]);
   const add = useMutation({
-    mutationFn: () => post("/v1/destinations", { email }),
-    onSuccess: () => {
+    mutationFn: () => post<{ destination: Destination }>("/v1/destinations", { email, verify_by: appOnly || byApp ? "app" : "cloudflare" }),
+    onSuccess: (r) => {
       setEmail("");
       inv();
-      toast("Cloudflare sent a verification e-mail to that address", "success");
+      if (!r.destination.last_error)
+        toast(
+          r.destination.verification === "app"
+            ? "Verification e-mail sent to that address"
+            : "Cloudflare sent a verification e-mail to that address",
+          "success",
+        );
     },
   });
   const action = useMutation({
@@ -35,8 +49,17 @@ export function DestinationsPage() {
     <>
       <PageHeader
         title="Destinations"
-        subtitle="Personal mailboxes that sites can forward to. Cloudflare must verify each one (click the link in the e-mail it sends)."
+        subtitle={`Personal mailboxes that sites can forward to. Each one must be verified: click the link in the e-mail ${appOnly ? "the app sends (valid 48 hours)" : "Cloudflare sends"}.`}
       />
+      {linkResult && (
+        <p
+          className={`card mb-4 p-3 text-sm ${linkResult === "1" ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+        >
+          {linkResult === "1"
+            ? "Destination verified: mail can now be forwarded to it."
+            : "This verification link is invalid, already used or expired (48 hours). Press Resend to get a new one."}
+        </p>
+      )}
       <form
         className="card mb-6 flex flex-wrap items-end gap-3 p-4"
         onSubmit={(e: FormEvent) => {
@@ -61,6 +84,12 @@ export function DestinationsPage() {
         <button className="btn-primary" disabled={add.isPending}>
           Add &amp; send verification
         </button>
+        {!appOnly && (
+          <label className="flex w-full items-center gap-2 text-xs text-zinc-500">
+            <input type="checkbox" checked={byApp} onChange={(e) => setByApp(e.target.checked)} />
+            Send the verification link from this app (through an IMAP domain's SMTP server) instead of Cloudflare
+          </label>
+        )}
         <div className="w-full">
           <ErrorText error={add.error} />
         </div>
@@ -77,16 +106,24 @@ export function DestinationsPage() {
                   <Badge value={d.verified ? "verified" : "unverified"} />
                 </div>
                 <p className="text-xs text-zinc-500">
-                  {d.verified ? `Verified ${timeAgo(d.verified_at)}` : "Waiting for you to click the Cloudflare verification link"}
+                  {d.verified
+                    ? `Verified ${timeAgo(d.verified_at)}`
+                    : d.verification === "app"
+                      ? d.verify_sent_at
+                        ? `Link sent ${timeAgo(d.verify_sent_at)}: click it within 48 hours`
+                        : "No verification link sent yet"
+                      : "Waiting for you to click the Cloudflare verification link"}
                 </p>
                 {d.last_error && <p className="text-xs text-red-600">{d.last_error}</p>}
                 <PgpRow d={d} />
               </div>
               {!d.verified && (
                 <>
-                  <button className="btn-secondary" onClick={() => action.mutate({ id: d.id, op: "refresh" })}>
-                    Check status
-                  </button>
+                  {d.verification === "cloudflare" && (
+                    <button className="btn-secondary" onClick={() => action.mutate({ id: d.id, op: "refresh" })}>
+                      Check status
+                    </button>
+                  )}
                   <button className="btn-secondary" onClick={() => action.mutate({ id: d.id, op: "resend" })}>
                     Resend
                   </button>
@@ -157,7 +194,8 @@ function PgpRow({ d }: { d: Destination }) {
             aria-label="OpenPGP public key"
           />
           <p className="text-zinc-500">
-            The Worker then sends an encrypted PGP/MIME copy instead of forwarding (needs the SEND_EMAIL binding, see docs/installation.md).
+            An encrypted PGP/MIME copy is sent instead of the plain forward (by the Worker's SEND_EMAIL binding, or over SMTP for IMAP
+            domains; see docs/installation.md).
           </p>
           <button className="btn-primary px-2 py-1 text-xs" disabled={!key.trim()} onClick={() => save({ pgp_public_key: key })}>
             Save key

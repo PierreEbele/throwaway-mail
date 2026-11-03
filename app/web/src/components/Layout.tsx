@@ -355,7 +355,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
       <div className="space-y-2 border-t border-zinc-200 px-4 py-3 dark:border-zinc-800">
         {cloudflareMode === "mock" && <p className="text-xs text-amber-700 dark:text-amber-400">Cloudflare mock mode</p>}
-        {cloudflareMode === "unconfigured" && <p className="text-xs text-red-600">Cloudflare not configured</p>}
+        {cloudflareMode === "unconfigured" && user?.role === "admin" && (
+          <p className="text-xs text-zinc-500">Cloudflare off: IMAP domains only</p>
+        )}
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-xs text-zinc-500" title={user?.email}>
             {user?.email}

@@ -118,8 +118,11 @@ export interface DnsRecord {
 export interface Domain {
   id: string;
   name: string;
+  transport: "cloudflare" | "imap";
   status: "pending" | "active" | "error";
   unknown_policy: "reject" | "inbox" | "auto_create";
+  mailbox?: Mailbox;
+  last_ingest_at?: number | null;
   cf_zone_id?: string | null;
   status_detail?: string | null;
   owner?: { id: string; name: string | null; email: string } | null;
@@ -129,6 +132,25 @@ export interface Domain {
   created_at?: number;
   last_checked_at?: number | null;
 }
+/** IMAP/SMTP settings of a mailbox domain; passwords are never returned. */
+export interface Mailbox {
+  imap_host: string;
+  imap_port: number;
+  imap_tls: boolean;
+  imap_user: string;
+  has_imap_password: boolean;
+  imap_folder: string;
+  imap_done_folder: string | null;
+  smtp_host: string | null;
+  smtp_port: number | null;
+  smtp_security: "tls" | "starttls" | "none" | null;
+  smtp_user: string | null;
+  has_smtp_password: boolean;
+  smtp_from: string | null;
+  poll_seconds: number;
+  last_poll_at: number | null;
+  last_poll_error: string | null;
+}
 export interface Destination {
   id: string;
   email: string;
@@ -137,6 +159,8 @@ export interface Destination {
   last_error: string | null;
   created_at: number;
   pgp: { fingerprint: string; hide_subject: boolean } | null;
+  verification: "cloudflare" | "app";
+  verify_sent_at: number | null;
 }
 export interface ApiKey {
   id: string;
