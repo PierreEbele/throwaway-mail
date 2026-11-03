@@ -12,11 +12,23 @@ export function openDatabase(file: string, migrationsFolder: string): DB {
   const sqlite = new Database(file);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("synchronous = NORMAL");
-  sqlite.pragma("foreign_keys = ON");
   sqlite.pragma("busy_timeout = 5000");
   const db = drizzle(sqlite, { schema }) as DB;
-  migrate(db, { migrationsFolder });
+  migrateSafely(sqlite, db, migrationsFolder);
+  sqlite.pragma("foreign_keys = ON");
   return db;
+}
+
+/**
+ * Runs migrations with foreign keys off. Drizzle rebuilds a table (create copy, drop, rename) to change a column,
+ * and its own "PRAGMA foreign_keys=OFF" has no effect inside the migration transaction: with keys on, dropping the
+ * old table would cascade-delete every row that references it. Integrity is checked before keys are turned back on.
+ */
+function migrateSafely(sqlite: Database.Database, db: DB, migrationsFolder: string) {
+  sqlite.pragma("foreign_keys = OFF");
+  migrate(db, { migrationsFolder });
+  const broken = sqlite.pragma("foreign_key_check") as unknown[];
+  if (broken.length) throw new Error(`Database migration left ${broken.length} broken foreign key reference(s)`);
 }
 
 export { schema };
