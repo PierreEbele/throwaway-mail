@@ -27,7 +27,9 @@ export function LoginPage() {
             Sign in with {ssoProvider}
           </a>
         ) : (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">Single sign-on is not configured on this server (OIDC_ISSUER / OIDC_CLIENT_SECRET).</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            Single sign-on is not configured on this server (OIDC_ISSUER / OIDC_CLIENT_SECRET).
+          </p>
         )}
         <p className="mt-4 text-xs text-zinc-500">Accounts come from {ssoProvider}. Admins are the members of its admin group.</p>
       </div>

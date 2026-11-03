@@ -1,0 +1,77 @@
+import { useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { post } from "../../api";
+import type { Address } from "../../types";
+import { ErrorText, Modal, confirmAction, useToast } from "../../components/ui";
+import { invalidate } from "../../queries";
+import { timeAgo } from "../../util";
+import { STALE_DAYS } from "./shared";
+
+/** Addresses that never received mail. */
+export function StaleDialog({ open, onClose, items }: { open: boolean; onClose: () => void; items: Address[] }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (open) setChecked(new Set(items.map((a) => a.id)));
+  }, [open, items]);
+  const act = useMutation({
+    mutationFn: (action: "archive" | "delete" | "keep") =>
+      post<{ affected: number }>("/v1/stale-addresses", { action, ids: [...checked], days: STALE_DAYS }).then((r) => ({ ...r, action })),
+    onSuccess: (r) => {
+      invalidate(qc, ["stale"], ["addresses"], ["categories"]);
+      toast(`${r.affected} address(es) ${r.action === "keep" ? "kept" : r.action === "archive" ? "archived" : "deleted"}`, "success");
+      onClose();
+    },
+  });
+  const toggle = (id: string) =>
+    setChecked((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  return (
+    <Modal open={open} onClose={onClose} title="Addresses that never received mail" wide>
+      <p className="mb-3 text-sm text-zinc-500">
+        Created more than {STALE_DAYS} days ago and still empty. Archiving rejects future mail but keeps the address; deleting frees it.
+        Pinned addresses are never listed.
+      </p>
+      <ul className="max-h-80 divide-y divide-zinc-200 overflow-auto rounded-md border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+        {items.map((a) => (
+          <li key={a.id}>
+            <label className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+              <input type="checkbox" checked={checked.has(a.id)} onChange={() => toggle(a.id)} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{a.site_name}</span>
+                <span className="block truncate font-mono text-xs text-zinc-500">{a.email}</span>
+              </span>
+              <span className="shrink-0 text-xs text-zinc-500">created {timeAgo(a.created_at)}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <ErrorText error={act.error} />
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
+        <button
+          className="btn-ghost"
+          disabled={!checked.size || act.isPending}
+          onClick={() => act.mutate("keep")}
+          title="Stop suggesting these"
+        >
+          Keep them
+        </button>
+        <button className="btn-secondary" disabled={!checked.size || act.isPending} onClick={() => act.mutate("archive")}>
+          Archive {checked.size}
+        </button>
+        <button
+          className="btn-danger"
+          disabled={!checked.size || act.isPending}
+          onClick={() => confirmAction(`Delete ${checked.size} address(es)? This cannot be undone.`) && act.mutate("delete")}
+        >
+          Delete {checked.size}
+        </button>
+      </div>
+    </Modal>
+  );
+}

@@ -7,8 +7,10 @@ import { AuthProvider, LiveEvents, useAuth } from "./auth";
 import { ToastProvider, Spinner } from "./components/ui";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/AuthPages";
-import { MailboxPage } from "./pages/Mailbox";
-import { AccountPage, DestinationsPage, KeysPage } from "./pages/Settings";
+import { MailboxPage } from "./pages/mailbox/MailboxPage";
+import { AccountPage } from "./pages/settings/AccountPage";
+import { DestinationsPage } from "./pages/settings/DestinationsPage";
+import { KeysPage } from "./pages/settings/KeysPage";
 import { AuditPage, DomainsPage, UsersPage, HealthPage } from "./pages/Admin";
 import { ReviewPage } from "./pages/Review";
 import { DigestPage } from "./pages/Digest";
@@ -39,18 +41,102 @@ function PublicOnly({ children }: { children: ReactNode }) {
 function App() {
   return (
     <Routes>
-      <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
-      <Route path="/" element={<Protected bare><MailboxPage /></Protected>} />
-      <Route path="/addresses/:id" element={<Protected bare><MailboxPage /></Protected>} />
-      <Route path="/review" element={<Protected><ReviewPage /></Protected>} />
-      <Route path="/digest" element={<Protected><DigestPage /></Protected>} />
-      <Route path="/destinations" element={<Protected><DestinationsPage /></Protected>} />
-      <Route path="/keys" element={<Protected><KeysPage /></Protected>} />
-      <Route path="/account" element={<Protected><AccountPage /></Protected>} />
-      <Route path="/admin/health" element={<Protected admin><HealthPage /></Protected>} />
-      <Route path="/admin/domains" element={<Protected admin><DomainsPage /></Protected>} />
-      <Route path="/admin/users" element={<Protected admin><UsersPage /></Protected>} />
-      <Route path="/admin/audit" element={<Protected admin><AuditPage /></Protected>} />
+      <Route
+        path="/login"
+        element={
+          <PublicOnly>
+            <LoginPage />
+          </PublicOnly>
+        }
+      />
+      <Route
+        path="/"
+        element={
+          <Protected bare>
+            <MailboxPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/addresses/:id"
+        element={
+          <Protected bare>
+            <MailboxPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/review"
+        element={
+          <Protected>
+            <ReviewPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/digest"
+        element={
+          <Protected>
+            <DigestPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/destinations"
+        element={
+          <Protected>
+            <DestinationsPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/keys"
+        element={
+          <Protected>
+            <KeysPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/account"
+        element={
+          <Protected>
+            <AccountPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/admin/health"
+        element={
+          <Protected admin>
+            <HealthPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/admin/domains"
+        element={
+          <Protected admin>
+            <DomainsPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/admin/users"
+        element={
+          <Protected admin>
+            <UsersPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/admin/audit"
+        element={
+          <Protected admin>
+            <AuditPage />
+          </Protected>
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

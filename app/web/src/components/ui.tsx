@@ -1,8 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { copyText } from "../util";
 
-/* ---------- Toasts ---------- */
-interface Toast { id: number; text: string; kind: "info" | "error" | "success" }
+// Toasts
+interface Toast {
+  id: number;
+  text: string;
+  kind: "info" | "error" | "success";
+}
 const ToastCtx = createContext<(text: string, kind?: Toast["kind"]) => void>(() => {});
 export const useToast = () => useContext(ToastCtx);
 
@@ -21,7 +25,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             className={`pointer-events-auto rounded-md px-4 py-2 text-sm shadow-lg ${
-              t.kind === "error" ? "bg-red-600 text-white" : t.kind === "success" ? "bg-emerald-600 text-white" : "bg-zinc-800 text-white dark:bg-zinc-700"
+              t.kind === "error"
+                ? "bg-red-600 text-white"
+                : t.kind === "success"
+                  ? "bg-emerald-600 text-white"
+                  : "bg-zinc-800 text-white dark:bg-zinc-700"
             }`}
           >
             {t.text}
@@ -32,8 +40,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/* ---------- Modal (native <dialog>: focus trap, Escape, backdrop) ---------- */
-export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
+// Modal (native <dialog>: focus trap, Escape, backdrop)
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  wide,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+  wide?: boolean;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const d = ref.current;
@@ -57,8 +77,12 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
       {open && (
         <div className="p-5">
           <div className="mb-4 flex items-start justify-between gap-4">
-            <h2 id="modal-title" className="text-lg font-semibold">{title}</h2>
-            <button className="btn-ghost -mt-1 -mr-2 px-2" onClick={onClose} aria-label="Close dialog">✕</button>
+            <h2 id="modal-title" className="text-lg font-semibold">
+              {title}
+            </h2>
+            <button className="btn-ghost -mt-1 -mr-2 px-2" onClick={onClose} aria-label="Close dialog">
+              ✕
+            </button>
           </div>
           {children}
         </div>
@@ -67,8 +91,18 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
   );
 }
 
-/* ---------- Small pieces ---------- */
-export function CopyButton({ text, label = "Copy", className = "btn-secondary", big }: { text: string; label?: string; className?: string; big?: boolean }) {
+// Small pieces
+export function CopyButton({
+  text,
+  label = "Copy",
+  className = "btn-secondary",
+  big,
+}: {
+  text: string;
+  label?: string;
+  className?: string;
+  big?: boolean;
+}) {
   const [done, setDone] = useState(false);
   return (
     <button
@@ -123,7 +157,19 @@ export function Badge({ value, children }: { value: string; children?: ReactNode
   return <span className={`badge ${STATUS_STYLES[value] ?? STATUS_STYLES.archived}`}>{children ?? value}</span>;
 }
 
-export function Toggle({ checked, onChange, label, disabled, id }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean; id?: string }) {
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  disabled,
+  id,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  disabled?: boolean;
+  id?: string;
+}) {
   return (
     <button
       id={id}
@@ -137,7 +183,9 @@ export function Toggle({ checked, onChange, label, disabled, id }: { checked: bo
         checked ? "bg-zinc-900 dark:bg-zinc-100" : "bg-zinc-300 dark:bg-zinc-700"
       }`}
     >
-      <span className={`inline-block size-5 rounded-full bg-white shadow dark:bg-zinc-900 transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
+      <span
+        className={`inline-block size-5 rounded-full bg-white shadow dark:bg-zinc-900 transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`}
+      />
     </button>
   );
 }

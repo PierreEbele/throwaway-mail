@@ -5,7 +5,10 @@ import { del, patch, post } from "../api";
 import { useToast } from "./ui";
 import { useAuth } from "../auth";
 import { useReviewCount } from "../pages/Review";
-import { ADDRESS_DRAG_TYPE, CATEGORY_DRAG_TYPE, CategoryDialog, DOT, PinIcon, folderHref, useCategories, useSavedSearches } from "../pages/Mailbox";
+import { ADDRESS_DRAG_TYPE, CATEGORY_DRAG_TYPE, DOT, folderHref, useCategories, useSavedSearches } from "../pages/mailbox/shared";
+import { CategoryDialog } from "../pages/mailbox/CategoryDialog";
+import { PinIcon } from "./icons";
+import { invalidate } from "../queries";
 import type { Category } from "../types";
 
 function ThemeToggle() {
@@ -27,13 +30,24 @@ function ThemeToggle() {
 
 const itemCls = (active: boolean) =>
   `group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-zinc-100 ${
-    active ? "bg-zinc-200/70 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50" : "text-zinc-600 hover:bg-zinc-200/40 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+    active
+      ? "bg-zinc-200/70 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+      : "text-zinc-600 hover:bg-zinc-200/40 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
   }`;
 const navCls = ({ isActive }: { isActive: boolean }) => itemCls(isActive);
 
 function Icon({ d }: { d: string }) {
   return (
-    <svg viewBox="0 0 24 24" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      viewBox="0 0 24 24"
+      className="size-4 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <path d={d} />
     </svg>
   );
@@ -55,7 +69,16 @@ const ICONS = {
 
 function EyeIcon({ off }: { off?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      className="size-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
       <circle cx="12" cy="12" r="3" />
       {off && <path d="M3 3l18 18" />}
@@ -64,14 +87,39 @@ function EyeIcon({ off }: { off?: boolean }) {
 }
 
 function Folder({
-  to, active, icon, label, count, unread, pinned, dimmed, onDropAddress, categoryId, onDropCategory, children,
+  to,
+  active,
+  icon,
+  label,
+  count,
+  unread,
+  pinned,
+  dimmed,
+  onDropAddress,
+  categoryId,
+  onDropCategory,
+  children,
 }: {
-  to: string; active: boolean; icon?: ReactNode; label: string; count?: number; unread?: number; pinned?: boolean; dimmed?: boolean;
-  onDropAddress?: (ids: string[]) => void; categoryId?: string; onDropCategory?: (draggedId: string) => void; children?: ReactNode;
+  to: string;
+  active: boolean;
+  icon?: ReactNode;
+  label: string;
+  count?: number;
+  unread?: number;
+  pinned?: boolean;
+  dimmed?: boolean;
+  onDropAddress?: (ids: string[]) => void;
+  categoryId?: string;
+  onDropCategory?: (draggedId: string) => void;
+  children?: ReactNode;
 }) {
   const [over, setOver] = useState<"" | "address" | "category">("");
   const kind = (e: DragEvent) =>
-    onDropAddress && e.dataTransfer.types.includes(ADDRESS_DRAG_TYPE) ? "address" : onDropCategory && e.dataTransfer.types.includes(CATEGORY_DRAG_TYPE) ? "category" : "";
+    onDropAddress && e.dataTransfer.types.includes(ADDRESS_DRAG_TYPE)
+      ? "address"
+      : onDropCategory && e.dataTransfer.types.includes(CATEGORY_DRAG_TYPE)
+        ? "category"
+        : "";
   return (
     <div
       className={`group/f relative rounded-md ${over === "address" ? "ring-2 ring-zinc-900 dark:ring-zinc-100" : over === "category" ? "shadow-[inset_0_2px_0_0] shadow-zinc-900 dark:shadow-zinc-100" : ""}`}
@@ -95,15 +143,31 @@ function Folder({
       <Link
         to={to}
         draggable={!!categoryId}
-        onDragStart={categoryId ? (e) => { e.dataTransfer.setData(CATEGORY_DRAG_TYPE, categoryId); e.dataTransfer.effectAllowed = "move"; } : undefined}
+        onDragStart={
+          categoryId
+            ? (e) => {
+                e.dataTransfer.setData(CATEGORY_DRAG_TYPE, categoryId);
+                e.dataTransfer.effectAllowed = "move";
+              }
+            : undefined
+        }
         className={`${itemCls(active)} ${dimmed ? "opacity-50" : ""}`}
         aria-current={active ? "page" : undefined}
       >
         {icon}
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        {pinned && <span className="text-zinc-400" title="Pinned"><PinIcon filled className="size-3" /></span>}
+        {pinned && (
+          <span className="text-zinc-400" title="Pinned">
+            <PinIcon filled className="size-3" />
+          </span>
+        )}
         {unread ? (
-          <span className={`text-xs font-semibold tabular-nums text-zinc-900 dark:text-zinc-100 ${children ? "group-hover/f:invisible" : ""}`} title={`${unread} unread`}>{unread}</span>
+          <span
+            className={`text-xs font-semibold tabular-nums text-zinc-900 dark:text-zinc-100 ${children ? "group-hover/f:invisible" : ""}`}
+            title={`${unread} unread`}
+          >
+            {unread}
+          </span>
         ) : (
           !!count && <span className={`text-xs tabular-nums text-zinc-500 ${children ? "group-hover/f:invisible" : ""}`}>{count}</span>
         )}
@@ -123,11 +187,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const nav = useNavigate();
   const [editing, setEditing] = useState<Category | null | undefined>(undefined);
   const toast = useToast();
-  const refreshLists = () => {
-    qc.invalidateQueries({ queryKey: ["addresses"] });
-    qc.invalidateQueries({ queryKey: ["address"] });
-    qc.invalidateQueries({ queryKey: ["categories"] });
-  };
+  const refreshLists = () => invalidate(qc, ["addresses"], ["address"], ["categories"]);
   const moveTo = (cat: Category | null) => (ids: string[]) =>
     post("/v1/addresses/bulk", { ids, action: "move", category_id: cat?.id ?? null }).then(
       () => {
@@ -159,7 +219,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col" onClick={(e) => (e.target as HTMLElement).closest("a") && onNavigate?.()}>
       <div className="flex items-center gap-2 px-4 pt-4 pb-3">
-        <span className="grid size-7 place-items-center rounded-md bg-zinc-900 font-mono text-sm font-bold text-white dark:bg-zinc-100 dark:text-zinc-900">@</span>
+        <span className="grid size-7 place-items-center rounded-md bg-zinc-900 font-mono text-sm font-bold text-white dark:bg-zinc-100 dark:text-zinc-900">
+          @
+        </span>
         <span className="font-semibold tracking-tight">Throwaway Mail</span>
       </div>
       <nav aria-label="Mailbox" className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
@@ -169,7 +231,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <NavLink to="/review" className={navCls}>
             <Icon d={ICONS.sort} />
             <span className="flex-1">To sort</span>
-            <span className="rounded-full bg-zinc-900 px-1.5 text-[11px] font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">{review.data!.count}</span>
+            <span className="rounded-full bg-zinc-900 px-1.5 text-[11px] font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">
+              {review.data!.count}
+            </span>
           </NavLink>
         )}
         <Folder to={folderHref("archived")} active={isFolder("archived")} icon={<Icon d={ICONS.archive} />} label="Archived" />
@@ -180,7 +244,12 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
         <div className="flex items-center justify-between px-2.5 pt-5 pb-1">
           <span className="text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Categories</span>
-          <button className="rounded px-1 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100" onClick={() => setEditing(null)} aria-label="New category" title="New category">
+          <button
+            className="rounded px-1 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+            onClick={() => setEditing(null)}
+            aria-label="New category"
+            title="New category"
+          >
             +
           </button>
         </div>
@@ -217,9 +286,18 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             </button>
           </Folder>
         ))}
-        <Folder to={folderHref("none")} active={isFolder("none")} icon={<Icon d={ICONS.none} />} label="No category" onDropAddress={moveTo(null)} />
+        <Folder
+          to={folderHref("none")}
+          active={isFolder("none")}
+          icon={<Icon d={ICONS.none} />}
+          label="No category"
+          onDropAddress={moveTo(null)}
+        />
         {cats.length === 0 && (
-          <button className="px-2.5 py-1 text-left text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" onClick={() => setEditing(null)}>
+          <button
+            className="px-2.5 py-1 text-left text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+            onClick={() => setEditing(null)}
+          >
             Group addresses: create a category
           </button>
         )}
@@ -228,7 +306,13 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <>
             <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Smart folders</p>
             {searches.data!.map((x) => (
-              <Folder key={x.id} to={folderHref(`smart:${x.id}`)} active={isFolder(`smart:${x.id}`)} icon={<Icon d={ICONS.search} />} label={x.name}>
+              <Folder
+                key={x.id}
+                to={folderHref(`smart:${x.id}`)}
+                active={isFolder(`smart:${x.id}`)}
+                icon={<Icon d={ICONS.search} />}
+                label={x.name}
+              >
                 <button
                   className="absolute top-1 right-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 opacity-0 group-hover/f:opacity-100 hover:bg-zinc-300/60 focus-visible:opacity-100 dark:hover:bg-zinc-700"
                   onClick={() => del(`/v1/saved-searches/${x.id}`).then(() => qc.invalidateQueries({ queryKey: ["saved-searches"] }))}
@@ -242,16 +326,30 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         )}
 
         <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Settings</p>
-        <NavLink to="/destinations" className={navCls}><Icon d={ICONS.dest} /> Destinations</NavLink>
-        <NavLink to="/keys" className={navCls}><Icon d={ICONS.key} /> API keys</NavLink>
-        <NavLink to="/account" className={navCls}><Icon d={ICONS.user} /> Account</NavLink>
+        <NavLink to="/destinations" className={navCls}>
+          <Icon d={ICONS.dest} /> Destinations
+        </NavLink>
+        <NavLink to="/keys" className={navCls}>
+          <Icon d={ICONS.key} /> API keys
+        </NavLink>
+        <NavLink to="/account" className={navCls}>
+          <Icon d={ICONS.user} /> Account
+        </NavLink>
         {user?.role === "admin" && (
           <>
             <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Admin</p>
-            <NavLink to="/admin/domains" className={navCls}><Icon d={ICONS.globe} /> Domains</NavLink>
-            <NavLink to="/admin/users" className={navCls}><Icon d={ICONS.users} /> Users</NavLink>
-            <NavLink to="/admin/audit" className={navCls}><Icon d={ICONS.log} /> Audit log</NavLink>
-            <NavLink to="/admin/health" className={navCls}><Icon d={ICONS.digest} /> Health</NavLink>
+            <NavLink to="/admin/domains" className={navCls}>
+              <Icon d={ICONS.globe} /> Domains
+            </NavLink>
+            <NavLink to="/admin/users" className={navCls}>
+              <Icon d={ICONS.users} /> Users
+            </NavLink>
+            <NavLink to="/admin/audit" className={navCls}>
+              <Icon d={ICONS.log} /> Audit log
+            </NavLink>
+            <NavLink to="/admin/health" className={navCls}>
+              <Icon d={ICONS.digest} /> Health
+            </NavLink>
           </>
         )}
       </nav>
@@ -259,12 +357,18 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         {cloudflareMode === "mock" && <p className="text-xs text-amber-700 dark:text-amber-400">Cloudflare mock mode</p>}
         {cloudflareMode === "unconfigured" && <p className="text-xs text-red-600">Cloudflare not configured</p>}
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-xs text-zinc-500" title={user?.email}>{user?.email}</span>
+          <span className="truncate text-xs text-zinc-500" title={user?.email}>
+            {user?.email}
+          </span>
           <ThemeToggle />
         </div>
         <div className="flex items-center justify-between text-xs">
-          <a href="/docs" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" target="_blank" rel="noreferrer">API docs ↗</a>
-          <button className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" onClick={logout}>Log out</button>
+          <a href="/docs" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" target="_blank" rel="noreferrer">
+            API docs ↗
+          </a>
+          <button className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" onClick={logout}>
+            Log out
+          </button>
         </div>
       </div>
       <CategoryDialog open={editing !== undefined} category={editing} onClose={() => setEditing(undefined)} />
@@ -277,7 +381,12 @@ export function Layout({ children, bare }: { children: ReactNode; bare?: boolean
   const [open, setOpen] = useState(false);
   return (
     <div className="flex h-dvh flex-col md:flex-row">
-      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2">Skip to content</a>
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2"
+      >
+        Skip to content
+      </a>
       <header className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2.5 md:hidden dark:border-zinc-800 dark:bg-zinc-950">
         <span className="font-semibold tracking-tight">Throwaway Mail</span>
         <button className="btn-ghost" aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen(!open)}>
@@ -285,7 +394,10 @@ export function Layout({ children, bare }: { children: ReactNode; bare?: boolean
         </button>
       </header>
       {open && (
-        <div id="mobile-nav" className="max-h-[70dvh] overflow-hidden border-b border-zinc-200 bg-zinc-50 md:hidden dark:border-zinc-800 dark:bg-zinc-950">
+        <div
+          id="mobile-nav"
+          className="max-h-[70dvh] overflow-hidden border-b border-zinc-200 bg-zinc-50 md:hidden dark:border-zinc-800 dark:bg-zinc-950"
+        >
           <Sidebar onNavigate={() => setOpen(false)} />
         </div>
       )}

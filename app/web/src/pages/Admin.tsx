@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, patch, post } from "../api";
 import type { AuditEntry, Domain, User } from "../types";
 import { useAuth } from "../auth";
-import { Badge, CopyButton, EmptyState, ErrorText, PageHeader, Spinner, confirmAction, useToast } from "../components/ui";
+import { Badge, EmptyState, ErrorText, PageHeader, Spinner, confirmAction, useToast } from "../components/ui";
 import { useDomains } from "./Addresses";
 import { fullDate, timeAgo } from "../util";
 
@@ -48,17 +48,27 @@ export function DomainsPage() {
     },
     onError: (e) => toast((e as Error).message, "error"),
   });
-  const setPolicyM = useMutation({ mutationFn: ({ id, p }: { id: string; p: string }) => patch(`/v1/domains/${id}`, { unknown_policy: p }), onSuccess: inv });
+  const setPolicyM = useMutation({
+    mutationFn: ({ id, p }: { id: string; p: string }) => patch(`/v1/domains/${id}`, { unknown_policy: p }),
+    onSuccess: inv,
+  });
   const setForwardUnknown = useMutation({
     mutationFn: ({ id, on }: { id: string; on: boolean }) => patch(`/v1/domains/${id}`, { forward_unknown: on }),
     onSuccess: inv,
     onError: (e) => toast((e as Error).message, "error"),
   });
-  const remove = useMutation({ mutationFn: (id: string) => del(`/v1/domains/${id}`), onSuccess: inv, onError: (e) => toast((e as Error).message, "error") });
+  const remove = useMutation({
+    mutationFn: (id: string) => del(`/v1/domains/${id}`),
+    onSuccess: inv,
+    onError: (e) => toast((e as Error).message, "error"),
+  });
 
   return (
     <>
-      <PageHeader title="Domains" subtitle="Shared by all users. Adding a domain enables Cloudflare Email Routing and points its catch-all rule at the Worker." />
+      <PageHeader
+        title="Domains"
+        subtitle="Shared by all users. Adding a domain enables Cloudflare Email Routing and points its catch-all rule at the Worker."
+      />
       <form
         className="card mb-6 grid gap-3 p-4 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-end"
         onSubmit={(e: FormEvent) => {
@@ -67,28 +77,57 @@ export function DomainsPage() {
         }}
       >
         <div>
-          <label htmlFor="dom-name" className="label">Domain name</label>
-          <input id="dom-name" required className="input" placeholder="mail.example.com" value={name} onChange={(e) => setName(e.target.value.trim().toLowerCase())} />
+          <label htmlFor="dom-name" className="label">
+            Domain name
+          </label>
+          <input
+            id="dom-name"
+            required
+            className="input"
+            placeholder="mail.example.com"
+            value={name}
+            onChange={(e) => setName(e.target.value.trim().toLowerCase())}
+          />
         </div>
         <div>
-          <label htmlFor="dom-policy" className="label">Unknown addresses</label>
+          <label htmlFor="dom-policy" className="label">
+            Unknown addresses
+          </label>
           <select id="dom-policy" className="input" value={policy} onChange={(e) => setPolicy(e.target.value as Domain["unknown_policy"])}>
-            {Object.keys(POLICY_HELP).map((k) => <option key={k} value={k}>{k}</option>)}
+            {Object.keys(POLICY_HELP).map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
           </select>
         </div>
         <div>
-          <label htmlFor="dom-owner" className="label">Owner</label>
+          <label htmlFor="dom-owner" className="label">
+            Owner
+          </label>
           <select id="dom-owner" className="input" value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
             <option value="">Me</option>
-            {usersQ.data?.map((u) => <option key={u.id} value={u.id}>{u.name ?? u.email}</option>)}
+            {usersQ.data?.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name ?? u.email}
+              </option>
+            ))}
           </select>
         </div>
-        <button className="btn-primary" disabled={add.isPending}>{add.isPending ? "Configuring Cloudflare…" : "Add domain"}</button>
-        <p className="text-xs text-zinc-500 sm:col-span-4">Unknown addresses: {POLICY_HELP[policy]}. The owner receives the domain's “To sort” box.</p>
-        <div className="sm:col-span-4"><ErrorText error={add.error} /></div>
+        <button className="btn-primary" disabled={add.isPending}>
+          {add.isPending ? "Configuring Cloudflare…" : "Add domain"}
+        </button>
+        <p className="text-xs text-zinc-500 sm:col-span-4">
+          Unknown addresses: {POLICY_HELP[policy]}. The owner receives the domain's “To sort” box.
+        </p>
+        <div className="sm:col-span-4">
+          <ErrorText error={add.error} />
+        </div>
       </form>
       {domains.isLoading && <Spinner />}
-      {domains.data?.length === 0 && <EmptyState title="No domains yet">Add the first domain above. Its DNS must already be on Cloudflare.</EmptyState>}
+      {domains.data?.length === 0 && (
+        <EmptyState title="No domains yet">Add the first domain above. Its DNS must already be on Cloudflare.</EmptyState>
+      )}
       <ul className="space-y-3">
         {domains.data?.map((d) => (
           <li key={d.id} className="card p-4" data-testid={`domain-${d.name}`}>
@@ -98,64 +137,133 @@ export function DomainsPage() {
                 <Badge value={d.status} />
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <label className="sr-only" htmlFor={`own-${d.id}`}>Owner of {d.name}</label>
+                <label className="sr-only" htmlFor={`own-${d.id}`}>
+                  Owner of {d.name}
+                </label>
                 <select
                   id={`own-${d.id}`}
                   className="input w-auto"
                   value={d.owner?.id ?? ""}
                   onChange={(e) => {
                     const u = usersQ.data?.find((x) => x.id === e.target.value);
-                    if (u && confirmAction(`Give ${d.name} to ${u.name ?? u.email}? Its "To sort" box and the mail in it move to them.`)) setOwner.mutate({ id: d.id, owner: u.id });
+                    if (u && confirmAction(`Give ${d.name} to ${u.name ?? u.email}? Its "To sort" box and the mail in it move to them.`))
+                      setOwner.mutate({ id: d.id, owner: u.id });
                   }}
                 >
                   {!d.owner && <option value="">no owner</option>}
-                  {usersQ.data?.map((u) => <option key={u.id} value={u.id}>owner: {u.name ?? u.email}</option>)}
+                  {usersQ.data?.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      owner: {u.name ?? u.email}
+                    </option>
+                  ))}
                 </select>
-                <label className="sr-only" htmlFor={`pol-${d.id}`}>Unknown address policy for {d.name}</label>
-                <select id={`pol-${d.id}`} className="input w-auto" value={d.unknown_policy} onChange={(e) => setPolicyM.mutate({ id: d.id, p: e.target.value })}>
-                  {Object.keys(POLICY_HELP).map((k) => <option key={k} value={k}>unknown: {k}</option>)}
+                <label className="sr-only" htmlFor={`pol-${d.id}`}>
+                  Unknown address policy for {d.name}
+                </label>
+                <select
+                  id={`pol-${d.id}`}
+                  className="input w-auto"
+                  value={d.unknown_policy}
+                  onChange={(e) => setPolicyM.mutate({ id: d.id, p: e.target.value })}
+                >
+                  {Object.keys(POLICY_HELP).map((k) => (
+                    <option key={k} value={k}>
+                      unknown: {k}
+                    </option>
+                  ))}
                 </select>
-                <button className="btn-secondary" onClick={() => verify.mutate(d.id)} disabled={verify.isPending && verify.variables === d.id}>Re-check</button>
-                <button className="btn-ghost text-red-600" onClick={() => confirmAction(`Remove ${d.name}? Only possible when it has no addresses. Cloudflare settings are left untouched.`) && remove.mutate(d.id)}>Remove</button>
+                <button
+                  className="btn-secondary"
+                  onClick={() => verify.mutate(d.id)}
+                  disabled={verify.isPending && verify.variables === d.id}
+                >
+                  Re-check
+                </button>
+                <button
+                  className="btn-ghost text-red-600"
+                  onClick={() =>
+                    confirmAction(`Remove ${d.name}? Only possible when it has no addresses. Cloudflare settings are left untouched.`) &&
+                    remove.mutate(d.id)
+                  }
+                >
+                  Remove
+                </button>
               </div>
             </div>
-            {d.previous_catch_all && (() => {
-              const oldFwd = d.previous_catch_all.actions.find((a) => a.type === "forward")?.value?.[0];
-              return (
-                <div className="mt-2 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
-                  <p>
-                    Catch-all before the app: <strong>{d.previous_catch_all.actions.map((a) => `${a.type}${a.value ? " → " + a.value.join(", ") : ""}`).join("; ")}</strong>.
-                    {" "}It is restored if you remove the domain here.
-                  </p>
-                  {oldFwd && (
-                    <p className="mt-1 flex flex-wrap items-center gap-2">
-                      {d.catchall_forward_to ? (
-                        <>Unknown addresses are still forwarded to {d.catchall_forward_to} and listed under “To sort”.
-                          <button className="btn-ghost" onClick={() => confirmAction(`Stop forwarding unknown addresses to ${oldFwd}? The "${d.unknown_policy}" policy will apply instead.`) && setForwardUnknown.mutate({ id: d.id, on: false })}>Stop forwarding</button></>
-                      ) : (
-                        <>Unknown addresses follow the “{d.unknown_policy}” policy.
-                          <button className="btn-ghost" onClick={() => setForwardUnknown.mutate({ id: d.id, on: true })}>Forward them to {oldFwd} again</button></>
-                      )}
+            {d.previous_catch_all &&
+              (() => {
+                const oldFwd = d.previous_catch_all.actions.find((a) => a.type === "forward")?.value?.[0];
+                return (
+                  <div className="mt-2 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+                    <p>
+                      Catch-all before the app:{" "}
+                      <strong>
+                        {d.previous_catch_all.actions.map((a) => `${a.type}${a.value ? " → " + a.value.join(", ") : ""}`).join("; ")}
+                      </strong>
+                      . It is restored if you remove the domain here.
                     </p>
-                  )}
-                </div>
-              );
-            })()}
-            {d.status_detail && <p className={`mt-2 text-sm ${d.status === "error" ? "text-red-600 dark:text-red-400" : "text-zinc-600 dark:text-zinc-400"}`}>{d.status_detail}</p>}
+                    {oldFwd && (
+                      <p className="mt-1 flex flex-wrap items-center gap-2">
+                        {d.catchall_forward_to ? (
+                          <>
+                            Unknown addresses are still forwarded to {d.catchall_forward_to} and listed under “To sort”.
+                            <button
+                              className="btn-ghost"
+                              onClick={() =>
+                                confirmAction(
+                                  `Stop forwarding unknown addresses to ${oldFwd}? The "${d.unknown_policy}" policy will apply instead.`,
+                                ) && setForwardUnknown.mutate({ id: d.id, on: false })
+                              }
+                            >
+                              Stop forwarding
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            Unknown addresses follow the “{d.unknown_policy}” policy.
+                            <button className="btn-ghost" onClick={() => setForwardUnknown.mutate({ id: d.id, on: true })}>
+                              Forward them to {oldFwd} again
+                            </button>
+                          </>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+            {d.status_detail && (
+              <p className={`mt-2 text-sm ${d.status === "error" ? "text-red-600 dark:text-red-400" : "text-zinc-600 dark:text-zinc-400"}`}>
+                {d.status_detail}
+              </p>
+            )}
             {!!d.dns_missing?.length && (
               <div className="mt-3 overflow-x-auto">
                 <p className="mb-1 text-sm font-medium">Missing DNS records</p>
                 <table className="w-full font-mono text-xs">
-                  <thead className="text-left text-zinc-500"><tr><th className="pr-4">Type</th><th className="pr-4">Name</th><th className="pr-4">Content</th><th>Priority</th></tr></thead>
+                  <thead className="text-left text-zinc-500">
+                    <tr>
+                      <th className="pr-4">Type</th>
+                      <th className="pr-4">Name</th>
+                      <th className="pr-4">Content</th>
+                      <th>Priority</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {d.dns_missing.map((r, i) => (
-                      <tr key={i}><td className="pr-4">{r.type}</td><td className="pr-4">{r.name}</td><td className="pr-4 break-all">{r.content}</td><td>{r.priority ?? ""}</td></tr>
+                      <tr key={i}>
+                        <td className="pr-4">{r.type}</td>
+                        <td className="pr-4">{r.name}</td>
+                        <td className="pr-4 break-all">{r.content}</td>
+                        <td>{r.priority ?? ""}</td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-            <p className="mt-2 text-xs text-zinc-500">Zone {d.cf_zone_id ?? "—"} · last checked {timeAgo(d.last_checked_at)}</p>
+            <p className="mt-2 text-xs text-zinc-500">
+              Zone {d.cf_zone_id ?? "—"} · last checked {timeAgo(d.last_checked_at)}
+            </p>
           </li>
         ))}
       </ul>
@@ -186,14 +294,19 @@ export function UsersPage() {
           <li key={u.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
             <div className="min-w-0 flex-1">
               <div className="truncate">{u.name ?? u.email}</div>
-              <div className="truncate text-xs text-zinc-500">{u.email} · last sign-in {timeAgo(u.last_login_at)}</div>
+              <div className="truncate text-xs text-zinc-500">
+                {u.email} · last sign-in {timeAgo(u.last_login_at)}
+              </div>
             </div>
             <Badge value={u.role} />
             {u.disabled && <Badge value="disabled" />}
             {u.id !== me?.id && (
               <button
                 className="btn-ghost"
-                onClick={() => (u.disabled || confirmAction(`Disable ${u.email}? They are signed out and their API keys stop working.`)) && updateUser.mutate({ id: u.id, disabled: !u.disabled })}
+                onClick={() =>
+                  (u.disabled || confirmAction(`Disable ${u.email}? They are signed out and their API keys stop working.`)) &&
+                  updateUser.mutate({ id: u.id, disabled: !u.disabled })
+                }
               >
                 {u.disabled ? "Enable" : "Disable"}
               </button>
@@ -206,7 +319,10 @@ export function UsersPage() {
 }
 
 export function AuditPage() {
-  const log = useQuery({ queryKey: ["audit"], queryFn: () => get<{ entries: AuditEntry[] }>("/v1/admin/audit?limit=200").then((r) => r.entries) });
+  const log = useQuery({
+    queryKey: ["audit"],
+    queryFn: () => get<{ entries: AuditEntry[] }>("/v1/admin/audit?limit=200").then((r) => r.entries),
+  });
   return (
     <>
       <PageHeader title="Audit log" subtitle="Admin and security-relevant actions." />
@@ -214,7 +330,15 @@ export function AuditPage() {
       <ErrorText error={log.error} />
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="text-left text-xs text-zinc-500 uppercase"><tr><th className="px-4 py-2">When</th><th className="px-4 py-2">Action</th><th className="px-4 py-2">Target</th><th className="px-4 py-2">Details</th><th className="px-4 py-2">IP</th></tr></thead>
+          <thead className="text-left text-xs text-zinc-500 uppercase">
+            <tr>
+              <th className="px-4 py-2">When</th>
+              <th className="px-4 py-2">Action</th>
+              <th className="px-4 py-2">Target</th>
+              <th className="px-4 py-2">Details</th>
+              <th className="px-4 py-2">IP</th>
+            </tr>
+          </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {log.data?.map((e) => (
               <tr key={e.id}>
@@ -233,7 +357,11 @@ export function AuditPage() {
 }
 
 interface Health {
-  uptime_s: number; db_bytes: number; cloudflare: string; retention_days: number; metrics_enabled: boolean;
+  uptime_s: number;
+  db_bytes: number;
+  cloudflare: string;
+  retention_days: number;
+  metrics_enabled: boolean;
   counts: Record<string, number>;
   domains: Array<{ name: string; status: string; last_ingest_at: number | null; last_checked_at: number | null; dns_missing: number }>;
   ingest: Array<{ action: string; reason: string; count: number }>;
@@ -241,7 +369,8 @@ interface Health {
 }
 
 const bytes = (n: number) => (n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`);
-const duration = (s: number) => (s < 3600 ? `${Math.round(s / 60)} min` : s < 86400 ? `${Math.round(s / 3600)} h` : `${Math.round(s / 86400)} d`);
+const duration = (s: number) =>
+  s < 3600 ? `${Math.round(s / 60)} min` : s < 86400 ? `${Math.round(s / 3600)} h` : `${Math.round(s / 86400)} d`;
 
 export function HealthPage() {
   const q = useQuery({ queryKey: ["admin-health"], queryFn: () => get<Health>("/v1/admin/health"), refetchInterval: 30_000 });
@@ -272,15 +401,30 @@ export function HealthPage() {
           <section className="card p-5">
             <h2 className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">Domains</h2>
             <table className="mt-2 w-full text-sm">
-              <thead className="text-left text-xs text-zinc-500"><tr><th className="py-1">Domain</th><th>Status</th><th>Last mail</th><th>Last DNS check</th></tr></thead>
+              <thead className="text-left text-xs text-zinc-500">
+                <tr>
+                  <th className="py-1">Domain</th>
+                  <th>Status</th>
+                  <th>Last mail</th>
+                  <th>Last DNS check</th>
+                </tr>
+              </thead>
               <tbody>
                 {h.domains.map((d) => {
                   const quiet = !d.last_ingest_at || Date.now() - d.last_ingest_at > 7 * 86400_000;
                   return (
                     <tr key={d.name} className="border-t border-zinc-100 dark:border-zinc-800">
                       <td className="py-1.5 font-mono">{d.name}</td>
-                      <td><Badge value={d.status === "active" && d.dns_missing ? "error" : d.status} />{d.dns_missing ? <span className="ml-1 text-xs text-red-600">{d.dns_missing} DNS record(s) missing</span> : null}</td>
-                      <td className={quiet ? "text-amber-700 dark:text-amber-400" : ""} title={quiet ? "No mail for 7 days: check MX records and the Worker" : undefined}>{timeAgo(d.last_ingest_at)}</td>
+                      <td>
+                        <Badge value={d.status === "active" && d.dns_missing ? "error" : d.status} />
+                        {d.dns_missing ? <span className="ml-1 text-xs text-red-600">{d.dns_missing} DNS record(s) missing</span> : null}
+                      </td>
+                      <td
+                        className={quiet ? "text-amber-700 dark:text-amber-400" : ""}
+                        title={quiet ? "No mail for 7 days: check MX records and the Worker" : undefined}
+                      >
+                        {timeAgo(d.last_ingest_at)}
+                      </td>
                       <td>{timeAgo(d.last_checked_at)}</td>
                     </tr>
                   );
@@ -295,9 +439,17 @@ export function HealthPage() {
                 <p className="mt-2 text-sm text-zinc-500">No mail since the app started.</p>
               ) : (
                 <ul className="mt-2 space-y-1 text-sm">
-                  {[...h.ingest].sort((a, b) => b.count - a.count).map((x) => (
-                    <li key={`${x.action}-${x.reason}`} className="flex justify-between gap-2"><span>{x.action}{x.reason ? ` · ${x.reason}` : ""}</span><span className="tabular-nums">{x.count}</span></li>
-                  ))}
+                  {[...h.ingest]
+                    .sort((a, b) => b.count - a.count)
+                    .map((x) => (
+                      <li key={`${x.action}-${x.reason}`} className="flex justify-between gap-2">
+                        <span>
+                          {x.action}
+                          {x.reason ? ` · ${x.reason}` : ""}
+                        </span>
+                        <span className="tabular-nums">{x.count}</span>
+                      </li>
+                    ))}
                 </ul>
               )}
             </section>
@@ -307,13 +459,16 @@ export function HealthPage() {
                 {Object.entries(h.jobs).map(([name, j]) => (
                   <li key={name} className="flex flex-wrap justify-between gap-2">
                     <span>{name.replace("_", " ")}</span>
-                    <span className={j.ok ? "text-zinc-500" : "text-red-600"}>{j.ok ? "ok" : "failed"} · {timeAgo(j.at)} · {j.detail}</span>
+                    <span className={j.ok ? "text-zinc-500" : "text-red-600"}>
+                      {j.ok ? "ok" : "failed"} · {timeAgo(j.at)} · {j.detail}
+                    </span>
                   </li>
                 ))}
                 {Object.keys(h.jobs).length === 0 && <li className="text-zinc-500">No run yet.</li>}
               </ul>
               <p className="mt-3 text-xs text-zinc-500">
-                Retention: {h.retention_days ? `${h.retention_days} days` : "off"} · Cloudflare: {h.cloudflare} · Prometheus /metrics: {h.metrics_enabled ? "on" : "off (set METRICS_TOKEN)"}
+                Retention: {h.retention_days ? `${h.retention_days} days` : "off"} · Cloudflare: {h.cloudflare} · Prometheus /metrics:{" "}
+                {h.metrics_enabled ? "on" : "off (set METRICS_TOKEN)"}
               </p>
             </section>
           </div>

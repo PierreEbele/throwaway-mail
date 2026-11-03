@@ -9,7 +9,9 @@ import { timeAgo } from "../util";
 function List({ title, items, empty, extra }: { title: string; items: Address[]; empty: string; extra?: (a: Address) => string }) {
   return (
     <section className="card p-5" aria-label={title}>
-      <h2 className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">{title} <span className="tabular-nums">({items.length})</span></h2>
+      <h2 className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">
+        {title} <span className="tabular-nums">({items.length})</span>
+      </h2>
       {items.length === 0 ? (
         <p className="mt-2 text-sm text-zinc-500">{empty}</p>
       ) : (
@@ -36,7 +38,10 @@ function LeakHistory() {
   const block = (g: LeakGroup) =>
     confirmAction(`Block ${g.sender_domain} on the ${g.addresses.length} address(es) it wrote to?`) &&
     post<{ affected: number }>("/v1/leaks/block", { sender_domain: g.sender_domain }).then(
-      (r) => { qc.invalidateQueries(); toast(`${g.sender_domain} blocked on ${r.affected} address(es)`, "success"); },
+      (r) => {
+        qc.invalidateQueries();
+        toast(`${g.sender_domain} blocked on ${r.affected} address(es)`, "success");
+      },
       (e: Error) => toast(e.message, "error"),
     );
   return (
@@ -52,13 +57,23 @@ function LeakHistory() {
           {q.data.map((g) => (
             <li key={g.sender_domain} className="flex flex-wrap items-center gap-2 py-2">
               <span className="font-mono font-medium">{g.sender_domain}</span>
-              <span className="text-xs text-zinc-500">{g.count} mail(s) · last {timeAgo(g.last_at)}</span>
+              <span className="text-xs text-zinc-500">
+                {g.count} mail(s) · last {timeAgo(g.last_at)}
+              </span>
               <span className="flex flex-wrap gap-1">
                 {g.addresses.map((a) => (
-                  <Link key={a.id} to={`/addresses/${a.id}`} className="rounded bg-zinc-100 px-1.5 text-xs hover:underline dark:bg-zinc-800">{a.site_name}</Link>
+                  <Link
+                    key={a.id}
+                    to={`/addresses/${a.id}`}
+                    className="rounded bg-zinc-100 px-1.5 text-xs hover:underline dark:bg-zinc-800"
+                  >
+                    {a.site_name}
+                  </Link>
                 ))}
               </span>
-              <button className="btn-secondary ml-auto px-2 py-0.5 text-xs" onClick={() => block(g)}>Block everywhere</button>
+              <button className="btn-secondary ml-auto px-2 py-0.5 text-xs" onClick={() => block(g)}>
+                Block everywhere
+              </button>
             </li>
           ))}
         </ul>
@@ -111,10 +126,20 @@ export function DigestPage() {
               </ul>
             )}
           </section>
-          <List title="Expiring within 3 days" items={d.expiring} empty="No address about to expire." extra={(a) => new Date(a.expires_at!).toLocaleString()} />
+          <List
+            title="Expiring within 3 days"
+            items={d.expiring}
+            empty="No address about to expire."
+            extra={(a) => new Date(a.expires_at!).toLocaleString()}
+          />
           <List title="New addresses" items={d.created} empty="No address created in this period." extra={(a) => timeAgo(a.created_at)} />
           <LeakHistory />
-          <List title="Silent for 30+ days" items={d.silent} empty="Every address has received mail." extra={(a) => `created ${timeAgo(a.created_at)}`} />
+          <List
+            title="Silent for 30+ days"
+            items={d.silent}
+            empty="Every address has received mail."
+            extra={(a) => `created ${timeAgo(a.created_at)}`}
+          />
         </div>
       )}
     </>

@@ -33,11 +33,20 @@ export async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export function hostOf(url: string | null) {
+/**
+ * Host of a URL, or null when there is none.
+ * Default: `host` as written, falling back to the raw string when it does not parse.
+ * `bare`: hostname without a leading "www.", or null when it does not parse (used for site logos).
+ */
+export function hostOf(url: string | null, opts: { bare?: boolean } = {}) {
   if (!url) return null;
   try {
-    return new URL(url).host;
+    const u = new URL(url);
+    return opts.bare ? u.hostname.replace(/^www\./, "") : u.host;
   } catch {
-    return url;
+    return opts.bare ? null : url;
   }
 }
+
+/** localStorage flag enabling desktop notifications for new mail. */
+export const NOTIFY_KEY = "notify-new-mail";

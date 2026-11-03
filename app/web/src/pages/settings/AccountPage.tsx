@@ -1,0 +1,34 @@
+import { useAuth } from "../../auth";
+import { Badge, PageHeader } from "../../components/ui";
+import { fullDate } from "../../util";
+import { BackupCard } from "./BackupCard";
+import { DirectoriesCard } from "./DirectoriesCard";
+import { NotificationsCard } from "./NotificationsCard";
+import { PanicCard } from "./PanicCard";
+import { PushTargetsCard } from "./PushTargetsCard";
+
+export function AccountPage() {
+  const { user, ssoProvider } = useAuth();
+  return (
+    <>
+      <PageHeader title="Account" />
+      <div className="card max-w-xl space-y-2 p-5 text-sm">
+        <p>
+          Signed in as <strong>{user?.name ?? user?.email}</strong> ({user?.email}) <Badge value={user?.role ?? "user"} />
+        </p>
+        <p className="text-zinc-500">
+          Member since {fullDate(user?.created_at)} · last sign-in {fullDate(user?.last_login_at)}
+        </p>
+        <p className="text-zinc-500">
+          Your identity, password and two-factor settings are managed by {ssoProvider}. Your role here follows your {ssoProvider} groups and
+          is refreshed at every sign-in.
+        </p>
+      </div>
+      <NotificationsCard />
+      <PushTargetsCard />
+      <DirectoriesCard />
+      <PanicCard />
+      <BackupCard />
+    </>
+  );
+}
