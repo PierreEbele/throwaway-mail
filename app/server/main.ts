@@ -27,8 +27,8 @@ const logger = createLogger(config.LOG_LEVEL, { service: "throwaway-mail" });
 const deps = buildDeps(config, logger);
 const app = createApp(deps);
 
-if (!deps.oidc.enabled) logger.warn("Single sign-on is not configured (OIDC_ISSUER / OIDC_CLIENT_SECRET): nobody can log in");
-else
+if (config.localLoginEnabled) logger.info("local accounts enabled (e-mail + password)");
+if (deps.oidc.enabled)
   logger.info("single sign-on", {
     issuer: config.OIDC_ISSUER,
     client_id: config.OIDC_CLIENT_ID,

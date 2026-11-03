@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import type { Deps } from "../context.js";
 import { metrics } from "../services/metrics.js";
@@ -86,6 +86,13 @@ export function healthGauges(deps: Deps) {
   ];
 }
 
+const activeAdmins = (d: Deps) =>
+  d.db
+    .select({ n: sql<number>`count(*)` })
+    .from(users)
+    .where(and(eq(users.role, "admin"), eq(users.disabled, false)))
+    .get()!.n;
+
 export function registerAdmin(r: ApiRouter) {
   r.add(
     {
@@ -107,21 +114,30 @@ export function registerAdmin(r: ApiRouter) {
     {
       method: "patch",
       path: "/v1/admin/users/:id",
-      summary: "Disable or re-enable a user (roles come from the identity provider's groups)",
+      summary: "Disable or re-enable a user, or change the role of a local account (SSO roles come from IdP groups)",
       tags: ["admin"],
       auth: "admin",
-      body: z.object({ disabled: z.boolean() }),
+      body: z.object({ disabled: z.boolean().optional(), role: z.enum(["admin", "user"]).optional() }),
     },
     (c, { body }) => {
       const d = c.get("deps");
       const me = c.get("user")!;
       const id = c.req.param("id")!;
+      const ip = clientIp(c);
       const target = d.db.select().from(users).where(eq(users.id, id)).get();
       if (!target) throw notFound("User");
-      if (id === me.id && body.disabled) throw badRequest("You cannot disable yourself");
-      d.db.update(users).set({ disabled: body.disabled }).where(eq(users.id, id)).run();
-      if (body.disabled) d.db.delete(sessions).where(eq(sessions.userId, id)).run();
-      audit(d, me.id, body.disabled ? "user.disabled" : "user.enabled", id, undefined, clientIp(c));
+      if (body.disabled !== undefined) {
+        if (id === me.id && body.disabled) throw badRequest("You cannot disable yourself");
+        d.db.update(users).set({ disabled: body.disabled }).where(eq(users.id, id)).run();
+        if (body.disabled) d.db.delete(sessions).where(eq(sessions.userId, id)).run();
+        audit(d, me.id, body.disabled ? "user.disabled" : "user.enabled", id, undefined, ip);
+      }
+      if (body.role && body.role !== target.role) {
+        if (target.oidcSub !== null) throw badRequest("This user's role comes from the identity provider's groups");
+        if (body.role === "user" && activeAdmins(d) <= 1) throw badRequest("The last admin cannot be demoted");
+        d.db.update(users).set({ role: body.role }).where(eq(users.id, id)).run();
+        audit(d, me.id, "user.role_changed", id, { from: target.role, to: body.role }, ip);
+      }
       return c.json({ user: userOut(d.db.select().from(users).where(eq(users.id, id)).get()!) });
     },
   );

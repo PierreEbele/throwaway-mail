@@ -37,7 +37,7 @@ export class OidcService {
   ) {}
 
   get enabled() {
-    return !!(this.config.OIDC_ISSUER && this.config.OIDC_CLIENT_SECRET);
+    return this.config.oidcEnabled;
   }
 
   get providerName() {

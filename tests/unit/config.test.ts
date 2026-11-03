@@ -7,10 +7,12 @@ describe("config", () => {
     expect(c.OIDC_ISSUER).toBeUndefined();
     expect(c.RETENTION_DAYS).toBe(30);
   });
-  it("requires a real ingest secret and SSO settings in production; Cloudflare may come later", () => {
+  it("requires a real ingest secret and a login method in production; Cloudflare may come later", () => {
     const sso = { OIDC_ISSUER: "https://auth.example.test", OIDC_CLIENT_SECRET: "s".repeat(32) };
     expect(() => loadConfig({ NODE_ENV: "production", ...sso })).toThrow(/INGEST_SECRET/);
-    expect(() => loadConfig({ NODE_ENV: "production", INGEST_SECRET: "x".repeat(32) })).toThrow(/OIDC_ISSUER/);
+    const prod = { NODE_ENV: "production", INGEST_SECRET: "x".repeat(32) };
+    expect(() => loadConfig({ ...prod, LOCAL_LOGIN: "false" })).toThrow(/OIDC_ISSUER/);
+    expect(loadConfig(prod).localLoginEnabled).toBe(true);
     expect(() => loadConfig({ NODE_ENV: "production", INGEST_SECRET: "x".repeat(32), ...sso })).not.toThrow();
   });
   it("derives the SSO redirect URI and allowed groups", () => {

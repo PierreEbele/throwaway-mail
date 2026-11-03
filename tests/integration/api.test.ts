@@ -176,11 +176,14 @@ describe("auth", () => {
     expect((await admin.patch(`/v1/admin/users/${self.id}`, { disabled: true })).status).toBe(400);
   });
 
-  it("has no password, setup or invite endpoints (SSO only)", async () => {
-    const c = new Client(t);
-    for (const p of ["/v1/auth/login", "/v1/auth/setup", "/v1/auth/accept-invite", "/v1/auth/password", "/v1/admin/invites"]) {
+  it("has no password, setup or invite endpoints when local login is off", async () => {
+    // Discovery is lazy: an unreachable issuer is fine as long as nobody starts an SSO login.
+    const sso = makeTestApp({ OIDC_ISSUER: "http://127.0.0.1:9/", OIDC_CLIENT_SECRET: "x", LOCAL_LOGIN: "false" });
+    const c = new Client(sso);
+    for (const p of ["/v1/auth/login", "/v1/auth/setup", "/v1/auth/invite/abc", "/v1/auth/password", "/v1/admin/invites"]) {
       expect((await c.post(p, { email: "a@b.c", password: "x".repeat(12) })).status).toBe(404);
     }
+    expect((await c.get("/v1/auth/status")).json.local).toEqual({ enabled: false, setup_required: false });
   });
 });
 

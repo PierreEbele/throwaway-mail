@@ -7,6 +7,8 @@ export function userOut(u: User) {
     email: u.email,
     name: u.name,
     role: u.role,
+    /** "local": e-mail + password, role managed in the app; "sso": role follows identity-provider groups. */
+    auth: u.oidcSub === null ? ("local" as const) : ("sso" as const),
     disabled: u.disabled,
     created_at: u.createdAt,
     last_login_at: u.lastLoginAt,

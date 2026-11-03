@@ -11,6 +11,8 @@ import { RateLimiter } from "../auth/ratelimit.js";
 import type { SsoIdentity } from "../auth/oidc.js";
 import type { Deps } from "../context.js";
 import { audit } from "../services/audit.js";
+import { findUserByEmail, isLocalUser } from "../auth/invites.js";
+import { registerLocalAuth } from "./local-auth.js";
 import { userOut } from "../services/serialize.js";
 
 const STATE_COOKIE = "tm_oidc_state";
@@ -24,6 +26,15 @@ export function upsertSsoUser(deps: Deps, id: SsoIdentity, ip: string | null): U
   const role = id.groups.includes(cfg.OIDC_ADMIN_GROUP) ? ("admin" as const) : ("user" as const);
   const now = deps.now();
   const existing = deps.db.select().from(users).where(eq(users.oidcSub, id.sub)).get();
+  if (!existing) {
+    const local = findUserByEmail(deps, id.email);
+    if (local && isLocalUser(local))
+      throw new HttpError(
+        409,
+        "local_account_exists",
+        "A local account already uses this e-mail address: sign in with its password instead of single sign-on",
+      );
+  }
   if (existing) {
     if (existing.disabled) throw new HttpError(403, "account_disabled", "Your account is disabled in this app");
     deps.db.update(users).set({ email: id.email, name: id.name, role, lastLoginAt: now }).where(eq(users.id, existing.id)).run();
@@ -41,21 +52,53 @@ function loginRedirect(c: Ctx, code: string, message: string) {
   return c.redirect(`/login?${u}`, 302);
 }
 
-export function registerAuth(r: ApiRouter) {
+export type LoginLimit = (c: Ctx) => void;
+
+/** One per-IP budget shared by every login-like endpoint (SSO, password, setup, invites). */
+function loginLimiter(): LoginLimit {
   let limiter: RateLimiter | null = null;
-  const limit = (c: Ctx) => {
+  return (c) => {
     limiter ??= new RateLimiter(c.get("deps").config.LOGIN_RATE_LIMIT_PER_MINUTE);
-    const res = limiter.hit(`sso:${clientIp(c)}`);
+    const res = limiter.hit(`login:${clientIp(c)}`);
     if (!res.ok) {
       c.header("retry-after", String(res.retryAfter));
       throw new HttpError(429, "rate_limited", `Too many attempts, retry in ${res.retryAfter}s`);
     }
   };
+}
 
-  r.add({ method: "get", path: "/v1/auth/status", summary: "Login method and Cloudflare mode", tags: ["auth"], auth: "none" }, (c) => {
-    const d = c.get("deps");
-    return c.json({ sso: { enabled: d.oidc.enabled, provider: d.oidc.providerName }, cloudflare_mode: d.cf.mode });
+/** Opens a browser session for the user (session cookie) and records the sign-in. */
+export function signIn(c: Ctx, user: User) {
+  const d = c.get("deps");
+  const s = createSession(d, user.id);
+  d.db.update(users).set({ lastLoginAt: d.now() }).where(eq(users.id, user.id)).run();
+  setCookie(c, SESSION_COOKIE, s.token, {
+    httpOnly: true,
+    secure: d.config.cookieSecure,
+    sameSite: "Lax",
+    path: "/",
+    expires: new Date(s.expiresAt),
   });
+  return s;
+}
+
+const hasUsers = (d: Deps) => !!d.db.select({ id: users.id }).from(users).limit(1).get();
+
+/** Local accounts routes are only registered when local login is enabled (otherwise they 404). */
+export function registerAuth(r: ApiRouter, localLogin: boolean) {
+  const limit = loginLimiter();
+
+  r.add({ method: "get", path: "/v1/auth/status", summary: "Login methods and Cloudflare mode", tags: ["auth"], auth: "none" }, (c) => {
+    const d = c.get("deps");
+    const local = d.config.localLoginEnabled;
+    return c.json({
+      sso: { enabled: d.oidc.enabled, provider: d.oidc.providerName },
+      local: { enabled: local, setup_required: local && !hasUsers(d) },
+      cloudflare_mode: d.cf.mode,
+    });
+  });
+
+  if (localLogin) registerLocalAuth(r, limit);
 
   r.add(
     {
@@ -108,14 +151,7 @@ export function registerAuth(r: ApiRouter) {
       try {
         const { identity, returnTo } = await d.oidc.finish(url, browserState);
         const user = upsertSsoUser(d, identity, clientIp(c));
-        const s = createSession(d, user.id);
-        setCookie(c, SESSION_COOKIE, s.token, {
-          httpOnly: true,
-          secure: d.config.cookieSecure,
-          sameSite: "Lax",
-          path: "/",
-          expires: new Date(s.expiresAt),
-        });
+        signIn(c, user);
         d.logger.info("sso login", { user_id: user.id, role: user.role });
         return c.redirect(returnTo, 302);
       } catch (e) {

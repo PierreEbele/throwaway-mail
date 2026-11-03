@@ -15,6 +15,7 @@ import { RateLimiter } from "./auth/ratelimit.js";
 import { registerIngest } from "./routes/ingest.js";
 import { registerAuth } from "./routes/auth.js";
 import { registerAdmin } from "./routes/admin.js";
+import { registerInvites } from "./routes/invites.js";
 import { registerAddresses } from "./routes/addresses.js";
 import { registerMessages } from "./routes/messages.js";
 import { registerDomains } from "./routes/domains.js";
@@ -120,7 +121,7 @@ export function createApp(deps: Deps) {
   const limiter = new RateLimiter(deps.config.RATE_LIMIT_PER_MINUTE);
   app.use("/v1/*", authenticate, csrf, rateLimit(limiter, callerKey));
   const api = new ApiRouter(app);
-  registerAuth(api);
+  registerAuth(api, deps.config.localLoginEnabled);
   // Before registerAddresses: /v1/addresses/bulk must not be taken for /v1/addresses/:id.
   registerBulk(api);
   registerLifecycle(api);
@@ -142,6 +143,7 @@ export function createApp(deps: Deps) {
   registerDirectories(api);
   registerStale(api);
   registerAdmin(api);
+  if (deps.config.localLoginEnabled) registerInvites(api);
   // Site logo: an image, so outside the JSON router
   app.get("/v1/icons/:host", async (c) => {
     if (!c.get("user")) return c.json({ error: { code: "unauthorized", message: "Sign in first" } }, 401);
