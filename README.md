@@ -126,9 +126,9 @@ Deployed once; the app points every managed domain's catch-all rule at it.
 cd worker
 npm install
 npx wrangler login
-# edit wrangler.toml: APP_URL = "https://<APP_DOMAIN>", optionally FALLBACK_FORWARD
-npx wrangler secret put INGEST_SECRET      # same value as INGEST_SECRET in .env
-npx wrangler deploy
+cp wrangler.toml wrangler.local.toml       # git-ignored: put your real APP_URL / FALLBACK_FORWARD here
+npx wrangler secret put INGEST_SECRET -c wrangler.local.toml   # same value as INGEST_SECRET in .env
+npx wrangler deploy -c wrangler.local.toml
 ```
 
 - The Worker name (`name` in `wrangler.toml`, default `throwaway-mail-ingest`) must equal `WORKER_NAME` in `.env`.

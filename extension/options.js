@@ -81,7 +81,7 @@ $("clear").addEventListener("click", async () => {
   $("bitwarden-mode").checked = extra.bitwardenMode === true;
   $("identity-ttl").value = String(extra.identityTtlHours ?? 24);
   const cfg = await Throwaway.config();
-  $("server").value = cfg.server || "https://mail.example.com";
+  $("server").value = cfg.server || "";
   $("api-key").value = cfg.apiKey;
   if (cfg.server && cfg.apiKey) {
     try {
