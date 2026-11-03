@@ -1,14 +1,14 @@
 "use strict";
-// Script de fond : remplit une page avec une identité neuve + une adresse jetable,
-// et sert de relais réseau aux scripts de page (qui n'ont pas accès au serveur à cause du CORS).
-// Les adresses « en attente de code » sont gardées par site dans storage.local (tmPending)
-// pour survivre aux changements de page entre l'inscription et la saisie du code.
+// Background script: fills a page with a fresh identity + a disposable address,
+// and relays network requests for content scripts (which cannot reach the server because of CORS).
+// Addresses "waiting for a code" are kept per site in storage.local (tmPending)
+// to survive page changes between sign-up and code entry.
 
 const PENDING_MS = 15 * 60_000;
 const DEFAULT_TTL_HOURS = 24;
 
-// Les identités Fable se périment : passé le délai (réglages, 24 h par défaut, 0 = jamais),
-// l'identité courante (nom, mot de passe…) est effacée du stockage. L'adresse jetable reste sur le serveur.
+// Fake identities expire: after the delay (settings, 24 h by default, 0 = never),
+// the current identity (name, password…) is deleted from storage. The disposable address stays on the server.
 async function purgeExpired() {
   const {
     profile,
@@ -72,11 +72,11 @@ async function clearPending(host) {
   await browser.storage.local.set({ tmPending });
 }
 
-// Identité neuve (sauf champs verrouillés) + adresse jetable pour ce site, puis remplissage de l'onglet.
+// Fresh identity (except locked fields) + disposable address for this site, then fill the tab.
 async function fillNewIdentity(tabId, pageUrl) {
   const s = await settings();
   const host = new URL(pageUrl).hostname;
-  // Mode Bitwarden : l'e-mail et le mot de passe sont laissés à Bitwarden (qui les enregistre).
+  // Bitwarden mode: e-mail and password are left to Bitwarden (which saves them).
   const fields = s.bitwardenMode ? s.selectedFields.filter((k) => k !== "email" && k !== "password") : s.selectedFields;
   const keepPrevious = s.profile && (!s.alwaysNew || s.profile.throwaway?.host === host || (s.bitwardenMode && s.profile.site === host));
   let profile = keepPrevious ? s.profile : FableGenerator.generate(s.countryMode, s.profile, s.lockedFields);
@@ -115,9 +115,9 @@ browser.runtime.onMessage.addListener((msg, sender) => {
         };
       })();
     case "fill-new":
-      return fillNewIdentity(tabId, url).catch((e) => ({ error: e.status === 401 ? "Clé API Throwaway Mail invalide." : e.message }));
+      return fillNewIdentity(tabId, url).catch((e) => ({ error: e.status === 401 ? "Invalid Throwaway Mail API key." : e.message }));
     case "poll-code":
-      // Long polling court (20 s) : chaque message garde le script de fond éveillé.
+      // Short long polling (20 s): each message keeps the background script awake.
       return (async () => {
         const p = host && (await getPending(host));
         if (!p) return { done: true };
@@ -137,7 +137,7 @@ browser.runtime.onMessage.addListener((msg, sender) => {
         }
       })();
     case "adopt-email":
-      // Mode Bitwarden : l'adresse tapée/remplie dans la page est-elle une de nos adresses jetables ?
+      // Bitwarden mode: is the address typed/filled in the page one of our disposable addresses?
       return (async () => {
         const email = String(msg.email || "")
           .trim()
@@ -154,7 +154,7 @@ browser.runtime.onMessage.addListener((msg, sender) => {
         }
       })();
     case "site-code":
-      // Champ de code détecté sans attente en cours : dernier code (< 15 min) de l'adresse de ce site.
+      // Code field detected with no wait in progress: latest code (< 15 min) of this site's address.
       return (async () => {
         if (!host || !(await Throwaway.enabled()) || !(await settings()).autoCode) return { done: true };
         try {
@@ -187,8 +187,8 @@ browser.runtime.onMessage.addListener((msg, sender) => {
   return undefined;
 });
 
-// Adresse jetable de ce site : celle de l'identité courante, celle en attente de code, sinon celle
-// du serveur (site_name = hôte) ; si `create`, une nouvelle est créée en dernier recours.
+// This site's disposable address: the current identity's, the one waiting for a code, otherwise the
+// server's (site_name = host); if `create`, a new one is created as a last resort.
 async function addressForHost(host, pageUrl, create) {
   const { profile } = await browser.storage.local.get("profile");
   if (profile?.throwaway?.host === host) return profile.throwaway;
@@ -199,9 +199,9 @@ async function addressForHost(host, pageUrl, create) {
   return create ? Throwaway.createAddress(pageUrl, profile?.fullName) : null;
 }
 
-// ---------- Menu contextuel des champs éditables ----------
+// ---------- Context menu for editable fields ----------
 browser.menus.create(
-  { id: "tm-insert", title: "Générer une adresse Throwaway ici", contexts: ["editable"] },
+  { id: "tm-insert", title: "Generate a Throwaway address here", contexts: ["editable"] },
   () => void browser.runtime.lastError,
 );
 browser.menus.onClicked.addListener(async (info, tab) => {
@@ -209,7 +209,7 @@ browser.menus.onClicked.addListener(async (info, tab) => {
   const host = new URL(tab.url).hostname;
   let email;
   try {
-    if (!(await Throwaway.enabled())) throw new Error("Throwaway Mail n’est pas configuré (réglages de l’extension).");
+    if (!(await Throwaway.enabled())) throw new Error("Throwaway Mail is not configured (see the extension settings).");
     const a = await addressForHost(host, tab.url, true);
     email = a.email;
     if ((await settings()).autoCode) await setPending(host, a);
@@ -219,7 +219,7 @@ browser.menus.onClicked.addListener(async (info, tab) => {
       .executeScript({
         target: { tabId: tab.id, frameIds: [info.frameId ?? 0] },
         func: (m) => alert(m),
-        args: [e.status === 401 ? "Clé API Throwaway Mail invalide." : e.message],
+        args: [e.status === 401 ? "Invalid Throwaway Mail API key." : e.message],
       })
       .catch(() => {});
     return;
@@ -245,7 +245,7 @@ browser.menus.onClicked.addListener(async (info, tab) => {
   void updateBadge(tab.id);
 });
 
-// ---------- Badge : non lus (ou « ! » si fuite) de l'adresse du site actif ----------
+// ---------- Badge: unread count (or "!" on leak) of the active site's address ----------
 async function updateBadge(tabId) {
   const tab = await browser.tabs.get(tabId).catch(() => null);
   let text = "",
@@ -259,7 +259,7 @@ async function updateBadge(tabId) {
       } else if (a?.unread_count) text = a.unread_count > 99 ? "99+" : String(a.unread_count);
     }
   } catch {
-    /* serveur injoignable : badge vide */
+    /* server unreachable: empty badge */
   }
   await browser.action.setBadgeText({ tabId, text }).catch(() => {});
   if (text) await browser.action.setBadgeBackgroundColor({ tabId, color }).catch(() => {});
@@ -277,7 +277,7 @@ browser.alarms.onAlarm.addListener((a) => {
   if (a.name === "badge") void updateActiveBadge();
 });
 
-// À l'installation / mise à jour : sans accès aux sites, ouvrir les réglages pour le demander.
+// On install / update: without site access, open the settings to ask for it.
 browser.runtime.onInstalled.addListener(async () => {
   if (!(await browser.permissions.contains({ origins: ["http://*/*", "https://*/*"] }))) browser.runtime.openOptionsPage();
 });

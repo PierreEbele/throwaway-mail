@@ -25,7 +25,7 @@ function showPanel(name) {
 }
 $("tab-profile").addEventListener("click", () => showPanel("profile"));
 $("tab-card").addEventListener("click", () => showPanel("card"));
-for (const [key, name] of Object.entries(FableGenerator.banks)) $("card-bank").add(new Option(name + " (simulation)", key));
+for (const [key, name] of Object.entries(FableGenerator.banks)) $("card-bank").add(new Option(name + " (simulated)", key));
 function syncCardSettings() {
   const bankMode = $("card-mode").value === "bank-bin";
   $("card-network").querySelector('[value="visa"]').textContent = bankMode ? "Visa" : "CB / Visa";
@@ -43,7 +43,7 @@ for (const id of ["card-mode", "card-bank", "card-network"])
   $(id).addEventListener("change", async () => {
     cardSettingsTouched = true;
     syncCardSettings();
-    cardStatus("Choix appliqué à la prochaine carte de test.");
+    cardStatus("Applies to the next test card.");
     try {
       await browser.storage.local.set({
         cardMode: $("card-mode").value,
@@ -51,15 +51,15 @@ for (const id of ["card-mode", "card-bank", "card-network"])
         cardNetworkMode: $("card-network").value,
       });
     } catch {
-      cardStatus("Choix appliqué ; sa sauvegarde locale a échoué.", true);
+      cardStatus("Applied, but saving it locally failed.", true);
     }
   });
 function renderCard() {
   const bankMode = testCard.mode === "bank-bin";
-  $("card-mode-heading").textContent = bankMode ? "FRANCE · NUMÉRO SYNTHÉTIQUE" : "FRANCE · SANDBOX STRIPE";
+  $("card-mode-heading").textContent = bankMode ? "FRANCE · SYNTHETIC NUMBER" : "FRANCE · STRIPE SANDBOX";
   $("card-explanation").textContent = bankMode
-    ? "BIN attribué à la banque par BinCheck.org ; les autres chiffres sont générés avec une clé Luhn. Aucune carte n’est émise ni aucun compte créé. Numéro de maquette, non certifié par la banque et non fourni par Stripe pour son sandbox."
-    : "Numéros officiels de test Stripe, fixes selon le réseau. Le choix de banque est un libellé simulé : ces cartes ne sont pas émises par les banques indiquées et ne permettent aucun paiement réel.";
+    ? "BIN attributed to the bank by BinCheck.org; the other digits are generated with a Luhn check digit. No card is issued and no account is created. Mock-up number, not certified by the bank and not provided by Stripe for its sandbox."
+    : "Official Stripe test numbers, fixed per network. The bank is a simulated label: these cards are not issued by the banks shown and cannot make any real payment.";
   $("card-bin-info").hidden = !bankMode;
   $("card-bin-info").replaceChildren();
   if (bankMode) {
@@ -67,10 +67,10 @@ function renderCard() {
     source.href = testCard.binSource;
     source.target = "_blank";
     source.rel = "noopener noreferrer";
-    source.textContent = "Source BinCheck";
-    $("card-bin-info").append(`BIN ${testCard.bin} · ${testCard.binIssuer}. Relevé le ${testCard.binChecked || "2026-10-20"}. `, source);
+    source.textContent = "BinCheck source";
+    $("card-bin-info").append(`BIN ${testCard.bin} · ${testCard.binIssuer}. Checked on ${testCard.binChecked || "2026-10-20"}. `, source);
   }
-  $("card-bank-name").textContent = testCard.bank + " · simulée";
+  $("card-bank-name").textContent = testCard.bank + " · simulated";
   $("card-network-name").textContent = testCard.network + " · France";
   $("card-number").textContent = testCard.number.match(/.{4}/g).join(" ");
   $("card-holder").textContent = testCard.holder;
@@ -82,20 +82,20 @@ $("generate-card").addEventListener("click", async () => {
   if (busy) return;
   const generated = FableGenerator.generateCard($("card-bank").value, $("card-network").value, profile?.fullName, $("card-mode").value);
   if (!generated) {
-    cardStatus("Aucun BIN référencé pour cette combinaison banque/réseau. Choisissez un autre réseau.", true);
+    cardStatus("No known BIN for this bank/network combination. Pick another network.", true);
     return;
   }
   testCard = generated;
   renderCard();
   cardStatus(
     testCard.mode === "bank-bin"
-      ? "Numéro synthétique prêt, avec le BIN bancaire référencé. Réservé aux maquettes de formulaires."
-      : "Carte de test prête. Le numéro officiel reste fixe selon le réseau.",
+      ? "Synthetic number ready, with the listed bank BIN. For form mock-ups only."
+      : "Test card ready. The official number is fixed per network.",
   );
   try {
     await browser.storage.local.set({ testCard });
   } catch {
-    cardStatus("Carte prête ; sa sauvegarde locale a échoué.", true);
+    cardStatus("Card ready, but saving it locally failed.", true);
   }
 });
 for (const id of ["copy-card", "copy-card-number"])
@@ -105,23 +105,23 @@ for (const id of ["copy-card", "copy-card-number"])
       id === "copy-card-number"
         ? testCard.number
         : [
-            testCard.mode === "bank-bin" ? "CARTE SYNTHÉTIQUE — MAQUETTE, HORS SANDBOX STRIPE" : "CARTE DE TEST — SANDBOX STRIPE",
-            `Banque simulée : ${testCard.bank} (aucune émission réelle)`,
+            testCard.mode === "bank-bin" ? "SYNTHETIC CARD — MOCK-UP, NOT A STRIPE SANDBOX CARD" : "TEST CARD — STRIPE SANDBOX",
+            `Simulated bank: ${testCard.bank} (not actually issued)`,
             ...(testCard.mode === "bank-bin"
-              ? [`BIN référencé : ${testCard.bin}`, `Émetteur selon BinCheck : ${testCard.binIssuer}`, `Source : ${testCard.binSource}`]
+              ? [`Listed BIN: ${testCard.bin}`, `Issuer per BinCheck: ${testCard.binIssuer}`, `Source: ${testCard.binSource}`]
               : []),
-            `Réseau : ${testCard.network}`,
-            "Pays : France",
-            `Numéro : ${testCard.number}`,
-            `Titulaire fictif : ${testCard.holder}`,
-            `Expiration : ${testCard.expiry}`,
-            `CVC de test : ${testCard.cvc}`,
+            `Network: ${testCard.network}`,
+            "Country: France",
+            `Number: ${testCard.number}`,
+            `Fake holder: ${testCard.holder}`,
+            `Expiry: ${testCard.expiry}`,
+            `Test CVC: ${testCard.cvc}`,
           ].join("\n");
     try {
       await navigator.clipboard.writeText(text);
-      cardStatus(id === "copy-card-number" ? "Numéro de test copié." : "Carte de test copiée.");
+      cardStatus(id === "copy-card-number" ? "Test number copied." : "Test card copied.");
     } catch {
-      cardStatus("Copie indisponible. Vous pouvez copier les valeurs affichées manuellement.", true);
+      cardStatus("Copy unavailable. You can copy the displayed values by hand.", true);
     }
   });
 function status(message, error = false) {
@@ -140,9 +140,8 @@ function syncControls() {
   const countryLocked = !!profile && FableGenerator.isCountryLocked([...lockedFields]);
   $("country-mode").disabled = busy || countryLocked;
   $("country-hint").hidden = !countryLocked;
-  $("country-hint").textContent = countryLocked ? `Pays conservé : ${profile.country} (coordonnées verrouillées).` : "";
-  $("options-count").textContent =
-    `${selectedFields.size}/${fieldKeys.length} champs · ${lockedFields.size} verrou${lockedFields.size > 1 ? "s" : ""}`;
+  $("country-hint").textContent = countryLocked ? `Country kept: ${profile.country} (location details locked).` : "";
+  $("options-count").textContent = `${selectedFields.size}/${fieldKeys.length} fields · ${lockedFields.size} locked`;
   for (const key of fieldKeys) {
     const include = $("include-" + key),
       lock = $("lock-" + key);
@@ -150,16 +149,16 @@ function syncControls() {
     include.disabled = busy;
     lock.disabled = busy || !profile;
     lock.setAttribute("aria-pressed", String(lockedFields.has(key)));
-    lock.setAttribute("aria-label", `${lockedFields.has(key) ? "Déverrouiller" : "Verrouiller"} : ${fieldLabels[key]}`);
-    lock.textContent = lockedFields.has(key) ? "Fixé" : "Libre";
-    lock.title = lockedFields.has(key) ? "Valeur conservée lors de Générer" : "Verrouiller cette valeur lors de Générer";
+    lock.setAttribute("aria-label", `${lockedFields.has(key) ? "Unlock" : "Lock"}: ${fieldLabels[key]}`);
+    lock.textContent = lockedFields.has(key) ? "Locked" : "Free";
+    lock.title = lockedFields.has(key) ? "Value kept when generating" : "Keep this value when generating";
   }
 }
 async function saveSettings() {
   try {
     await browser.storage.local.set({ selectedFields: [...selectedFields], lockedFields: [...lockedFields], settingsVersion: 3 });
   } catch {
-    status("Réglages appliqués ; leur sauvegarde locale a échoué.", true);
+    status("Settings applied, but saving them locally failed.", true);
   }
 }
 for (const [key, label] of Object.entries(fieldLabels)) {
@@ -171,17 +170,13 @@ for (const [key, label] of Object.entries(fieldLabels)) {
   const include = document.createElement("input");
   include.type = "checkbox";
   include.id = "include-" + key;
-  include.setAttribute("aria-label", "Remplir : " + label);
+  include.setAttribute("aria-label", "Fill: " + label);
   include.addEventListener("change", () => {
     settingsTouched = true;
     if (include.checked) selectedFields.add(key);
     else selectedFields.delete(key);
     syncControls();
-    status(
-      selectedFields.size
-        ? `${selectedFields.size} information(s) sélectionnée(s) pour le remplissage.`
-        : "Cochez au moins une information à remplir.",
-    );
+    status(selectedFields.size ? `${selectedFields.size} field(s) selected for filling.` : "Tick at least one field to fill.");
     void saveSettings();
   });
   const lock = document.createElement("button");
@@ -194,7 +189,7 @@ for (const [key, label] of Object.entries(fieldLabels)) {
     if (lockedFields.has(key)) lockedFields.delete(key);
     else lockedFields.add(key);
     syncControls();
-    status(`${lockedFields.has(key) ? "Verrou activé" : "Verrou retiré"} pour « ${label} ».`);
+    status(`${lockedFields.has(key) ? "Locked" : "Unlocked"}: “${label}”.`);
     void saveSettings();
   });
   row.append(name, include, lock);
@@ -214,36 +209,36 @@ function render() {
   }))
     $(id).textContent = profile[key];
   $("avatar").textContent = profile.firstName[0] + profile.lastName[0];
-  $("edition").textContent = `Identité n° ${revision} · ${profile.country}`;
+  $("edition").textContent = `Identity #${revision} · ${profile.country}`;
   $("password").value = profile.password;
   $("birth-date").textContent = profile.birthDate.split("-").reverse().join("/");
   $("password").type = "password";
-  $("reveal-password").textContent = "Afficher";
+  $("reveal-password").textContent = "Show";
   $("reveal-password").setAttribute("aria-pressed", "false");
   syncControls();
 }
 $("reveal-password").addEventListener("click", () => {
   const show = $("password").type === "password";
   $("password").type = show ? "text" : "password";
-  $("reveal-password").textContent = show ? "Masquer" : "Afficher";
+  $("reveal-password").textContent = show ? "Hide" : "Show";
   $("reveal-password").setAttribute("aria-pressed", String(show));
 });
 $("country-mode").addEventListener("change", async () => {
   countryTouched = true;
   const countryMode = $("country-mode").value;
-  status("Pays choisi pour le prochain profil. Cliquez sur Générer.");
+  status("Country set for the next profile. Click New identity.");
   try {
     await browser.storage.local.set({ countryMode });
   } catch {
-    status("Choix appliqué ; sa sauvegarde locale a échoué.", true);
+    status("Applied, but saving it locally failed.", true);
   }
 });
 $("generate").addEventListener("click", async () => {
   if (profile && lockedFields.size === fieldKeys.length) {
-    status("Toutes les informations sont verrouillées. Passez au moins une valeur sur Libre pour la régénérer.");
+    status("Every field is locked. Set at least one value to Free to regenerate it.");
     return;
   }
-  // L'adresse jetable suit l'e-mail : conservée seulement si l'e-mail est verrouillé.
+  // The disposable address follows the e-mail: kept only if the e-mail is locked.
   const keptAlias = lockedFields.has("email") ? profile?.throwaway : undefined;
   profile = FableGenerator.generate($("country-mode").value, profile, [...lockedFields]);
   revision++;
@@ -251,25 +246,23 @@ $("generate").addEventListener("click", async () => {
   tmCode = null;
   void tmRender();
   render();
-  status(
-    lockedFields.size ? "Profil régénéré. Les valeurs verrouillées sont conservées." : "Nouveau profil prêt. La page n’a pas été modifiée.",
-  );
+  status(lockedFields.size ? "Profile regenerated. Locked values were kept." : "New profile ready. The page was not changed.");
   try {
     await browser.storage.local.set({ profile, revision });
   } catch {
-    status("Profil prêt ; sa sauvegarde locale a échoué.", true);
+    status("Profile ready, but saving it locally failed.", true);
   }
 });
 $("copy").addEventListener("click", async () => {
   if (!profile) return;
   const text = Object.entries(fieldLabels)
-    .map(([key, label]) => `${label} : ${key === "birthDate" ? profile[key].split("-").reverse().join("/") : profile[key]}`)
+    .map(([key, label]) => `${label}: ${key === "birthDate" ? profile[key].split("-").reverse().join("/") : profile[key]}`)
     .join("\n");
   try {
     await navigator.clipboard.writeText(text);
-    status("Profil copié dans le presse-papiers.");
+    status("Profile copied to the clipboard.");
   } catch {
-    status("Copie indisponible. Vous pouvez sélectionner les valeurs affichées et les copier manuellement.", true);
+    status("Copy unavailable. You can select the displayed values and copy them by hand.", true);
   }
 });
 async function activeTabId() {
@@ -281,7 +274,7 @@ $("fill").addEventListener("click", async () => {
   if (!selectedFields.size || busy) return;
   busy = true;
   syncControls();
-  status("Recherche des champs du formulaire…");
+  status("Looking for form fields…");
   try {
     if (!(await ensureIdentity())) return;
     const { bitwardenMode } = await browser.storage.local.get("bitwardenMode");
@@ -301,49 +294,42 @@ $("fill").addEventListener("click", async () => {
     });
     const report = results[0]?.result;
     if (!report) throw new Error("NO_RESULT");
-    // Mode Bitwarden : la page attend l'e-mail rempli par Bitwarden, puis le code.
+    // Bitwarden mode: the page waits for the e-mail filled by Bitwarden, then the code.
     if (bitwardenMode) await browser.tabs.sendMessage(tabId, { type: "watch-email" }).catch(() => {});
     if (report.filled && profile.throwaway) void handOffCode(tabId);
     const passwordNote =
       (report.passwordIssue === "preserved"
-        ? " Mots de passe conservés ensemble pour éviter une confirmation différente."
+        ? " Passwords kept together to avoid a mismatched confirmation."
         : report.passwordIssue === "constraints"
-          ? " Mot de passe incompatible avec les contraintes du site : aucun des deux champs modifié."
+          ? " Password does not meet the site’s rules: neither field was changed."
           : report.passwordIssue === "registration"
-            ? " Mot de passe ignoré : inscription non identifiée."
+            ? " Password skipped: not recognised as a sign-up."
             : "") +
       (report.birthIssue === "preserved"
-        ? " Date de naissance existante conservée ensemble."
+        ? " Existing birth date kept as a whole."
         : report.birthIssue === "constraints"
-          ? " Date de naissance incompatible avec les contraintes du site : ses champs sont conservés."
+          ? " Birth date does not meet the site’s rules: its fields were kept."
           : "");
     if (report.filled) {
       status(
-        `${report.filled} champ${report.filled > 1 ? "s" : ""} rempli${report.filled > 1 ? "s" : ""}.${report.preserved ? ` ${report.preserved} déjà renseigné(s), conservé(s).` : ""}${report.rejected ? ` ${report.rejected} valeur(s) incompatible(s).` : ""}${passwordNote} Aucun envoi déclenché par Fable.`,
+        `${report.filled} field${report.filled > 1 ? "s" : ""} filled.${report.preserved ? ` ${report.preserved} already filled, kept.` : ""}${report.rejected ? ` ${report.rejected} value(s) rejected.` : ""}${passwordNote} Nothing was submitted.`,
       );
     } else if (report.passwordIssue || report.birthIssue)
       status(
         passwordNote.trim(),
         report.passwordIssue === "constraints" || report.birthIssue === "constraints" || report.passwordIssue === "registration",
       );
-    else if (report.preserved) status("Les champs détectés sont déjà renseignés. Cochez l’option de remplacement pour les modifier.");
-    else if (report.unchanged) status("Les champs sélectionnés contiennent déjà les valeurs du profil.");
-    else if (report.rejected) status("Champs détectés, mais valeurs refusées par leurs contraintes. Aucun champ modifié.", true);
+    else if (report.preserved) status("The detected fields are already filled. Tick Overwrite existing to change them.");
+    else if (report.unchanged) status("The selected fields already hold the profile values.");
+    else if (report.rejected) status("Fields found, but their rules rejected the values. No field changed.", true);
     else if (report.blockedAuthentication)
-      status(
-        "Ce formulaire semble être une connexion ou une vérification de compte. Fable ignore ces formulaires et les mots de passe.",
-        true,
-      );
+      status("This looks like a sign-in or account verification form. Throwaway Mail skips those forms and their passwords.", true);
     else if (report.selectionMismatch)
-      status("Des champs sont reconnus, mais ils sont décochés dans Personnaliser. Cochez les informations à remplir.", true);
-    else
-      status(
-        "Aucun champ compatible avec votre sélection. Certains formulaires intégrés et composants personnalisés sont inaccessibles.",
-        true,
-      );
+      status("Some fields were recognised but are unticked in Fields to fill. Tick the ones to fill.", true);
+    else status("No field matches your selection. Some embedded forms and custom components cannot be reached.", true);
   } catch {
     status(
-      "Impossible d’accéder à cette page. Ouvrez une page web ordinaire puis réessayez. Firefox protège ses pages internes, sa boutique et certains PDF.",
+      "Cannot access this page. Open a regular web page and try again. Firefox protects its internal pages, its add-on store and some PDFs.",
       true,
     );
   } finally {
@@ -355,7 +341,7 @@ $("fill-card").addEventListener("click", async () => {
   if (!testCard || busy) return;
   busy = true;
   syncControls();
-  cardStatus("Recherche des champs de carte…");
+  cardStatus("Looking for card fields…");
   try {
     const tabId = await activeTabId();
     await browser.scripting.executeScript({ target: { tabId }, files: ["filler.js"] });
@@ -366,22 +352,18 @@ $("fill-card").addEventListener("click", async () => {
     });
     const report = results[0]?.result;
     if (!report) throw new Error("NO_RESULT");
-    if (report.invalidCard) cardStatus("Carte de test invalide ou expirée. Générez une nouvelle carte.", true);
-    else if (report.readOnlyGroup) cardStatus("Un champ de carte est protégé et contient une autre valeur. Aucun champ modifié.", true);
-    else if (report.preservedGroup) cardStatus("Valeurs existantes conservées ensemble. Cochez Remplacer pour insérer la carte de test.");
-    else if (report.incompatible) cardStatus("Les contraintes d’un champ refusent cette carte de test. Aucun champ modifié.", true);
+    if (report.invalidCard) cardStatus("Invalid or expired test card. Generate a new one.", true);
+    else if (report.readOnlyGroup) cardStatus("A card field is read-only and holds another value. No field changed.", true);
+    else if (report.preservedGroup) cardStatus("Existing values kept as a whole. Tick Overwrite existing to insert the test card.");
+    else if (report.incompatible) cardStatus("A field’s rules reject this test card. No field changed.", true);
     else if (report.filled)
       cardStatus(
-        `${report.filled} champ(s) de carte rempli(s).${report.missing?.length ? ` Non détecté(s) : ${report.missing.join(", ")}.` : ""}${report.rejected ? ` ${report.rejected} valeur(s) refusée(s) par le site.` : ""} Aucun clic ni envoi déclenché par Fable.`,
+        `${report.filled} card field(s) filled.${report.missing?.length ? ` Not found: ${report.missing.join(", ")}.` : ""}${report.rejected ? ` ${report.rejected} value(s) rejected by the site.` : ""} Nothing was clicked or submitted.`,
       );
-    else if (report.unchanged) cardStatus("Les champs détectés contiennent déjà cette carte de test.");
-    else
-      cardStatus(
-        "Aucun formulaire de carte reconnu. Les iframes d’un autre domaine et certains champs personnalisés sont inaccessibles.",
-        true,
-      );
+    else if (report.unchanged) cardStatus("The detected fields already hold this test card.");
+    else cardStatus("No card form recognised. Iframes from another domain and some custom fields cannot be reached.", true);
   } catch {
-    cardStatus("Impossible d’accéder à cette page. Ouvrez votre formulaire de test puis réessayez.", true);
+    cardStatus("Cannot access this page. Open your test form and try again.", true);
   } finally {
     busy = false;
     syncControls();
@@ -392,7 +374,7 @@ async function undoFill(cardMode = false) {
   const notify = cardMode ? cardStatus : status;
   busy = true;
   syncControls();
-  notify("Annulation du dernier remplissage…");
+  notify("Undoing the last fill…");
   try {
     const tabId = await activeTabId();
     const results = await browser.scripting.executeScript({
@@ -400,14 +382,14 @@ async function undoFill(cardMode = false) {
       func: () => globalThis.FableFill?.undo?.() || { available: false, restored: 0, skipped: 0, failed: 0 },
     });
     const report = results[0]?.result;
-    if (!report?.available) notify("Aucun remplissage à annuler sur cette page.");
+    if (!report?.available) notify("Nothing to undo on this page.");
     else
       notify(
-        `${report.restored} champ(s) restauré(s).${report.skipped ? ` ${report.skipped} champ(s) retouché(s) ou inaccessible(s), conservé(s).` : ""}${report.failed ? ` ${report.failed} restauration(s) refusée(s) par le site.` : ""}`,
+        `${report.restored} field(s) restored.${report.skipped ? ` ${report.skipped} field(s) edited since or unreachable, kept.` : ""}${report.failed ? ` ${report.failed} restore(s) rejected by the site.` : ""}`,
         !!report.failed,
       );
   } catch {
-    notify("Annulation impossible sur cette page. Le remplissage doit appartenir à l’onglet actif.", true);
+    notify("Cannot undo on this page. The fill must belong to the active tab.", true);
   } finally {
     busy = false;
     syncControls();
@@ -416,7 +398,7 @@ async function undoFill(cardMode = false) {
 $("undo").addEventListener("click", () => undoFill(false));
 $("undo-card").addEventListener("click", () => undoFill(true));
 // ---------------------------------------------------------------------------
-// Throwaway Mail : vraie adresse jetable par site + récupération du code reçu.
+// Throwaway Mail: a real disposable address per site + retrieval of the received code.
 // ---------------------------------------------------------------------------
 let tmCode = null;
 let tmWaiting = false;
@@ -428,16 +410,16 @@ async function tmRender() {
   const on = await Throwaway.enabled().catch(() => false);
   $("tm-badge").replaceChildren(document.createElement("i"), on ? " THROWAWAY" : " LOCAL");
   $("tm-badge").classList.toggle("on", on);
-  $("tm-badge").title = on ? "Adresses e-mail réelles via Throwaway Mail" : "Adresses @example.com, rien ne quitte le navigateur";
+  $("tm-badge").title = on ? "Real e-mail addresses via Throwaway Mail" : "@example.com addresses, nothing leaves the browser";
   const alias = profile?.throwaway;
   $("tm-email-note").hidden = !on;
-  $("tm-email-note").textContent = alias ? "JETABLE" : "JETABLE AU REMPLISSAGE";
+  $("tm-email-note").textContent = alias ? "DISPOSABLE" : "DISPOSABLE ON FILL";
   $("tm-panel").hidden = !(on && alias);
   if (alias) $("tm-address").textContent = alias.email;
   $("tm-code").textContent = tmCode?.code || "—";
   $("tm-copy").disabled = $("tm-paste").disabled = !tmCode?.code;
   $("tm-wait").disabled = tmWaiting || !alias;
-  $("tm-wait").textContent = tmWaiting ? "En attente…" : tmCode ? "Code suivant" : "Attendre le code";
+  $("tm-wait").textContent = tmWaiting ? "Waiting…" : tmCode ? "Next code" : "Wait for code";
   $("tm-link").hidden = !(tmCode && !tmCode.code && tmCode.links?.length);
   $("tm-link").replaceChildren();
   if (tmCode && !tmCode.code && tmCode.links?.length) {
@@ -445,7 +427,7 @@ async function tmRender() {
     a.href = tmCode.links[0].url || tmCode.links[0];
     a.target = "_blank";
     a.rel = "noopener noreferrer";
-    a.textContent = "Ouvrir le lien de confirmation";
+    a.textContent = "Open the confirmation link";
     $("tm-link").append(a);
   }
 }
@@ -453,18 +435,18 @@ async function activeTabUrl() {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   return tab?.url || "";
 }
-// Avant de remplir : crée (ou réutilise) l'adresse jetable du site ouvert.
-// Retourne false si le remplissage doit être interrompu.
+// Before filling: create (or reuse) the disposable address for the open site.
+// Returns false if the fill must be aborted.
 async function ensureAlias() {
   if (!selectedFields.has("email") || !(await Throwaway.enabled())) return true;
   const url = await activeTabUrl();
   if (!/^https?:/.test(url)) {
-    status("Ouvrez le formulaire d’un site web puis réessayez.", true);
+    status("Open a website’s form and try again.", true);
     return false;
   }
   const host = new URL(url).hostname;
   if (profile.throwaway?.host === host) return true;
-  status(`Création de l’adresse jetable pour ${host}…`);
+  status(`Creating a disposable address for ${host}…`);
   try {
     const alias = await Throwaway.createAddress(url, profile.fullName);
     profile = { ...profile, email: alias.email, throwaway: alias };
@@ -476,14 +458,14 @@ async function ensureAlias() {
   } catch (e) {
     status(
       e.status === 401
-        ? "Clé API Throwaway Mail invalide. Vérifiez les réglages."
-        : `Adresse jetable impossible : ${e.message}. Rien n’a été rempli.`,
+        ? "Invalid Throwaway Mail API key. Check the settings."
+        : `Could not create a disposable address: ${e.message}. Nothing was filled.`,
       true,
     );
     return false;
   }
 }
-// Nouvelle identité pour chaque nouveau site (réglage « alwaysNew », activé par défaut).
+// New identity for every new site ("alwaysNew" setting, on by default).
 async function ensureIdentity() {
   const { alwaysNew } = await browser.storage.local.get("alwaysNew");
   const url = await activeTabUrl();
@@ -501,14 +483,14 @@ async function ensureIdentity() {
   await browser.storage.local.set({ profile, revision });
   return true;
 }
-// Après un remplissage : le script de page attend le code et le colle tout seul,
-// même si la popup se ferme ou si le site change de page.
+// After a fill: the content script waits for the code and pastes it by itself,
+// even if the popup closes or the site moves to another page.
 async function handOffCode(tabId) {
   const { autoCode } = await browser.storage.local.get("autoCode");
   if (autoCode === false || !profile?.throwaway) return;
   await browser.runtime.sendMessage({ type: "pending-set", host: profile.throwaway.host, alias: profile.throwaway }).catch(() => {});
   await browser.tabs.sendMessage(tabId, { type: "watch-code" }).catch(() => {});
-  tmStatus("Le code sera collé automatiquement dans la page dès son arrivée.");
+  tmStatus("The code will be pasted into the page as soon as it arrives.");
 }
 async function tmPoll(wait) {
   const alias = profile?.throwaway;
@@ -516,7 +498,7 @@ async function tmPoll(wait) {
   const since = tmCode?.message_id || alias.createdAt;
   tmWaiting = wait > 0;
   void tmRender();
-  if (wait) tmStatus("En attente d’un e-mail (jusqu’à 2 min). Gardez cette fenêtre ouverte.");
+  if (wait) tmStatus("Waiting for an e-mail (up to 2 min). Keep this window open.");
   try {
     let found = null;
     for (let i = 0; i < (wait ? 2 : 1) && !found; i++) found = await Throwaway.waitForCode(alias.id, since, wait);
@@ -525,12 +507,12 @@ async function tmPoll(wait) {
       if (found.code && wait) setTimeout(() => $("tm-paste").click(), 0);
       tmStatus(
         found.code
-          ? `Reçu de ${found.from || "?"}${found.subject ? ` · « ${found.subject} »` : ""}.`
-          : "E-mail reçu sans code : lien de confirmation disponible.",
+          ? `From ${found.from || "?"}${found.subject ? ` · “${found.subject}”` : ""}.`
+          : "E-mail received without a code: confirmation link available.",
       );
-    } else if (wait) tmStatus("Rien reçu pour l’instant. Réessayez après avoir demandé le code au site.");
+    } else if (wait) tmStatus("Nothing yet. Try again after asking the site to send the code.");
   } catch (e) {
-    tmStatus(`Throwaway Mail injoignable : ${e.message}`, true);
+    tmStatus(`Throwaway Mail unreachable: ${e.message}`, true);
   } finally {
     tmWaiting = false;
     void tmRender();
@@ -540,9 +522,9 @@ $("tm-wait").addEventListener("click", () => tmPoll(55));
 $("tm-copy").addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(tmCode.code);
-    tmStatus("Code copié.");
+    tmStatus("Code copied.");
   } catch {
-    tmStatus("Copie indisponible.", true);
+    tmStatus("Copy unavailable.", true);
   }
 });
 $("tm-paste").addEventListener("click", async () => {
@@ -550,16 +532,14 @@ $("tm-paste").addEventListener("click", async () => {
     const tabId = await activeTabId();
     const [res] = await browser.scripting.executeScript({ target: { tabId }, func: fillCodeInPage, args: [tmCode.code] });
     tmStatus(
-      res?.result
-        ? `Code collé (${res.result} champ${res.result > 1 ? "s" : ""}). Aucun envoi déclenché.`
-        : "Aucun champ de code trouvé : utilisez Copier.",
+      res?.result ? `Code pasted (${res.result} field${res.result > 1 ? "s" : ""}). Nothing submitted.` : "No code field found: use Copy.",
       !res?.result,
     );
   } catch {
-    tmStatus("Impossible d’accéder à cette page. Utilisez Copier.", true);
+    tmStatus("Cannot access this page. Use Copy.", true);
   }
 });
-// Exécutée dans la page : champ one-time-code, champ focalisé ou cases d'un chiffre.
+// Runs in the page: one-time-code field, focused field or one-digit boxes.
 function fillCodeInPage(code) {
   const set = (el, v) => {
     const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -622,7 +602,7 @@ syncControls();
     if (!testCard && FableGenerator.isTestCard(saved.testCard)) {
       testCard = saved.testCard;
       renderCard();
-      cardStatus("Dernière carte de test retrouvée.");
+      cardStatus("Last test card restored.");
     }
     if (!countryTouched && ["random", "FR", "GB", "US"].includes(saved.countryMode)) $("country-mode").value = saved.countryMode;
     if (!settingsTouched) {
@@ -671,7 +651,7 @@ syncControls();
       }
       revision = saved.revision || 1;
       render();
-      status("Dernier profil retrouvé. Prêt à remplir un formulaire.");
+      status("Last profile restored. Ready to fill a form.");
       if (upgradedProfile) await browser.storage.local.set({ profile });
     }
     if (saved.settingsVersion !== 3) await saveSettings();
@@ -679,11 +659,11 @@ syncControls();
     await tmRender();
     if (profile?.throwaway && (await Throwaway.enabled())) void tmPoll(0);
   } catch {
-    status("Stockage local indisponible. Vous pouvez toujours générer un profil.", true);
+    status("Local storage unavailable. You can still generate a profile.", true);
   }
 })();
 
-// Firefox (MV3) n'accorde pas « tous les sites » à l'installation : on le demande (clic requis).
+// Firefox (MV3) does not grant "all sites" at install time: ask for it (needs a click).
 const ALL_SITES = { origins: ["http://*/*", "https://*/*"] };
 async function checkSitePermission() {
   const banner = document.getElementById("perm-banner");

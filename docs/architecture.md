@@ -33,7 +33,7 @@ app/web/src/           React + Vite + Tailwind + TanStack Query
   pages/address/       Address page: header, cards, banners, message view
   pages/settings/      Destinations, API keys, account cards
 worker/                Cloudflare Email Worker
-extension/             Firefox extension (fork of Fable)
+extension/             Throwaway Mail Firefox extension
 sdk/                   Node.js SDK (@throwaway-mail/sdk)
 tests/                 unit/, integration/ (real app, in-memory SQLite), sdk/, e2e/ (Playwright), fixtures/ (.eml)
 scripts/               simulate-mail, parse-eml, backup, fake-idp, pack-extension

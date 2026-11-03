@@ -42,16 +42,16 @@
     "Srisai",
   ];
   const fields = Object.freeze({
-    firstName: "Prénom",
-    lastName: "Nom",
-    address: "Adresse",
-    city: "Ville",
-    postalCode: "Code postal",
-    country: "Pays",
+    firstName: "First name",
+    lastName: "Last name",
+    address: "Address",
+    city: "City",
+    postalCode: "Postal code",
+    country: "Country",
     email: "E-mail",
-    phone: "Téléphone",
-    birthDate: "Date de naissance",
-    password: "Mot de passe",
+    phone: "Phone",
+    birthDate: "Birth date",
+    password: "Password",
   });
   const localFields = ["country", "address", "city", "postalCode", "phone"];
   const isCountryLocked = (locks) => localFields.some((key) => locks.includes(key));
@@ -64,7 +64,7 @@
       countryAliases: ["FR", "FRA", "France", "République française", "French Republic", "Frankreich", "Francia", "Frankrijk"],
     },
     GB: {
-      country: "Royaume-Uni",
+      country: "United Kingdom",
       countryEnglish: "United Kingdom",
       postalCode: "ZZ1 1ZZ",
       phoneCountryCode: "+44",
@@ -81,7 +81,7 @@
       ],
     },
     US: {
-      country: "États-Unis",
+      country: "United States",
       countryEnglish: "United States",
       postalCode: "00000",
       phoneCountryCode: "+1",
@@ -299,12 +299,12 @@
       firstName,
       lastName,
       fullName: `${firstName} ${lastName}`,
-      address: `${integer(900) + 100} ${fr ? "rue Fable-Démonstration" : "Fable Test Lane"} ${token.slice(0, 4).toUpperCase()}`,
+      address: `${integer(900) + 100} ${fr ? "rue de la Démonstration" : "Demo Test Lane"} ${token.slice(0, 4).toUpperCase()}`,
       address2: "",
       city: pick(
         fr
-          ? ["Exempleville-Fable", "Fable-sur-Test", "Démo-les-Fables", "Val-des-Exemples"]
-          : ["Examplebrook", "Fableton", "Mockhaven", "Demovale"],
+          ? ["Exempleville", "Test-sur-Démo", "Démo-les-Bains", "Val-des-Exemples"]
+          : ["Examplebrook", "Testford", "Mockhaven", "Demovale"],
       ),
       email: `${firstName}.${lastName}.${token}@example.com`.toLowerCase(),
       phone,
@@ -320,7 +320,7 @@
       }
     }
     profile.fullName = `${profile.firstName} ${profile.lastName}`;
-    profile.createdAt = Date.now(); // pour l'expiration automatique (background.js)
+    profile.createdAt = Date.now(); // for automatic expiry (background.js)
     return profile;
   }
   root.FableGenerator = {

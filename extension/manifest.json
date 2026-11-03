@@ -1,21 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "Fable × Throwaway Mail",
-  "version": "1.11.0",
-  "description": "Fork de Fable 1.7.0 : identités fictives + vraies adresses jetables Throwaway Mail, avec récupération du code de vérification.",
+  "name": "Throwaway Mail",
+  "version": "1.11.1",
+  "description": "Fake identities with real Throwaway Mail disposable addresses, and automatic verification code retrieval.",
   "permissions": ["alarms", "activeTab", "menus", "scripting", "storage"],
   "action": {
-    "default_title": "Fable × Throwaway Mail",
+    "default_title": "Throwaway Mail",
     "default_popup": "popup.html",
     "default_icon": {
-      "32": "icons/fable.svg",
-      "64": "icons/fable.svg"
+      "32": "icons/throwaway-mail.svg",
+      "64": "icons/throwaway-mail.svg"
     }
   },
   "icons": {
-    "32": "icons/fable.svg",
-    "64": "icons/fable.svg",
-    "128": "icons/fable.svg"
+    "32": "icons/throwaway-mail.svg",
+    "64": "icons/throwaway-mail.svg",
+    "128": "icons/throwaway-mail.svg"
   },
   "browser_specific_settings": {
     "gecko": {

@@ -1,12 +1,12 @@
 "use strict";
-// Client de l'API Throwaway Mail (clé API Bearer). Partagé par la popup et la page d'options.
-// La clé reste dans browser.storage.local de ce profil Firefox et n'est envoyée qu'au serveur configuré.
+// Throwaway Mail API client (Bearer API key). Shared by the popup and the options page.
+// The key stays in this Firefox profile's browser.storage.local and is only sent to the configured server.
 const Throwaway = (() => {
   const KEYS = ["tmServer", "tmApiKey", "tmDomain"];
 
   function normalizeServer(raw) {
     const url = new URL(String(raw || "").trim());
-    if (url.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(url.hostname)) throw new Error("Le serveur doit être en HTTPS.");
+    if (url.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(url.hostname)) throw new Error("The server must use HTTPS.");
     return url.origin;
   }
 
@@ -39,7 +39,7 @@ const Throwaway = (() => {
     return data;
   }
 
-  // Une adresse par site : site_name = nom d'hôte de l'onglet, libellé = identité fictive.
+  // One address per site: site_name = the tab's host name, label = fake identity.
   async function createAddress(pageUrl, label) {
     const c = await config();
     const url = new URL(pageUrl);
@@ -49,20 +49,20 @@ const Throwaway = (() => {
       body: {
         site_name: url.hostname,
         site_url: url.origin,
-        label: label ? `Fable · ${label}` : "Fable",
+        label: label ? `Throwaway Mail · ${label}` : "Throwaway Mail",
         ...(c.domain ? { domain: c.domain } : {}),
       },
     });
     return { id: data.id, email: data.email, host: url.hostname, createdAt: data.address?.created_at ?? Date.now() };
   }
 
-  // Adresse déjà créée pour ce site (site_name = nom d'hôte exact ; `site` côté serveur est un LIKE).
+  // Address already created for this site (site_name = exact host name; server-side `site` is a LIKE).
   async function siteAddress(host) {
     const data = await request(`/v1/addresses?site=${encodeURIComponent(host)}&status=active&limit=50`);
     return (data?.addresses || []).find((a) => String(a.site_name || "").toLowerCase() === host.toLowerCase()) || null;
   }
 
-  // Attend (long polling, 55 s max par appel) un code arrivé après `since`.
+  // Waits (long polling, 55 s max per call) for a code that arrived after `since`.
   function waitForCode(addressId, since, wait = 55) {
     const q = new URLSearchParams({ wait: String(wait), require: "any" });
     if (since) q.set("since", String(since));

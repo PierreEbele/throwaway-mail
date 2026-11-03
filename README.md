@@ -86,4 +86,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities privately as desc
 
 ## License
 
-[MIT](LICENSE). The Firefox extension is a fork of [Fable](extension/LICENSE) (MIT).
+[MIT](LICENSE). The Firefox extension is originally based on Fable ([MIT](extension/LICENSE)).

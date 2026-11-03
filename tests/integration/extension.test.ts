@@ -39,7 +39,7 @@ describe("Firefox extension client", () => {
     expect(alias.host).toBe("shop.example.org");
     const stored = (await admin.get(`/v1/addresses/${alias.id}`)).json.address;
     expect(stored.site_name).toBe("shop.example.org");
-    expect(stored.label).toBe("Fable · Ada Lovelace");
+    expect(stored.label).toBe("Throwaway Mail · Ada Lovelace");
 
     expect(await tm.waitForCode(alias.id, alias.createdAt, 0)).toBeNull();
     const r = await ingest(t, alias.email, simpleEml({ subject: "Votre code", text: "Votre code de vérification est 482913." }));

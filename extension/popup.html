@@ -1,45 +1,42 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Fable × Throwaway Mail</title>
+    <title>Throwaway Mail</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <header>
-      <span class="mark" aria-hidden="true">F</span>
-      <strong class="brand">Fable</strong>
+      <span class="mark" aria-hidden="true">T</span>
+      <strong class="brand">Throwaway Mail</strong>
       <span class="pill" id="tm-badge"><i></i> LOCAL</span>
-      <a id="tm-settings" class="icon-link" href="#" title="Réglages" aria-label="Réglages">⚙</a>
+      <a id="tm-settings" class="icon-link" href="#" title="Settings" aria-label="Settings">⚙</a>
     </header>
-    <nav class="tabs" aria-label="Type de données">
-      <button id="tab-profile" type="button" aria-pressed="true" aria-controls="profile-panel">Identité</button
-      ><button id="tab-card" type="button" aria-pressed="false" aria-controls="card-panel">Carte de test</button>
+    <nav class="tabs" aria-label="Data type">
+      <button id="tab-profile" type="button" aria-pressed="true" aria-controls="profile-panel">Identity</button
+      ><button id="tab-card" type="button" aria-pressed="false" aria-controls="card-panel">Test card</button>
     </nav>
     <main>
       <div id="perm-banner" class="perm" hidden>
-        <p>
-          Firefox n’a pas encore autorisé Fable sur les sites : il ne peut pas repérer les formulaires d’inscription ni coller les codes
-          tout seul.
-        </p>
-        <button id="perm-grant" class="primary" type="button">Autoriser sur tous les sites</button>
+        <p>Firefox has not yet allowed Throwaway Mail on websites, so it cannot detect sign-up forms or paste codes on its own.</p>
+        <button id="perm-grant" class="primary" type="button">Allow on all sites</button>
       </div>
-      <section id="profile-panel" aria-label="Profil fictif">
-        <section class="identity-card" aria-label="Informations générées">
+      <section id="profile-panel" aria-label="Fake profile">
+        <section class="identity-card" aria-label="Generated details">
           <div class="identity">
             <div class="avatar" id="avatar" aria-hidden="true">?</div>
             <div class="who">
-              <h2 id="full-name">Aucune identité</h2>
+              <h2 id="full-name">No identity</h2>
               <span id="edition" class="meta">—</span>
             </div>
             <label class="country" for="country-mode"
-              ><span class="sr">Pays</span
+              ><span class="sr">Country</span
               ><select id="country-mode">
-                <option value="random">Au hasard</option>
+                <option value="random">Random</option>
                 <option value="FR">France</option>
-                <option value="GB">Royaume-Uni</option>
-                <option value="US">États-Unis</option>
+                <option value="GB">United Kingdom</option>
+                <option value="US">United States</option>
               </select></label
             >
           </div>
@@ -50,41 +47,41 @@
               <dd id="email" class="mono">—</dd>
             </div>
             <div>
-              <dt>Prénom</dt>
+              <dt>First name</dt>
               <dd id="first-name">—</dd>
             </div>
             <div>
-              <dt>Nom</dt>
+              <dt>Last name</dt>
               <dd id="last-name">—</dd>
             </div>
             <div class="wide">
-              <dt>Adresse</dt>
+              <dt>Address</dt>
               <dd id="address">—</dd>
             </div>
             <div>
-              <dt>Ville</dt>
+              <dt>City</dt>
               <dd id="city">—</dd>
             </div>
             <div>
-              <dt>Code postal</dt>
+              <dt>Postal code</dt>
               <dd id="postal-code" class="mono">—</dd>
             </div>
             <div>
-              <dt>Pays</dt>
+              <dt>Country</dt>
               <dd id="country">—</dd>
             </div>
             <div>
-              <dt>Téléphone</dt>
+              <dt>Phone</dt>
               <dd id="phone" class="mono">—</dd>
             </div>
             <div>
-              <dt>Naissance</dt>
+              <dt>Birth date</dt>
               <dd id="birth-date" class="mono">—</dd>
             </div>
             <div>
-              <dt>Mot de passe</dt>
+              <dt>Password</dt>
               <dd class="password-row">
-                <input id="password" class="mono" type="password" readonly autocomplete="off" aria-label="Mot de passe généré" /><button
+                <input id="password" class="mono" type="password" readonly autocomplete="off" aria-label="Generated password" /><button
                   id="reveal-password"
                   class="link"
                   type="button"
@@ -92,96 +89,94 @@
                   aria-controls="password"
                   disabled
                 >
-                  Afficher
+                  Show
                 </button>
               </dd>
             </div>
           </dl>
         </section>
 
-        <section id="tm-panel" class="code-card" aria-label="Code de vérification" hidden>
-          <div class="code-head"><span class="label">Code de vérification</span><span id="tm-address" class="meta mono"></span></div>
+        <section id="tm-panel" class="code-card" aria-label="Verification code" hidden>
+          <div class="code-head"><span class="label">Verification code</span><span id="tm-address" class="meta mono"></span></div>
           <p id="tm-code" class="code">—</p>
           <div class="row">
-            <button id="tm-wait" class="ghost" type="button">Attendre le code</button
-            ><button id="tm-copy" class="ghost" type="button" disabled>Copier</button
-            ><button id="tm-paste" class="primary" type="button" disabled>Coller</button>
+            <button id="tm-wait" class="ghost" type="button">Wait for code</button
+            ><button id="tm-copy" class="ghost" type="button" disabled>Copy</button
+            ><button id="tm-paste" class="primary" type="button" disabled>Paste</button>
           </div>
           <p id="tm-link" class="hint" hidden></p>
           <p id="tm-status" class="hint" role="status" aria-live="polite"></p>
         </section>
 
         <details id="options">
-          <summary>Champs à remplir <span id="options-count" class="meta">10/10 champs · 0 verrou</span></summary>
-          <p class="hint">« Remplir » choisit les champs de la page. « Fixé » garde la valeur quand vous générez.</p>
-          <div class="option-head"><span>Information</span><span>Remplir</span><span>Valeur</span></div>
+          <summary>Fields to fill <span id="options-count" class="meta">10/10 fields · 0 locked</span></summary>
+          <p class="hint">“Fill” picks the fields on the page. “Locked” keeps the value when you generate.</p>
+          <div class="option-head"><span>Field</span><span>Fill</span><span>Value</span></div>
           <div id="field-options"></div>
         </details>
 
         <div class="toolbar">
-          <label class="check"><input type="checkbox" id="overwrite" /> Remplacer l’existant</label>
+          <label class="check"><input type="checkbox" id="overwrite" /> Overwrite existing</label>
           <span class="spacer"></span>
-          <button id="undo" class="link" type="button" title="Annuler le dernier remplissage sur cette page">Annuler</button>
-          <button id="copy" class="link" type="button" disabled>Copier</button>
+          <button id="undo" class="link" type="button" title="Undo the last fill on this page">Undo</button>
+          <button id="copy" class="link" type="button" disabled>Copy</button>
         </div>
-        <p id="status" class="status" role="status" aria-live="polite">Générez une identité ou remplissez directement.</p>
+        <p id="status" class="status" role="status" aria-live="polite">Generate an identity or fill directly.</p>
       </section>
 
-      <section id="card-panel" aria-label="Carte de test" hidden>
-        <p id="card-mode-heading" class="label">FRANCE · SANDBOX STRIPE</p>
+      <section id="card-panel" aria-label="Test card" hidden>
+        <p id="card-mode-heading" class="label">FRANCE · STRIPE SANDBOX</p>
         <div class="field">
-          <label for="card-mode">Type de numéro</label
+          <label for="card-mode">Number type</label
           ><select id="card-mode">
-            <option value="stripe">Test officiel Stripe</option>
-            <option value="bank-bin">Synthétique · BIN bancaire</option>
+            <option value="stripe">Official Stripe test</option>
+            <option value="bank-bin">Synthetic · bank BIN</option>
           </select>
         </div>
         <div class="field">
-          <label for="card-bank">Banque simulée</label
+          <label for="card-bank">Simulated bank</label
           ><select id="card-bank">
-            <option value="random">Aléatoire</option>
+            <option value="random">Random</option>
           </select>
         </div>
         <div class="field">
-          <label for="card-network">Réseau</label
+          <label for="card-network">Network</label
           ><select id="card-network">
-            <option value="random">Aléatoire</option>
+            <option value="random">Random</option>
             <option value="visa">CB / Visa</option>
             <option value="mastercard">CB / Mastercard</option>
           </select>
         </div>
         <div class="test-card">
-          <div class="card-top"><span id="card-bank-name">Banque simulée</span><span class="tag">TEST</span></div>
+          <div class="card-top"><span id="card-bank-name">Simulated bank</span><span class="tag">TEST</span></div>
           <p id="card-number" class="mono">•••• •••• •••• ••••</p>
           <p id="card-network-name" class="meta">—</p>
           <div class="card-bottom">
-            <div><span>Titulaire</span><strong id="card-holder">—</strong></div>
-            <div><span>Expire</span><strong id="card-expiry" class="mono">—</strong></div>
+            <div><span>Holder</span><strong id="card-holder">—</strong></div>
+            <div><span>Expires</span><strong id="card-expiry" class="mono">—</strong></div>
             <div><span>CVC</span><strong id="card-cvc" class="mono">—</strong></div>
           </div>
         </div>
-        <p id="card-explanation" class="hint">
-          Numéros officiels de test Stripe. La banque est un libellé simulé : aucun paiement réel possible.
-        </p>
+        <p id="card-explanation" class="hint">Official Stripe test numbers. The bank is a simulated label: no real payment is possible.</p>
         <p id="card-bin-info" class="hint" hidden></p>
         <div class="toolbar">
-          <label class="check"><input id="card-overwrite" type="checkbox" /> Remplacer l’existant</label><span class="spacer"></span
-          ><button id="copy-card-number" class="link" type="button" disabled>Copier n°</button
-          ><button id="copy-card" class="link" type="button" disabled>Copier tout</button
-          ><button id="undo-card" class="link" type="button">Annuler</button>
+          <label class="check"><input id="card-overwrite" type="checkbox" /> Overwrite existing</label><span class="spacer"></span
+          ><button id="copy-card-number" class="link" type="button" disabled>Copy number</button
+          ><button id="copy-card" class="link" type="button" disabled>Copy all</button
+          ><button id="undo-card" class="link" type="button">Undo</button>
         </div>
-        <p id="card-status" class="status" role="status" aria-live="polite">Générez une carte pour votre environnement de test.</p>
+        <p id="card-status" class="status" role="status" aria-live="polite">Generate a card for your test environment.</p>
         <div class="actions">
-          <button id="generate-card" class="ghost" type="button">Générer</button
-          ><button id="fill-card" class="primary" type="button" disabled>Remplir la carte</button>
+          <button id="generate-card" class="ghost" type="button">Generate</button
+          ><button id="fill-card" class="primary" type="button" disabled>Fill card</button>
         </div>
       </section>
     </main>
     <footer class="actions" id="profile-actions">
-      <button id="generate" class="ghost" type="button">Nouvelle identité</button
-      ><button id="fill" class="primary" type="button" disabled>Remplir le formulaire</button>
+      <button id="generate" class="ghost" type="button">New identity</button
+      ><button id="fill" class="primary" type="button" disabled>Fill form</button>
     </footer>
-    <p class="credit">Fork de Fable par Numeriane · MIT · aucun envoi automatique</p>
+    <p class="credit">Based on Fable (MIT) · never submits automatically</p>
     <script src="generator.js"></script>
     <script src="throwaway.js"></script>
     <script src="popup.js"></script>

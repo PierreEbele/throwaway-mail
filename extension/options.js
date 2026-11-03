@@ -7,19 +7,19 @@ function status(message, error = false) {
 
 async function loadDomains(cfg, selected) {
   const data = await Throwaway.request("/v1/domains", { cfg });
-  $("domain").replaceChildren(new Option("Par défaut du serveur", ""));
+  $("domain").replaceChildren(new Option("Server default", ""));
   for (const d of data.domains || []) $("domain").add(new Option(d.name, d.name));
   $("domain").value = selected || "";
   return data.domains?.length || 0;
 }
 
-// Lit le formulaire et demande la permission d'accès au serveur (geste utilisateur requis).
+// Reads the form and requests access to the server (requires a user gesture).
 async function formConfig() {
   const server = Throwaway.normalizeServer($("server").value);
   const apiKey = $("api-key").value.trim();
-  if (!apiKey) throw new Error("Collez une clé API.");
+  if (!apiKey) throw new Error("Paste an API key.");
   const granted = await browser.permissions.request({ origins: [server + "/*", "http://*/*", "https://*/*"] });
-  if (!granted) throw new Error("Permission d’accès au serveur refusée.");
+  if (!granted) throw new Error("Access to the server was denied.");
   return { server, apiKey, domain: $("domain").value };
 }
 
@@ -29,30 +29,30 @@ const toggles = () => ({
   bitwardenMode: $("bitwarden-mode").checked,
   identityTtlHours: Number($("identity-ttl").value),
 });
-// Désactivés par défaut / 24 h par défaut, contrairement aux autres automatismes.
+// Off by default / 24 h by default, unlike the other automations.
 for (const id of ["bitwarden-mode", "identity-ttl"])
   $(id).addEventListener("change", async () => {
     await browser.storage.local.set(toggles());
     await browser.runtime.sendMessage({ type: "purge" }).catch(() => {});
-    status("Automatismes enregistrés.");
+    status("Automation settings saved.");
   });
 for (const id of Object.keys(TOGGLES))
   $(id).addEventListener("change", async () => {
     await browser.storage.local.set(toggles());
     if ($("auto-prompt").checked || $("auto-code").checked)
       await browser.permissions.request({ origins: ["http://*/*", "https://*/*"] }).catch(() => {});
-    status("Automatismes enregistrés.");
+    status("Automation settings saved.");
   });
 
 $("test").addEventListener("click", async () => {
   try {
     const cfg = await formConfig();
-    status("Connexion…");
+    status("Connecting…");
     const me = await Throwaway.request("/v1/auth/me", { cfg });
     const n = await loadDomains(cfg, cfg.domain);
-    status(`Connecté en tant que ${me.user?.name || me.user?.email || "?"} · ${n} domaine(s) disponible(s).`);
+    status(`Signed in as ${me.user?.name || me.user?.email || "?"} · ${n} domain(s) available.`);
   } catch (e) {
-    status(e.status === 401 ? "Clé API invalide ou révoquée." : `Échec : ${e.message}`, true);
+    status(e.status === 401 ? "Invalid or revoked API key." : `Failed: ${e.message}`, true);
   }
 });
 
@@ -62,16 +62,16 @@ $("form").addEventListener("submit", async (event) => {
     const cfg = await formConfig();
     await Throwaway.request("/v1/auth/me", { cfg });
     await browser.storage.local.set({ tmServer: cfg.server, tmApiKey: cfg.apiKey, tmDomain: cfg.domain, ...toggles() });
-    status("Enregistré. Les prochains remplissages utiliseront Throwaway Mail.");
+    status("Saved. Next fills will use Throwaway Mail.");
   } catch (e) {
-    status(e.status === 401 ? "Clé API invalide ou révoquée : rien n’a été enregistré." : `Échec : ${e.message}`, true);
+    status(e.status === 401 ? "Invalid or revoked API key: nothing was saved." : `Failed: ${e.message}`, true);
   }
 });
 
 $("clear").addEventListener("click", async () => {
   await browser.storage.local.remove(["tmApiKey"]);
   $("api-key").value = "";
-  status("Clé effacée. Fable revient aux adresses @example.com.");
+  status("Key deleted. Back to @example.com addresses.");
 });
 
 (async () => {
@@ -86,14 +86,14 @@ $("clear").addEventListener("click", async () => {
   if (cfg.server && cfg.apiKey) {
     try {
       await loadDomains(cfg, cfg.domain);
-      status("Throwaway Mail est actif.");
+      status("Throwaway Mail is active.");
     } catch {
-      status("Serveur injoignable ou clé invalide.", true);
+      status("Server unreachable or invalid key.", true);
     }
   }
 })();
 
-// Firefox (MV3) n'accorde pas « tous les sites » à l'installation : on le demande (clic requis).
+// Firefox (MV3) does not grant "all sites" at install time: ask for it (needs a click).
 const ALL_SITES = { origins: ["http://*/*", "https://*/*"] };
 async function checkSitePermission() {
   const banner = document.getElementById("perm-banner");

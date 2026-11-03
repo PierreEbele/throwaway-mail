@@ -1,9 +1,9 @@
 "use strict";
-// Script de page (tous les sites, cadre principal) :
-//  1. repère un formulaire d'inscription et propose « nouvelle identité + remplir » ;
-//  2. si une adresse jetable de ce site attend un code, l'attend et le colle dès qu'il arrive.
-// Rien n'est envoyé tant que l'utilisateur ne clique pas ; seule l'attente du code (après un
-// remplissage) interroge le serveur Throwaway Mail, via le script de fond.
+// Content script (all sites, top frame):
+//  1. detects a sign-up form and offers "new identity + fill";
+//  2. if a disposable address for this site is waiting for a code, waits for it and pastes it on arrival.
+// Nothing is sent until the user clicks; only the code wait (after a fill) queries the
+// Throwaway Mail server, through the background script.
 (() => {
   if (window.top !== window || window.__fableContent) return;
   window.__fableContent = true;
@@ -27,7 +27,7 @@
     return SIGNUP_WORDS.test(text) && !(LOGIN_WORDS.test(document.title) && !SIGNUP_WORDS.test(document.title));
   }
 
-  // ---------- Interface (Shadow DOM) ----------
+  // ---------- UI (Shadow DOM) ----------
   let host = null,
     root = null;
   function ui() {
@@ -59,7 +59,7 @@
   }
   function render(html) {
     const card = ui().querySelector(".card");
-    card.innerHTML = `<div class="top"><span class="mark">F</span><span class="title">Fable</span><button class="x" data-a="close" title="Fermer">✕</button></div>${html}`;
+    card.innerHTML = `<div class="top"><span class="mark">T</span><span class="title">Throwaway Mail</span><button class="x" data-a="close" title="Close">✕</button></div>${html}`;
     return card;
   }
   function close() {
@@ -69,14 +69,14 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const send = (msg) => browser.runtime.sendMessage(msg);
 
-  // ---------- 1. Proposition d'inscription ----------
+  // ---------- 1. Sign-up prompt ----------
   let proposed = false;
   function propose() {
     if (proposed || !signupForm()) return;
     proposed = true;
-    const card = render(`<p>Formulaire d’inscription détecté. Générer une nouvelle identité et la remplir ?</p>
-      <div class="row"><button class="b primary" data-a="fill">Générer et remplir</button><button class="b ghost" data-a="later">Plus tard</button></div>
-      <p class="muted" style="margin:8px 0 0"><a data-a="never" href="#" style="color:inherit">Ne plus proposer sur ce site</a></p>`);
+    const card = render(`<p>Sign-up form detected. Generate a new identity and fill it in?</p>
+      <div class="row"><button class="b primary" data-a="fill">Generate and fill</button><button class="b ghost" data-a="later">Later</button></div>
+      <p class="muted" style="margin:8px 0 0"><a data-a="never" href="#" style="color:inherit">Don’t offer on this site again</a></p>`);
     card.addEventListener("click", async (e) => {
       const a = e.target.closest("[data-a]")?.dataset.a;
       if (!a) return;
@@ -87,28 +87,28 @@
         return close();
       }
       if (a === "fill") {
-        render(`<p><span class="spin"></span>Création de l’identité…</p>`);
+        render(`<p><span class="spin"></span>Creating identity…</p>`);
         const r = await send({ type: "fill-new" }).catch((err) => ({ error: err.message }));
         if (r?.error)
           return render(
-            `<p>${esc(r.error)}</p><div class="row"><button class="b ghost" data-a="close">Fermer</button></div>`,
+            `<p>${esc(r.error)}</p><div class="row"><button class="b ghost" data-a="close">Close</button></div>`,
           ).addEventListener("click", close);
         const n = r?.report?.filled || 0;
         if (r?.bitwarden) {
           render(
-            `<p><strong>${esc(r.name)}</strong></p><p>${n} champ${n > 1 ? "s" : ""} rempli${n > 1 ? "s" : ""}. Remplissez maintenant l’e-mail (générateur d’alias) et le mot de passe avec Bitwarden.</p><p class="muted">Le code sera collé dès son arrivée.</p>`,
+            `<p><strong>${esc(r.name)}</strong></p><p>${n} field${n > 1 ? "s" : ""} filled. Now fill the e-mail (alias generator) and password with Bitwarden.</p><p class="muted">The code will be pasted as soon as it arrives.</p>`,
           ).addEventListener("click", (e2) => e2.target.closest("[data-a=close]") && close());
           return void watchEmail();
         }
         render(
-          `<p><strong>${esc(r.name)}</strong><br><span class="muted">${esc(r.email)}</span></p><p>${n} champ${n > 1 ? "s" : ""} rempli${n > 1 ? "s" : ""}. Vérifiez puis validez le formulaire vous-même.</p>`,
+          `<p><strong>${esc(r.name)}</strong><br><span class="muted">${esc(r.email)}</span></p><p>${n} field${n > 1 ? "s" : ""} filled. Check it, then submit the form yourself.</p>`,
         ).addEventListener("click", (e2) => e2.target.closest("[data-a=close]") && close());
         void watchCode();
       }
     });
   }
 
-  // Mode Bitwarden : attendre que l'e-mail soit rempli, puis vérifier que c'est une de nos adresses.
+  // Bitwarden mode: wait for the e-mail to be filled, then check it is one of our addresses.
   let watchingEmail = false;
   async function watchEmail() {
     if (watchingEmail) return;
@@ -127,7 +127,7 @@
           const r = await send({ type: "adopt-email", email }).catch(() => null);
           if (r?.ok) {
             render(
-              `<p>Adresse jetable reconnue : <span class="muted">${esc(r.email)}</span></p><p class="muted">Validez le formulaire ; le code sera collé dès son arrivée.</p>`,
+              `<p>Disposable address recognised: <span class="muted">${esc(r.email)}</span></p><p class="muted">Submit the form; the code will be pasted as soon as it arrives.</p>`,
             ).addEventListener("click", (e) => e.target.closest("[data-a=close]") && close());
             return void watchCode();
           }
@@ -138,7 +138,7 @@
     }
   }
 
-  // ---------- 2. Attente et collage du code ----------
+  // ---------- 2. Waiting for and pasting the code ----------
   function codeTarget(len) {
     const inputs = [...document.querySelectorAll("input")].filter(
       (el) => shown(el) && !el.readOnly && !["hidden", "password", "email", "checkbox", "radio", "submit", "button"].includes(el.type),
@@ -152,10 +152,10 @@
       inputs.find(isOtpShape);
     return el ? { el } : null;
   }
-  // Champ « code à usage unique » sans indice dans le nom : numérique et 4 à 8 caractères.
+  // One-time-code field with no hint in its name: numeric and 4 to 8 characters.
   const isOtpShape = (i) =>
     i.maxLength >= 4 && i.maxLength <= 8 && (i.inputMode === "numeric" || i.getAttribute("pattern") === "[0-9]*" || i.type === "number");
-  // Détection stricte (pour proposer le code sans attente en cours) : évite les champs « code promo ».
+  // Strict detection (to offer the code with no wait in progress): avoids "promo code" fields.
   function otpField() {
     const inputs = [...document.querySelectorAll("input")].filter(
       (el) => shown(el) && !el.readOnly && ["text", "number", "tel", ""].includes(el.type),
@@ -179,7 +179,7 @@
     );
   }
 
-  // ---------- 3. Puce « Remplir le code » près d'un champ de code ----------
+  // ---------- 3. "Fill code" chip next to a code field ----------
   let chip = null;
   function showChip(field, code) {
     chip?.remove();
@@ -187,7 +187,7 @@
     const r = field.getBoundingClientRect();
     chip.style.cssText = `all:initial;position:absolute;z-index:2147483647;left:${Math.round(r.left + scrollX)}px;top:${Math.round(r.bottom + scrollY + 4)}px`;
     const sh = chip.attachShadow({ mode: "closed" });
-    sh.innerHTML = `<style>button{all:unset;cursor:pointer;font:600 12px ui-sans-serif,system-ui,sans-serif;background:#18181b;color:#fff;padding:5px 10px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.18)}button:hover{background:#3f3f46}span{font-family:ui-monospace,monospace;letter-spacing:1px}</style><button title="Throwaway Mail">Remplir le code <span>${esc(code)}</span></button>`;
+    sh.innerHTML = `<style>button{all:unset;cursor:pointer;font:600 12px ui-sans-serif,system-ui,sans-serif;background:#18181b;color:#fff;padding:5px 10px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.18)}button:hover{background:#3f3f46}span{font-family:ui-monospace,monospace;letter-spacing:1px}</style><button title="Throwaway Mail">Fill code <span>${esc(code)}</span></button>`;
     sh.querySelector("button").addEventListener("click", (e) => {
       e.preventDefault();
       pasteCode(code);
@@ -207,7 +207,7 @@
     offering = true;
     try {
       for (let i = 0; i < 15 && !watching; i++) {
-        // ~5 min (20 s par appel)
+        // ~5 min (20 s per call)
         const r = await send({ type: "site-code", wait: i ? 20 : 0 }).catch(() => ({ error: "extension" }));
         if (r?.done) return;
         if (r?.code) {
@@ -240,14 +240,14 @@
   }
   function showCode(code, pasted) {
     const card =
-      render(`<p>${pasted ? "Code reçu et collé dans la page." : "Code reçu. Aucun champ de code trouvé sur cette page."}</p><div class="code">${esc(code)}</div>
-      <div class="row"><button class="b ${pasted ? "ghost" : "primary"}" data-a="copy">Copier</button>${pasted ? "" : `<button class="b ghost" data-a="retry">Coller</button>`}</div>`);
+      render(`<p>${pasted ? "Code received and pasted into the page." : "Code received. No code field found on this page."}</p><div class="code">${esc(code)}</div>
+      <div class="row"><button class="b ${pasted ? "ghost" : "primary"}" data-a="copy">Copy</button>${pasted ? "" : `<button class="b ghost" data-a="retry">Paste</button>`}</div>`);
     card.addEventListener("click", async (e) => {
       const a = e.target.closest("[data-a]")?.dataset.a;
       if (a === "close") close();
       if (a === "copy") {
         await navigator.clipboard.writeText(code).catch(() => {});
-        e.target.textContent = "Copié";
+        e.target.textContent = "Copied";
       }
       if (a === "retry" && pasteCode(code)) showCode(code, true);
     });
@@ -258,12 +258,12 @@
     watching = true;
     try {
       for (let i = 0; i < 45; i++) {
-        // ~15 min au plus (20 s par appel)
+        // ~15 min at most (20 s per call)
         const r = await send({ type: "poll-code" }).catch(() => ({ error: "extension" }));
         if (r?.done) return;
         if (r?.code) {
           let pasted = pasteCode(r.code);
-          // La page de saisie du code apparaît parfois juste après : on réessaie quelques secondes.
+          // The code entry page sometimes appears just after: retry for a few seconds.
           for (let k = 0; !pasted && k < 10; k++) {
             await new Promise((res) => setTimeout(res, 500));
             pasted = pasteCode(r.code);
@@ -272,7 +272,7 @@
         }
         if (r?.link && /^https?:\/\//i.test(r.link)) {
           return render(
-            `<p>E-mail de confirmation reçu (lien, pas de code).</p><div class="row"><a class="b primary" style="all:unset;cursor:pointer;background:#18181b;color:#fff;padding:7px 10px;border-radius:8px;font-weight:600;font-size:12px" href="${esc(r.link)}" target="_blank" rel="noopener noreferrer">Ouvrir le lien</a></div>`,
+            `<p>Confirmation e-mail received (a link, no code).</p><div class="row"><a class="b primary" style="all:unset;cursor:pointer;background:#18181b;color:#fff;padding:7px 10px;border-radius:8px;font-weight:600;font-size:12px" href="${esc(r.link)}" target="_blank" rel="noopener noreferrer">Open link</a></div>`,
           ).addEventListener("click", (e) => e.target.closest("[data-a=close]") && close());
         }
         if (r?.error) await new Promise((res) => setTimeout(res, 5000));
@@ -282,11 +282,11 @@
     }
   }
 
-  // ---------- Démarrage ----------
+  // ---------- Startup ----------
   send({ type: "state" })
     .then((state) => {
       if (state?.autoCode && !state?.pending) {
-        // Champ de code (même sans remplissage préalable) : proposer le dernier code de l'adresse du site.
+        // Code field (even without a prior fill): offer the latest code of this site's address.
         let ot = null;
         new MutationObserver(() => {
           if (!offering && !chip && !ot)
@@ -298,13 +298,13 @@
         void offerCode();
       }
       if (state?.pending) {
-        proposed = true; // déjà inscrit sur ce site : on attend le code au lieu de reproposer
+        proposed = true; // already signed up on this site: wait for the code instead of prompting again
         void watchCode();
         return;
       }
       if (!state?.autoPrompt) return;
-      // Throttle (pas debounce) : sur les applis web (Discord…) le DOM bouge en continu.
-      // On surveille tant que rien n'est proposé, y compris après un changement d'URL sans rechargement.
+      // Throttle (not debounce): on web apps (Discord…) the DOM changes constantly.
+      // Keep watching while nothing is offered, including after a URL change without reload.
       let t = null,
         url = location.href;
       const check = () => {
@@ -325,7 +325,7 @@
     })
     .catch(() => {});
 
-  // Le popup peut demander de surveiller le code après un remplissage manuel.
+  // The popup can ask to watch for the code after a manual fill.
   browser.runtime.onMessage.addListener((msg) => {
     if (msg?.type === "watch-code") void watchCode();
     if (msg?.type === "watch-email") void watchEmail();

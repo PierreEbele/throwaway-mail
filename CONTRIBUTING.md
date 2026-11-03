@@ -21,4 +21,4 @@ pnpm test
 - Keep changes focused; one feature or fix per pull request.
 - Add or update tests for behaviour changes (integration tests run against the real app with `makeTestApp`).
 - Database changes: edit `app/server/db/schema.ts`, then `pnpm db:generate --name <change>` and commit the migration.
-- Code comments and UI strings are in English (the extension UI is currently French).
+- Code comments and UI strings are in English.

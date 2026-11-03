@@ -108,7 +108,7 @@
       .split(/\s+/)
       .filter((token) => token !== "webauthn")
       .pop();
-    // Discord & co. : champ e-mail marqué autocomplete="username" (identifiant de connexion = e-mail).
+    // Discord & co.: e-mail field marked autocomplete="username" (login identifier = e-mail).
     if (auto === "username" && el.tagName === "INPUT" && (type === "email" || signals(el).some((text) => /^e ?mail$|\bemail\b/.test(text))))
       return "email";
     if (
@@ -124,8 +124,8 @@
       if (texts.some((text) => /\b(current|existing|old|actuel|actuelle|ancien|ancienne)\b/.test(text))) return null;
       return "password"; // Only a recognized registration group may use this candidate.
     }
-    // « Nouvelle adresse mail Yahoo », « choose your Gmail address » : on crée une boîte chez le site,
-    // le champ attend un identifiant (pas une adresse postale ni notre adresse jetable).
+    // "Nouvelle adresse mail Yahoo", "choose your Gmail address": a mailbox is being created on the site,
+    // the field expects a username (not a postal address nor our disposable address).
     const mailWords = /\b(e ?mail|mail|courriel|gmail|outlook|yahoo)\b/;
     if (
       el.tagName === "INPUT" &&
@@ -133,7 +133,7 @@
       texts.some((text) => mailWords.test(text) && /\b(new|nouvelle|nouveau|choose|choisissez|choisir|create|creer|neue)\b/.test(text))
     )
       return "username";
-    // Pseudo : rempli seulement dans un formulaire d'inscription reconnu (voir fill()).
+    // Username: filled only in a recognised sign-up form (see fill()).
     if (
       el.tagName === "INPUT" &&
       auto !== "username" &&
@@ -152,7 +152,7 @@
     // Explicit semantic input types take precedence over loose textual hints.
     if (type === "email") return "email";
     if (type === "tel") return "phone";
-    // « Adresse mail » / « adresse e-mail » : jamais une adresse postale.
+    // "Adresse mail" / "adresse e-mail": never a postal address.
     if (texts.some((text) => /\badresse (e )?mail\b|\bmail address\b/.test(text))) return "email";
     for (const [key, pattern] of rules) if (texts.some((text) => pattern.test(text))) return key;
     if (texts.some((text) => /^(nom|name|nome|naam)$/.test(text))) return "fullName";
@@ -238,8 +238,8 @@
         : el.tagName === "TEXTAREA"
           ? view.HTMLTextAreaElement.prototype
           : view.HTMLInputElement.prototype;
-    // Séquence proche d'une saisie (focus → input → change → blur) : les gestionnaires de mots
-    // de passe (Bitwarden…) n'enregistrent que les champs qu'ils ont vu « taper ».
+    // Sequence close to real typing (focus → input → change → blur): password
+    // managers (Bitwarden…) only save fields they have seen being "typed".
     el.dispatchEvent(new view.FocusEvent("focus", { composed: true }));
     el.dispatchEvent(new view.FocusEvent("focusin", { bubbles: true, composed: true }));
     Object.getOwnPropertyDescriptor(prototype, "value").set.call(el, value);
@@ -541,10 +541,10 @@
     if (!ranked.length) return report;
     const { fields, keys } = ranked[0];
     report.detected = fields.length;
-    if (!keys.has("cardNumber")) report.missing.push("numéro");
-    if (!(keys.has("cardExpiry") || (keys.has("cardMonth") && keys.has("cardYear")))) report.missing.push("expiration");
+    if (!keys.has("cardNumber")) report.missing.push("number");
+    if (!(keys.has("cardExpiry") || (keys.has("cardMonth") && keys.has("cardYear")))) report.missing.push("expiry");
     if (!keys.has("cardCvc")) report.missing.push("CVC");
-    if (!keys.has("cardHolder")) report.missing.push("titulaire");
+    if (!keys.has("cardHolder")) report.missing.push("holder");
     const plans = fields.map((field) => ({ ...field, value: cardValue(field.el, field.key, card) }));
     if (plans.some((plan) => plan.value === null))
       return { ...report, rejected: plans.filter((plan) => plan.value === null).length, incompatible: true };
