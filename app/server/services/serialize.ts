@@ -16,7 +16,7 @@ export function userOut(u: User) {
 }
 
 export function domainOut(d: Domain, full: boolean, owner?: { id: string; name: string | null; email: string } | null) {
-  const base = { id: d.id, name: d.name, status: d.status, unknown_policy: d.unknownPolicy };
+  const base = { id: d.id, name: d.name, transport: d.transport, status: d.status, unknown_policy: d.unknownPolicy };
   if (!full) return base;
   return {
     ...base,
@@ -28,6 +28,7 @@ export function domainOut(d: Domain, full: boolean, owner?: { id: string; name: 
     catchall_forward_to: d.catchallForwardTo,
     created_at: d.createdAt,
     last_checked_at: d.lastCheckedAt,
+    last_ingest_at: d.lastIngestAt,
   };
 }
 
@@ -40,6 +41,9 @@ export function destinationOut(d: Destination) {
     last_error: d.lastError,
     created_at: d.createdAt,
     pgp: d.pgpFingerprint ? { fingerprint: d.pgpFingerprint, hide_subject: d.pgpHideSubject } : null,
+    /** "app": verified through a link e-mailed by the app (no Cloudflare); "cloudflare": by Cloudflare Email Routing. */
+    verification: d.verifyTokenHash ? ("app" as const) : ("cloudflare" as const),
+    verify_sent_at: d.verifySentAt,
   };
 }
 

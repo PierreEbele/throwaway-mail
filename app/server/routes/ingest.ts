@@ -44,6 +44,8 @@ async function readLimited(req: Request, max: number): Promise<Uint8Array> {
 export function registerIngest(app: Hono<AppEnv>) {
   app.post("/ingest", async (c) => {
     const deps = c.get("deps");
+    if (!deps.config.ingestEnabled)
+      throw new HttpError(503, "ingest_disabled", "INGEST_SECRET is not set: the Cloudflare Worker ingest is disabled");
     const max = deps.config.MAX_INGEST_BYTES;
     const len = Number(c.req.header("content-length") ?? "0");
     if (len > max) throw new HttpError(413, "payload_too_large", `Message exceeds ${max} bytes`);

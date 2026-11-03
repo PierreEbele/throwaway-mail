@@ -8,6 +8,7 @@ import { inspectPublicKey } from "../services/pgp.js";
 import { refreshDestination, resendVerification, sharedWithOthers } from "../services/destinations.js";
 import { destinationOut } from "../services/serialize.js";
 import { CloudflareError } from "../cloudflare/index.js";
+import { confirmAppVerification, sendAppVerification, usesAppVerification } from "../services/mailbox/verification.js";
 
 export function registerDestinations(r: ApiRouter) {
   const owned = (c: Ctx) => {
@@ -39,10 +40,15 @@ export function registerDestinations(r: ApiRouter) {
     {
       method: "post",
       path: "/v1/destinations",
-      summary: "Add a personal mailbox; Cloudflare e-mails it a verification link",
+      summary: "Add a personal mailbox; Cloudflare (or the app itself) e-mails it a verification link",
       tags: ["destinations"],
       auth: "user",
-      body: z.object({ email: z.string().trim().toLowerCase().email().max(254) }),
+      body: z.object({
+        email: z.string().trim().toLowerCase().email().max(254),
+        verify_by: z.enum(["cloudflare", "app"]).optional(),
+      }),
+      description:
+        'verify_by "app": the app sends the link itself through the SMTP server of an IMAP domain (default when Cloudflare is not configured).',
       responses: { 201: "Created" },
     },
     async (c, { body }) => {
@@ -66,15 +72,19 @@ export function registerDestinations(r: ApiRouter) {
         verifiedAt: null as number | null,
         lastError: null as string | null,
       };
-      try {
-        const info = await d.cf.createDestination(body.email);
-        row.cfDestinationId = info.id;
-        row.verifiedAt = info.verified ? Date.parse(info.verified) || d.now() : null;
-      } catch (e) {
-        row.lastError = e instanceof CloudflareError ? e.message : (e as Error).message;
+      const byApp = body.verify_by === "app" || (body.verify_by === undefined && d.cf.mode === "unconfigured");
+      if (!byApp) {
+        try {
+          const info = await d.cf.createDestination(body.email);
+          row.cfDestinationId = info.id;
+          row.verifiedAt = info.verified ? Date.parse(info.verified) || d.now() : null;
+        } catch (e) {
+          row.lastError = e instanceof CloudflareError ? e.message : (e as Error).message;
+        }
       }
       d.db.insert(destinations).values(row).run();
-      return c.json({ destination: destinationOut(d.db.select().from(destinations).where(eq(destinations.id, row.id)).get()!) }, 201);
+      const created = d.db.select().from(destinations).where(eq(destinations.id, row.id)).get()!;
+      return c.json({ destination: destinationOut(byApp ? await sendAppVerification(d, created) : created) }, 201);
     },
   );
 
@@ -111,12 +121,14 @@ export function registerDestinations(r: ApiRouter) {
     {
       method: "post",
       path: "/v1/destinations/:id/refresh",
-      summary: "Refresh verification state from Cloudflare",
+      summary: "Refresh verification state from Cloudflare (app-verified destinations are returned as they are)",
       tags: ["destinations"],
       auth: "user",
     },
     async (c) => {
-      return c.json({ destination: destinationOut(await refreshDestination(c.get("deps"), owned(c))) });
+      const d = c.get("deps");
+      const row = owned(c);
+      return c.json({ destination: destinationOut(usesAppVerification(d, row) ? row : await refreshDestination(d, row)) });
     },
   );
 
@@ -129,7 +141,26 @@ export function registerDestinations(r: ApiRouter) {
       auth: "user",
     },
     async (c) => {
-      return c.json({ destination: destinationOut(await resendVerification(c.get("deps"), owned(c))) });
+      const d = c.get("deps");
+      const row = owned(c);
+      if (row.verifiedAt && usesAppVerification(d, row)) throw badRequest("Already verified");
+      return c.json({
+        destination: destinationOut(usesAppVerification(d, row) ? await sendAppVerification(d, row) : await resendVerification(d, row)),
+      });
+    },
+  );
+
+  r.add(
+    {
+      method: "get",
+      path: "/v1/destinations/verify/:token",
+      summary: "One-time link e-mailed by the app: confirms the destination, then redirects to the web UI",
+      tags: ["destinations"],
+      auth: "none",
+    },
+    (c) => {
+      const ok = !!confirmAppVerification(c.get("deps"), c.req.param("token")!);
+      return c.redirect(`/destinations?verified=${ok ? "1" : "0"}`, 302);
     },
   );
 

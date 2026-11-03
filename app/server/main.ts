@@ -36,7 +36,8 @@ if (deps.oidc.enabled)
   });
 if (deps.cf.mode === "mock") logger.warn("Cloudflare MOCK mode (CF_MOCK=1): no real Cloudflare calls are made");
 if (deps.cf.mode === "unconfigured")
-  logger.warn("Cloudflare is not configured (CF_API_TOKEN / CF_ACCOUNT_ID): adding domains and destinations will fail");
+  logger.info("Cloudflare is not configured (CF_API_TOKEN / CF_ACCOUNT_ID): only IMAP/SMTP mailbox domains can be used");
+if (!config.APP_SECRET) logger.info("APP_SECRET is not set: IMAP/SMTP mailbox domains cannot be added");
 
 try {
   backfillAuthResults(deps);
@@ -65,6 +66,7 @@ const reminders = () => {
 };
 retention();
 reminders();
+deps.mailboxes.start();
 const retentionTimer = setInterval(retention, 60 * 60 * 1000);
 retentionTimer.unref();
 const reminderTimer = setInterval(reminders, 10 * 60 * 1000);
@@ -82,6 +84,7 @@ function shutdown(signal: string) {
   logger.info("shutting down", { signal });
   clearInterval(retentionTimer);
   clearInterval(reminderTimer);
+  deps.mailboxes.stop();
   const force = setTimeout(() => {
     logger.warn("forced exit after timeout");
     process.exit(1);

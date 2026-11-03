@@ -16,7 +16,7 @@ import { createSession } from "../app/server/auth/tokens.js";
 export const FIXTURES = path.join(__dirname, "fixtures");
 export const SECRET = "test-ingest-secret-0123456789";
 
-export function makeTestApp(env: Record<string, string> = {}) {
+export function makeTestApp(env: Record<string, string> = {}, overrides: Partial<Deps> = {}) {
   const config = loadConfig({
     NODE_ENV: "test",
     CF_MOCK: "1",
@@ -30,7 +30,7 @@ export function makeTestApp(env: Record<string, string> = {}) {
   const db = openDatabase(":memory:", path.join(__dirname, "..", "app/server/db/migrations"));
   const cf = new MockCloudflareClient();
   // Tests never touch real DNS: every name resolves to a public documentation address.
-  const deps = buildDeps(config, silentLogger, { db, cf, resolve: async () => ["93.184.216.34"] });
+  const deps = buildDeps(config, silentLogger, { db, cf, resolve: async () => ["93.184.216.34"], ...overrides });
   const app = createApp(deps);
   return { app, deps, cf };
 }

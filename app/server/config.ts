@@ -68,8 +68,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   }
   const parsed = result.data;
   const isProd = parsed.NODE_ENV === "production";
-  if (isProd && !parsed.CF_MOCK && parsed.INGEST_SECRET === "dev-ingest-secret-change-me") {
-    throw new Error("INGEST_SECRET must be set in production (only CF_MOCK=1 may run with the default)");
+  // The Worker signs with INGEST_SECRET; without Cloudflare (IMAP domains only) /ingest refuses everything instead.
+  if (isProd && parsed.CF_API_TOKEN && parsed.INGEST_SECRET === "dev-ingest-secret-change-me") {
+    throw new Error("INGEST_SECRET must be set in production when Cloudflare is configured");
   }
   const oidcEnabled = !!(parsed.OIDC_ISSUER && parsed.OIDC_CLIENT_SECRET);
   const localLoginEnabled = parsed.LOCAL_LOGIN === "true" || (parsed.LOCAL_LOGIN === "auto" && !oidcEnabled);
@@ -88,6 +89,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     oidcEnabled,
     localLoginEnabled,
     cookieSecure,
+    /** /ingest only accepts mail signed with a real secret in production. */
+    ingestEnabled: !isProd || !!parsed.CF_MOCK || parsed.INGEST_SECRET !== "dev-ingest-secret-change-me",
     databasePath: parsed.DATABASE_PATH ?? path.join(parsed.DATA_DIR, "throwaway.db"),
     oidcAllowedGroups: parsed.OIDC_ALLOWED_GROUPS.split(",")
       .map((g) => g.trim())

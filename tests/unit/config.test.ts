@@ -7,9 +7,11 @@ describe("config", () => {
     expect(c.OIDC_ISSUER).toBeUndefined();
     expect(c.RETENTION_DAYS).toBe(30);
   });
-  it("requires a real ingest secret and a login method in production; Cloudflare may come later", () => {
+  it("requires a real ingest secret with Cloudflare and a login method in production", () => {
     const sso = { OIDC_ISSUER: "https://auth.example.test", OIDC_CLIENT_SECRET: "s".repeat(32) };
-    expect(() => loadConfig({ NODE_ENV: "production", ...sso })).toThrow(/INGEST_SECRET/);
+    expect(() => loadConfig({ NODE_ENV: "production", CF_API_TOKEN: "t", ...sso })).toThrow(/INGEST_SECRET/);
+    // Without Cloudflare (IMAP domains only) the app starts, but /ingest refuses everything.
+    expect(loadConfig({ NODE_ENV: "production", ...sso }).ingestEnabled).toBe(false);
     const prod = { NODE_ENV: "production", INGEST_SECRET: "x".repeat(32) };
     expect(() => loadConfig({ ...prod, LOCAL_LOGIN: "false" })).toThrow(/OIDC_ISSUER/);
     expect(loadConfig(prod).localLoginEnabled).toBe(true);

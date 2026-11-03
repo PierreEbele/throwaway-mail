@@ -2,19 +2,23 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { ApiRouter } from "../lib/http.js";
 import { clientIp } from "../lib/http.js";
-import { addresses, domains, messages, users, type Domain } from "../db/schema.js";
+import { addresses, domainMailboxes, domains, messages, users, type Domain } from "../db/schema.js";
 import type { Deps } from "../context.js";
 import { newId } from "../lib/crypto.js";
 import { DOMAIN_RE } from "../lib/email.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { audit } from "../services/audit.js";
-import { restoreCatchAll, setupDomain } from "../services/domains.js";
+import { checkDomain, restoreCatchAll } from "../services/domains.js";
 import { domainOut } from "../services/serialize.js";
+import { getMailbox, mailboxInput, mailboxOut, mailboxValues } from "../services/mailbox/settings.js";
 
 function ownerOf(d: Deps, dom: Domain) {
   return dom.createdBy ? (d.db.select().from(users).where(eq(users.id, dom.createdBy)).get() ?? null) : null;
 }
-const full = (d: Deps, dom: Domain) => domainOut(dom, true, ownerOf(d, dom));
+function full(d: Deps, dom: Domain) {
+  const mailbox = dom.transport === "imap" ? getMailbox(d, dom.id) : null;
+  return { ...domainOut(dom, true, ownerOf(d, dom)), ...(mailbox ? { mailbox: mailboxOut(mailbox) } : {}) };
+}
 
 /** Hand a domain (and its "To sort" box with the mail in it) over to another user. */
 function transferDomain(d: Deps, dom: Domain, newOwnerId: string) {
@@ -49,31 +53,44 @@ export function registerDomains(r: ApiRouter) {
     {
       method: "post",
       path: "/v1/domains",
-      summary: "Add a domain and configure Cloudflare Email Routing for it",
+      summary: "Add a domain: Cloudflare Email Routing, or an IMAP/SMTP catch-all mailbox",
       tags: ["domains"],
       auth: "admin",
       body: z.object({
         name: z.string().trim().toLowerCase().regex(DOMAIN_RE, "Not a valid domain name"),
         unknown_policy: z.enum(["reject", "inbox", "auto_create"]).default("reject"),
         owner_id: z.string().optional(),
+        transport: z.enum(["cloudflare", "imap"]).default("cloudflare"),
+        mailbox: mailboxInput.optional(),
       }),
-      description: 'owner_id: user who receives the domain\'s "To sort" box (default: you).',
-      responses: { 201: "Domain created (status reflects the Cloudflare setup result)" },
+      description:
+        'owner_id: user who receives the domain\'s "To sort" box (default: you). transport "imap" needs `mailbox` (passwords are write-only and stored encrypted with APP_SECRET); the domain becomes active once the connection test passes.',
+      responses: { 201: "Domain created (status reflects the Cloudflare setup or connection test result)" },
     },
     async (c, { body }) => {
       const d = c.get("deps");
       if (d.db.select().from(domains).where(eq(domains.name, body.name)).get()) throw conflict(`${body.name} already exists`);
       if (body.owner_id && !d.db.select().from(users).where(eq(users.id, body.owner_id)).get()) throw badRequest("Unknown owner_id");
+      if (body.transport === "imap" && !body.mailbox) throw badRequest("mailbox settings are required for an IMAP domain");
       const row = {
         id: newId("dom"),
         name: body.name,
+        transport: body.transport,
         unknownPolicy: body.unknown_policy,
         createdBy: body.owner_id ?? c.get("user")!.id,
         createdAt: d.now(),
       };
-      d.db.insert(domains).values(row).run();
-      audit(d, row.createdBy, "domain.added", row.id, { name: row.name }, clientIp(c));
-      const result = await setupDomain(d, d.db.select().from(domains).where(eq(domains.id, row.id)).get()!);
+      const mailbox = body.transport === "imap" ? mailboxValues(d, body.mailbox!) : null;
+      d.db.transaction((tx) => {
+        tx.insert(domains).values(row).run();
+        if (mailbox)
+          tx.insert(domainMailboxes)
+            .values({ domainId: row.id, ...mailbox })
+            .run();
+      });
+      audit(d, row.createdBy, "domain.added", row.id, { name: row.name, transport: row.transport }, clientIp(c));
+      const result = await checkDomain(d, d.db.select().from(domains).where(eq(domains.id, row.id)).get()!);
+      d.mailboxes.sync();
       return c.json({ domain: full(d, result) }, 201);
     },
   );
@@ -82,18 +99,19 @@ export function registerDomains(r: ApiRouter) {
     {
       method: "patch",
       path: "/v1/domains/:id",
-      summary: "Change the unknown-recipient policy, catch-all forwarding or owner",
+      summary: "Change the unknown-recipient policy, catch-all forwarding, owner or mailbox settings",
       tags: ["domains"],
       auth: "admin",
       description:
-        "forward_unknown=false stops forwarding unknown addresses to the preserved catch-all destination (unknown_policy then applies); true resumes it.",
+        "forward_unknown=false stops forwarding unknown addresses to the preserved catch-all destination (unknown_policy then applies); true resumes it. mailbox (IMAP domains): new settings, empty passwords keep the stored ones; the connection is tested again.",
       body: z.object({
         unknown_policy: z.enum(["reject", "inbox", "auto_create"]).optional(),
         forward_unknown: z.boolean().optional(),
         owner_id: z.string().optional(),
+        mailbox: mailboxInput.optional(),
       }),
     },
-    (c, { body }) => {
+    async (c, { body }) => {
       const d = c.get("deps");
       const id = c.req.param("id")!;
       const dom = d.db.select().from(domains).where(eq(domains.id, id)).get();
@@ -109,25 +127,44 @@ export function registerDomains(r: ApiRouter) {
         set.catchallForwardTo = body.forward_unknown ? fwd : null;
       }
       if (Object.keys(set).length) d.db.update(domains).set(set).where(eq(domains.id, id)).run();
+      if (body.mailbox) {
+        if (dom.transport !== "imap") throw badRequest("Only IMAP domains have mailbox settings");
+        const current = getMailbox(d, id);
+        const values = mailboxValues(d, body.mailbox, current ?? undefined);
+        // Another server or folder: its UIDs are unrelated to the ones processed so far.
+        const moved =
+          !current ||
+          current.imapHost !== values.imapHost ||
+          current.imapUser !== values.imapUser ||
+          current.imapFolder !== values.imapFolder;
+        const cursor = moved ? { lastUid: 0, uidValidity: null } : {};
+        if (current)
+          d.db
+            .update(domainMailboxes)
+            .set({ ...values, ...cursor })
+            .where(eq(domainMailboxes.domainId, id))
+            .run();
+        else
+          d.db
+            .insert(domainMailboxes)
+            .values({ domainId: id, ...values })
+            .run();
+        await checkDomain(d, d.db.select().from(domains).where(eq(domains.id, id)).get()!);
+        d.mailboxes.sync();
+      }
       if (body.owner_id && body.owner_id !== dom.createdBy) {
         if (!d.db.select().from(users).where(eq(users.id, body.owner_id)).get()) throw badRequest("Unknown owner_id");
         transferDomain(d, dom, body.owner_id);
         audit(d, c.get("user")!.id, "domain.owner_changed", id, { from: dom.createdBy, to: body.owner_id }, clientIp(c));
       }
-      audit(d, c.get("user")!.id, "domain.policy_changed", id, body, clientIp(c));
+      const { mailbox, ...changes } = body;
+      audit(d, c.get("user")!.id, "domain.policy_changed", id, { ...changes, ...(mailbox ? { mailbox: "updated" } : {}) }, clientIp(c));
       return c.json({ domain: full(d, d.db.select().from(domains).where(eq(domains.id, id)).get()!) });
     },
   );
 
-  r.add(
-    {
-      method: "post",
-      path: "/v1/domains/:id/verify",
-      summary: "Re-check / re-apply the Cloudflare configuration",
-      tags: ["domains"],
-      auth: "admin",
-    },
-    async (c) => {
+  const recheck = (path: string, summary: string) =>
+    r.add({ method: "post", path, summary, tags: ["domains"], auth: "admin" }, async (c) => {
       const d = c.get("deps");
       const dom = d.db
         .select()
@@ -135,17 +172,18 @@ export function registerDomains(r: ApiRouter) {
         .where(eq(domains.id, c.req.param("id")!))
         .get();
       if (!dom) throw notFound("Domain");
-      const result = await setupDomain(d, dom);
+      const result = await checkDomain(d, dom);
       audit(d, c.get("user")!.id, "domain.verified", dom.id, { status: result.status }, clientIp(c));
       return c.json({ domain: full(d, result) });
-    },
-  );
+    });
+  recheck("/v1/domains/:id/verify", "Re-check the domain: re-apply the Cloudflare configuration, or test the IMAP/SMTP connection");
+  recheck("/v1/domains/:id/test", "Test the IMAP/SMTP connection of a mailbox domain (same as /verify)");
 
   r.add(
     {
       method: "delete",
       path: "/v1/domains/:id",
-      summary: "Remove a domain that has no addresses (restores the catch-all it had before the app)",
+      summary: "Remove a domain that has no addresses (restores the Cloudflare catch-all it had before the app, stops IMAP polling)",
       tags: ["domains"],
       auth: "admin",
     },
@@ -167,6 +205,7 @@ export function registerDomains(r: ApiRouter) {
         throw badRequest(`Could not restore the previous catch-all in Cloudflare, domain kept: ${(e as Error).message}`);
       }
       d.db.delete(domains).where(eq(domains.id, id)).run();
+      d.mailboxes.sync();
       audit(d, c.get("user")!.id, "domain.deleted", id, { name: dom.name, catch_all_restored: restored }, clientIp(c));
       return c.json({ ok: true, catch_all_restored: restored });
     },

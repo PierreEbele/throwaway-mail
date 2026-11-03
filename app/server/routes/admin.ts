@@ -10,6 +10,7 @@ import { addresses, auditLog, domains, leakEvents, messages, notifyTargets, sess
 import { badRequest, notFound } from "../lib/errors.js";
 import { audit } from "../services/audit.js";
 import { userOut } from "../services/serialize.js";
+import { getMailbox } from "../services/mailbox/settings.js";
 
 function dbBytes(deps: Deps) {
   let total = 0;
@@ -55,13 +56,19 @@ export function healthSnapshot(deps: Deps) {
       .select()
       .from(domains)
       .all()
-      .map((d) => ({
-        name: d.name,
-        status: d.status,
-        last_ingest_at: d.lastIngestAt,
-        last_checked_at: d.lastCheckedAt,
-        dns_missing: d.dnsMissingJson ? (JSON.parse(d.dnsMissingJson) as unknown[]).length : 0,
-      })),
+      .map((d) => {
+        const mailbox = d.transport === "imap" ? getMailbox(deps, d.id) : null;
+        return {
+          name: d.name,
+          transport: d.transport,
+          status: d.status,
+          last_poll_at: mailbox?.lastPollAt ?? null,
+          last_poll_error: mailbox?.lastPollError ?? null,
+          last_ingest_at: d.lastIngestAt,
+          last_checked_at: d.lastCheckedAt,
+          dns_missing: d.dnsMissingJson ? (JSON.parse(d.dnsMissingJson) as unknown[]).length : 0,
+        };
+      }),
     ingest: metrics.ingest.entries().map(([l, v]) => ({ ...l, count: v })),
     http: metrics.http.entries().map(([l, v]) => ({ ...l, count: v })),
     jobs: Object.fromEntries(metrics.jobs),

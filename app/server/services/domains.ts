@@ -2,6 +2,12 @@ import { eq } from "drizzle-orm";
 import type { Deps } from "../context.js";
 import { domains, type Domain } from "../db/schema.js";
 import { CloudflareError } from "../cloudflare/index.js";
+import { checkMailboxDomain } from "./mailbox/check.js";
+
+/** (Re)check a domain with its transport: Cloudflare setup, or the IMAP/SMTP connection test. */
+export function checkDomain(deps: Deps, domain: Domain): Promise<Domain> {
+  return domain.transport === "imap" ? checkMailboxDomain(deps, domain) : setupDomain(deps, domain);
+}
 
 /**
  * (Re)configure Cloudflare for a domain: find zone, enable Email Routing, point the catch-all rule
