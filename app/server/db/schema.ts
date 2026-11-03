@@ -1,9 +1,15 @@
 import { sqliteTable, text, integer, real, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 
-/** Users exist only through SSO: created on first OpenID Connect login, role synced from IdP groups. */
+/**
+ * Users come from single sign-on (created at the first OpenID Connect login, role synced from IdP groups) or are
+ * local accounts with a password (when local login is enabled).
+ */
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
-  oidcSub: text("oidc_sub").notNull().unique(),
+  /** OpenID Connect subject; null for local accounts. */
+  oidcSub: text("oidc_sub").unique(),
+  /** scrypt hash ("scrypt$N$r$p$salt$hash"); null for SSO-only accounts. */
+  passwordHash: text("password_hash"),
   email: text("email").notNull(),
   name: text("name"),
   role: text("role", { enum: ["admin", "user"] })
@@ -28,6 +34,20 @@ export const sessions = sqliteTable(
   (t) => [index("sessions_user_idx").on(t.userId)],
 );
 
+/** One-time invitations to create a local account. */
+export const invites = sqliteTable("invites", {
+  id: text("id").primaryKey(),
+  tokenHash: text("token_hash").notNull().unique(),
+  email: text("email").notNull(),
+  role: text("role", { enum: ["admin", "user"] })
+    .notNull()
+    .default("user"),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  usedAt: integer("used_at"),
+});
+
 export const apiKeys = sqliteTable(
   "api_keys",
   {
@@ -48,6 +68,10 @@ export const apiKeys = sqliteTable(
 export const domains = sqliteTable("domains", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),
+  /** How mail reaches the app: Cloudflare Email Routing + Worker, or polling an IMAP catch-all mailbox. */
+  transport: text("transport", { enum: ["cloudflare", "imap"] })
+    .notNull()
+    .default("cloudflare"),
   cfZoneId: text("cf_zone_id"),
   status: text("status", { enum: ["pending", "active", "error"] })
     .notNull()
@@ -68,6 +92,36 @@ export const domains = sqliteTable("domains", {
   lastIngestAt: integer("last_ingest_at"),
 });
 
+/** Mailbox settings of a domain whose transport is "imap": mail is polled over IMAP and forwarded over SMTP. */
+export const domainMailboxes = sqliteTable("domain_mailboxes", {
+  domainId: text("domain_id")
+    .primaryKey()
+    .references(() => domains.id, { onDelete: "cascade" }),
+  imapHost: text("imap_host").notNull(),
+  imapPort: integer("imap_port").notNull().default(993),
+  imapTls: integer("imap_tls", { mode: "boolean" }).notNull().default(true),
+  imapUser: text("imap_user").notNull(),
+  /** Encrypted with APP_SECRET (lib/secrets.ts). */
+  imapPasswordEnc: text("imap_password_enc").notNull(),
+  imapFolder: text("imap_folder").notNull().default("INBOX"),
+  /** Folder processed mail is moved to (created if missing); null deletes it after processing. */
+  imapDoneFolder: text("imap_done_folder").default("Processed"),
+  smtpHost: text("smtp_host"),
+  smtpPort: integer("smtp_port").default(465),
+  /** "tls" (implicit, 465), "starttls" (587) or "none". */
+  smtpSecurity: text("smtp_security", { enum: ["tls", "starttls", "none"] }).default("tls"),
+  smtpUser: text("smtp_user"),
+  smtpPasswordEnc: text("smtp_password_enc"),
+  /** Envelope / From address used for forwarded and verification mail. */
+  smtpFrom: text("smtp_from"),
+  pollSeconds: integer("poll_seconds").notNull().default(60),
+  lastPollAt: integer("last_poll_at"),
+  lastPollError: text("last_poll_error"),
+  /** Highest IMAP UID processed (with uidValidity) to never process a mail twice. */
+  lastUid: integer("last_uid").notNull().default(0),
+  uidValidity: integer("uid_validity"),
+});
+
 export const destinations = sqliteTable(
   "destinations",
   {
@@ -83,6 +137,9 @@ export const destinations = sqliteTable(
     /** Armored OpenPGP public key: forwarded mail is encrypted for it (PGP/MIME). */
     pgpPublicKey: text("pgp_public_key"),
     pgpFingerprint: text("pgp_fingerprint"),
+    /** Verification by the app itself (destinations used without Cloudflare): hash of the emailed token. */
+    verifyTokenHash: text("verify_token_hash"),
+    verifySentAt: integer("verify_sent_at"),
     /** Replace the visible subject of encrypted forwards with "...". */
     pgpHideSubject: integer("pgp_hide_subject", { mode: "boolean" }).notNull().default(false),
   },

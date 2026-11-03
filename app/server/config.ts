@@ -47,6 +47,13 @@ const EnvSchema = z.object({
   OIDC_PROVIDER_NAME: z.string().default("Authelia"),
   /** Allow an http:// issuer (local development / tests only). */
   OIDC_ALLOW_INSECURE: bool,
+  /**
+   * Local accounts (e-mail + password). "auto" (default) enables them only when single sign-on is not configured;
+   * "true" offers both; "false" disables them.
+   */
+  LOCAL_LOGIN: z.enum(["auto", "true", "false"]).default("auto"),
+  /** Key for secrets stored in the database (IMAP/SMTP passwords). 32+ characters; required to add IMAP domains. */
+  APP_SECRET: z.string().min(32, "APP_SECRET must be at least 32 characters").optional(),
 });
 
 export type Config = ReturnType<typeof loadConfig>;
