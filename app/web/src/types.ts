@@ -4,6 +4,8 @@ export interface User {
   email: string;
   name: string | null;
   role: Role;
+  /** "local": e-mail + password; "sso": single sign-on. */
+  auth: "local" | "sso";
   disabled: boolean;
   created_at: number;
   last_login_at: number | null;

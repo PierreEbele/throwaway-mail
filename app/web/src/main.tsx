@@ -6,7 +6,9 @@ import "./index.css";
 import { AuthProvider, LiveEvents, useAuth } from "./auth";
 import { ToastProvider, Spinner } from "./components/ui";
 import { Layout } from "./components/Layout";
-import { LoginPage } from "./pages/AuthPages";
+import { LoginPage } from "./pages/auth/LoginPage";
+import { SetupPage } from "./pages/auth/SetupPage";
+import { InvitePage } from "./pages/auth/InvitePage";
 import { MailboxPage } from "./pages/mailbox/MailboxPage";
 import { AccountPage } from "./pages/settings/AccountPage";
 import { DestinationsPage } from "./pages/settings/DestinationsPage";
@@ -49,6 +51,15 @@ function App() {
           </PublicOnly>
         }
       />
+      <Route
+        path="/setup"
+        element={
+          <PublicOnly>
+            <SetupPage />
+          </PublicOnly>
+        }
+      />
+      <Route path="/invite/:token" element={<InvitePage />} />
       <Route
         path="/"
         element={

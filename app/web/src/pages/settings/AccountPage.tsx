@@ -5,6 +5,7 @@ import { BackupCard } from "./BackupCard";
 import { DirectoriesCard } from "./DirectoriesCard";
 import { NotificationsCard } from "./NotificationsCard";
 import { PanicCard } from "./PanicCard";
+import { PasswordCard } from "./PasswordCard";
 import { PushTargetsCard } from "./PushTargetsCard";
 
 export function AccountPage() {
@@ -20,10 +21,12 @@ export function AccountPage() {
           Member since {fullDate(user?.created_at)} · last sign-in {fullDate(user?.last_login_at)}
         </p>
         <p className="text-zinc-500">
-          Your identity, password and two-factor settings are managed by {ssoProvider}. Your role here follows your {ssoProvider} groups and
-          is refreshed at every sign-in.
+          {user?.auth === "local"
+            ? "Local account: an admin manages your role."
+            : `Your identity, password and two-factor settings are managed by ${ssoProvider}. Your role here follows your ${ssoProvider} groups and is refreshed at every sign-in.`}
         </p>
       </div>
+      {user?.auth === "local" && <PasswordCard />}
       <NotificationsCard />
       <PushTargetsCard />
       <DirectoriesCard />

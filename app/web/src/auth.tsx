@@ -11,15 +11,30 @@ interface AuthState {
   loading: boolean;
   ssoEnabled: boolean;
   ssoProvider: string;
+  localEnabled: boolean;
+  setupRequired: boolean;
   cloudflareMode: "live" | "mock" | "unconfigured" | null;
 }
-const Ctx = createContext<AuthState>({ user: null, loading: true, ssoEnabled: false, ssoProvider: "SSO", cloudflareMode: null });
+const Ctx = createContext<AuthState>({
+  user: null,
+  loading: true,
+  ssoEnabled: false,
+  ssoProvider: "SSO",
+  localEnabled: false,
+  setupRequired: false,
+  cloudflareMode: null,
+});
 export const useAuth = () => useContext(Ctx);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const status = useQuery({
     queryKey: ["status"],
-    queryFn: () => get<{ sso: { enabled: boolean; provider: string }; cloudflare_mode: AuthState["cloudflareMode"] }>("/v1/auth/status"),
+    queryFn: () =>
+      get<{
+        sso: { enabled: boolean; provider: string };
+        local: { enabled: boolean; setup_required: boolean };
+        cloudflare_mode: AuthState["cloudflareMode"];
+      }>("/v1/auth/status"),
     staleTime: 60_000,
   });
   const me = useQuery({
@@ -43,6 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading: me.isLoading || status.isLoading,
         ssoEnabled: status.data?.sso.enabled ?? false,
         ssoProvider: status.data?.sso.provider ?? "SSO",
+        localEnabled: status.data?.local.enabled ?? false,
+        setupRequired: status.data?.local.setup_required ?? false,
         cloudflareMode: status.data?.cloudflare_mode ?? null,
       }}
     >

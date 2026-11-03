@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, patch, post } from "../api";
-import type { AuditEntry, Domain, User } from "../types";
+import type { AuditEntry, Domain, Role, User } from "../types";
+import { InvitesCard, useCreateInvite } from "./admin/InvitesCard";
 import { useAuth } from "../auth";
 import { Badge, EmptyState, ErrorText, PageHeader, Spinner, confirmAction, useToast } from "../components/ui";
 import { useDomains } from "./Addresses";
@@ -274,32 +275,61 @@ export function DomainsPage() {
 export function UsersPage() {
   const qc = useQueryClient();
   const toast = useToast();
-  const { user: me, ssoProvider } = useAuth();
+  const { user: me, ssoEnabled, ssoProvider, localEnabled } = useAuth();
   const users = useQuery({ queryKey: ["admin-users"], queryFn: () => get<{ users: User[] }>("/v1/admin/users").then((r) => r.users) });
   const updateUser = useMutation({
-    mutationFn: ({ id, disabled }: { id: string; disabled: boolean }) => patch(`/v1/admin/users/${id}`, { disabled }),
+    mutationFn: ({ id, ...body }: { id: string; disabled?: boolean; role?: Role }) => patch(`/v1/admin/users/${id}`, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
     onError: (e) => toast((e as Error).message, "error"),
   });
+  const { create: resetLink, dialog } = useCreateInvite();
+  const subtitle = [
+    ssoEnabled && `${ssoProvider} accounts are created at their first sign-in and their role follows ${ssoProvider} groups.`,
+    localEnabled && "Local accounts join with an invite link; their role is set here.",
+    "Each user's addresses, messages, destinations and keys are private.",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
     <>
-      <PageHeader
-        title="Users"
-        subtitle={`Accounts are created automatically at the first ${ssoProvider} sign-in. Roles follow ${ssoProvider} groups. Each user's addresses, messages, destinations and keys are private.`}
-      />
+      <PageHeader title="Users" subtitle={subtitle} />
+      {localEnabled && <InvitesCard />}
       {users.isLoading && <Spinner />}
-      <ErrorText error={users.error} />
+      <ErrorText error={users.error ?? resetLink.error} />
       <ul className="card divide-y divide-zinc-200 dark:divide-zinc-800">
         {users.data?.map((u) => (
           <li key={u.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
             <div className="min-w-0 flex-1">
               <div className="truncate">{u.name ?? u.email}</div>
               <div className="truncate text-xs text-zinc-500">
-                {u.email} · last sign-in {timeAgo(u.last_login_at)}
+                {u.email} · {u.auth === "local" ? "local account" : ssoProvider} · last sign-in {timeAgo(u.last_login_at)}
               </div>
             </div>
-            <Badge value={u.role} />
+            {u.auth === "local" ? (
+              <select
+                className="input w-auto"
+                aria-label={`Role of ${u.email}`}
+                value={u.role}
+                onChange={(e) => updateUser.mutate({ id: u.id, role: e.target.value as Role })}
+              >
+                <option value="user">user</option>
+                <option value="admin">admin</option>
+              </select>
+            ) : (
+              <Badge value={u.role} />
+            )}
             {u.disabled && <Badge value="disabled" />}
+            {localEnabled && u.auth === "local" && (
+              <button
+                className="btn-ghost"
+                onClick={() =>
+                  confirmAction(`Create a password reset link for ${u.email}? Their sessions end when they use it.`) &&
+                  resetLink.mutate({ email: u.email, role: u.role })
+                }
+              >
+                Reset password
+              </button>
+            )}
             {u.id !== me?.id && (
               <button
                 className="btn-ghost"
@@ -314,6 +344,7 @@ export function UsersPage() {
           </li>
         ))}
       </ul>
+      {dialog}
     </>
   );
 }
