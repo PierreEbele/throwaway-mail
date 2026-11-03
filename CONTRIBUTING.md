@@ -8,7 +8,7 @@ pnpm dev        # API on :3000 (CF_MOCK=1 recommended)
 pnpm dev:web    # web UI on :5173, proxied to the API
 ```
 
-See README → _Development_ for the fake identity provider and the mail simulator.
+See [docs/development.md](docs/development.md) for the fake identity provider, the mail simulator and the tests.
 
 ## Before opening a pull request
 

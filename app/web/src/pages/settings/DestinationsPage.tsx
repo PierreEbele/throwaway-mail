@@ -157,7 +157,7 @@ function PgpRow({ d }: { d: Destination }) {
             aria-label="OpenPGP public key"
           />
           <p className="text-zinc-500">
-            The Worker then sends an encrypted PGP/MIME copy instead of forwarding (needs the SEND_EMAIL binding, see README).
+            The Worker then sends an encrypted PGP/MIME copy instead of forwarding (needs the SEND_EMAIL binding, see docs/installation.md).
           </p>
           <button className="btn-primary px-2 py-1 text-xs" disabled={!key.trim()} onClick={() => save({ pgp_public_key: key })}>
             Save key
