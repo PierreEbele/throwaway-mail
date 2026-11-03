@@ -1,6 +1,6 @@
 # Throwaway Mail
 
-Self-hosted disposable e-mail addresses on Cloudflare Email Routing. Give every website its own address, read
+Self-hosted disposable e-mail addresses on Cloudflare Email Routing or any catch-all IMAP mailbox. Give every website its own address, read
 verification codes in the web UI, the API or your browser, choose per site whether mail reaches your real mailbox, and
 see when a site leaks or sells your address.
 
@@ -10,7 +10,8 @@ Sender → Cloudflare MX → Email Routing catch-all → Email Worker ──HMAC
                                                         └── forward / reject ◀──┘
 ```
 
-No mail server to run: Cloudflare receives and forwards, the app stores, parses and decides. It fits on a 1 GB VPS.
+No mail server to run: Cloudflare receives and forwards, the app stores, parses and decides. Without Cloudflare, the
+app polls a catch-all mailbox of any provider over IMAP and forwards over SMTP. It fits on a 1 GB VPS.
 
 ## Features
 
@@ -47,6 +48,7 @@ No mail server to run: Cloudflare receives and forwards, the app stores, parses 
 
 - Multi-user: local accounts with invite links, and/or single sign-on (OpenID Connect, e.g. Authelia) with roles from identity-provider groups
 - The app configures Cloudflare itself (zones, catch-all rule, destinations)
+- Or no Cloudflare at all: domains backed by an IMAP catch-all mailbox, forwarding over SMTP
 - Docker Compose, online SQLite backups, health page, Prometheus metrics
 
 ## Try it locally
@@ -76,7 +78,8 @@ pnpm simulate --to <address> tests/fixtures/github-device-verification.eml
 
 ## Requirements
 
-- A domain whose DNS is on Cloudflare (free plan) with Email Routing
+- A domain whose DNS is on Cloudflare (free plan) with Email Routing, or a mail provider offering a catch-all
+  mailbox reachable over IMAP (SMTP for forwarding)
 - Docker, or Node.js 22+ and pnpm
 - Optional: an OpenID Connect provider (Authelia, Authentik, Keycloak, Zitadel…); without one, local accounts are used
 

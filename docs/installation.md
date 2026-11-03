@@ -11,6 +11,9 @@ verification mails.
 6. [Add a destination](#6-add-a-destination)
 7. [Install the extension and Bitwarden integration](#7-browser-extension-and-bitwarden)
 
+Not on Cloudflare? Skip steps 2 and 3 and see
+[Domain with an IMAP/SMTP mailbox](#domain-with-an-imapsmtp-mailbox-no-cloudflare).
+
 ## 1. Server
 
 Any small Linux VPS (1 vCPU, 1 GB RAM is plenty: the app uses about 40 MB and Caddy about 20 MB).
@@ -199,9 +202,47 @@ _Unknown addresses_ policy per domain:
 - `inbox`: kept in an _Unassigned_ box owned by the admin who added the domain.
 - `auto_create`: the address is created on the fly for that admin, named after the sender's domain (catch-all style).
 
+### Domain with an IMAP/SMTP mailbox (no Cloudflare)
+
+Instead of Cloudflare Email Routing, the app can poll an ordinary mailbox that receives all mail of the domain and
+forward over SMTP. Cloudflare credentials (`CF_API_TOKEN`, `CF_ACCOUNT_ID`) and the Worker are then not needed.
+
+**Provider requirements**
+
+- A **catch-all** mailbox for the domain (or an alias / wildcard that delivers every address to one mailbox), with
+  IMAP access. The provider should add `Delivered-To` or `X-Original-To` headers: the app reads the recipient from
+  them first (they also cover Bcc), then from `To` / `Cc`.
+- An **app password** (most providers refuse the main password over IMAP when two-factor authentication is on).
+- SMTP access with the same account, if mail should be forwarded or destinations verified by the app.
+- `APP_SECRET` set in `.env` (32+ characters, e.g. `openssl rand -hex 32`): IMAP/SMTP passwords are stored encrypted
+  with it. Without it the app refuses to add such a domain.
+
+**Setup.** **Admin → Domains → Add domain**, choose _IMAP + SMTP mailbox_ and fill in the server, login and password.
+Recommended folders: watch `INBOX` (or a folder a server-side rule files the domain's mail into) and move processed
+mail to `Processed` (created automatically); leave that field empty to delete processed mail. Mail for other
+addresses is left where it is. SMTP login and password default to the IMAP ones; _Sender address_ is the envelope
+sender of forwards (empty = the alias the mail was sent to; many providers only accept their own addresses here, so
+set it to the mailbox address). The domain becomes **active** once the connection test passes (IMAP login, folder
+exists, SMTP login); otherwise it shows the error. The card shows the last poll and its error; **Test connection**
+and **Edit settings** are next to it. Polling runs every _poll seconds_ (default 60, minimum 15).
+
+**Deliverability caveat.** Forwards are the original message, unchanged, sent through your SMTP server. The
+original sender's SPF does not cover your server, and DMARC of strict senders (banks, large platforms) may therefore
+fail at the destination: such mail can land in spam or be refused. Forward only to mailboxes you control and whose
+spam filter you can adjust (or that trust your provider), or use a destination with a PGP key: encrypted copies are
+new messages from the alias, which pass SPF/DMARC when your provider is in your domain's SPF record. A refused forward (5xx) is logged and skipped; a
+temporary error is retried at the next poll.
+
+A mailbox cannot bounce: mail the app would reject (unknown address with the `reject` policy, blocked sender…) is
+simply not stored and not forwarded, then moved like the rest.
+
 ## 6. Add a destination
 
 **Destinations → Add**. Cloudflare sends a verification e-mail to that mailbox. Click its link, then press **Check status**. Only verified destinations receive forwarded mail.
+
+Without Cloudflare (or when you tick _Send the verification link from this app_), the app sends the e-mail itself,
+through the SMTP server of the first active IMAP domain that has one. The link is valid for 48 hours and works once;
+**Resend** issues a new one. Forwarding from IMAP domains also requires a verified destination.
 
 Per site (address), toggle **Forward new mail to my mailbox** and pick the destination (default: your first verified one). The change applies to the next mail. Each mail records whether it was forwarded.
 

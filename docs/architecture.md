@@ -14,6 +14,26 @@ Sender → MX (Cloudflare) → Email Routing catch-all → Email Worker
 There is no SMTP server and no port 25: Cloudflare receives and forwards, the app stores, parses and decides. If the
 app is unreachable, the Worker forwards to `FALLBACK_FORWARD` or rejects with a temporary error.
 
+### Second transport: IMAP/SMTP mailbox
+
+```
+Sender → provider MX → catch-all mailbox ◀─IMAP poll─ App ─SMTP─▶ destinations
+```
+
+A domain with `transport = imap` needs no Cloudflare at all. `services/mailbox/` keeps one interval poller per such
+domain (`poll_seconds`, at least 15; IDLE is not used, a short poll is simpler to keep reliable across providers).
+Each poll opens the folder, resets `last_uid` when UIDVALIDITY changed, and handles up to 50 messages with a UID above
+`last_uid`: the recipient comes from `Delivered-To` / `X-Original-To` / `X-Envelope-To` / `Envelope-To`, else the first
+address of the domain in `To` / `Cc` (mail for nobody on the domain is left in place). The message goes through the
+same `ingestMessage()` as Worker mail; a `forward` decision is carried out over SMTP (the raw message unchanged, PGP
+copies as built by ingest), `reject` simply means no forward (a mailbox cannot bounce). `last_uid` is saved after each
+message, then the message is moved to the done folder or deleted. A temporary SMTP error aborts the poll and the
+message is retried (ingest deduplicates it); a permanent one (5xx) is logged and skipped. The IMAP and SMTP libraries
+(imapflow, nodemailer) sit behind `deps.mail` so tests use in-memory fakes.
+
+Destinations can also be verified by the app itself: a one-time link (`/v1/destinations/verify/<token>`, SHA-256 of the
+token stored, valid 48 h) is mailed through the SMTP server of the first active IMAP domain.
+
 ## Repository layout
 
 ```
@@ -22,6 +42,7 @@ app/server/            Hono API (Node 22, SQLite via Drizzle)
                        newsletters, backup, feeds, notify, smart-folders, directories, stale, domains, admin…
   services/            Business logic used by routes and jobs
     ingest/            index (pipeline), recipients, forwarding, effects (notifications, self-destruction), auth
+    mailbox/           IMAP poller, runner, SMTP forwarding, recipient detection, app-side destination verification
     addresses, categories, notify, pgp, reminders, retention, metrics, icons, domains, destinations
   lib/                 Pure helpers: senders (leak checks), phishing, trackers, listheaders, outbound, sanitize, time
   parser/              Verification-code and link extraction (English and French), pluggable strategies

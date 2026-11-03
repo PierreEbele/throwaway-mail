@@ -22,6 +22,7 @@ services:
       OIDC_ALLOWED_GROUPS: ${OIDC_ALLOWED_GROUPS:-}
       OIDC_PROVIDER_NAME: ${OIDC_PROVIDER_NAME:-Authelia}
       OIDC_SCOPES: ${OIDC_SCOPES:-openid profile email groups}
+      APP_SECRET: ${APP_SECRET:-}
       CF_MOCK: ${CF_MOCK:-0}
       CF_API_TOKEN: ${CF_API_TOKEN:-}
       CF_ACCOUNT_ID: ${CF_ACCOUNT_ID:-}
