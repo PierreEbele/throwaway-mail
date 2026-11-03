@@ -16,7 +16,10 @@ function streamOf(...chunks: string[]) {
 describe("SDK: SSE", () => {
   it("parses events split across chunks, CRLF, comments and multi-line data", async () => {
     const out = [];
-    for await (const m of parseSse(streamOf("event: a\r", "\ndata: {\"x\":", "1}\r\n\r\n: comment\n\ndata: l1\ndata: l2\nid: 7\n\n", "data: tail"))) out.push(m);
+    for await (const m of parseSse(
+      streamOf("event: a\r", '\ndata: {"x":', "1}\r\n\r\n: comment\n\ndata: l1\ndata: l2\nid: 7\n\n", "data: tail"),
+    ))
+      out.push(m);
     expect(out).toEqual([
       { event: "a", data: '{"x":1}' },
       { event: "message", data: "l1\nl2", id: "7" },
@@ -44,8 +47,15 @@ describe("SDK: SSE", () => {
   it("events() surfaces auth errors", async () => {
     const { t } = await sdkFixture();
     const { ThrowawayMail } = await import("../../sdk/src/index.js");
-    const bad = new ThrowawayMail({ baseUrl: "http://x", apiKey: "tm_invalid", fetch: (u, i) => Promise.resolve(t.app.request(new URL(u).pathname, i)) });
-    const err = await bad.events().next().catch((e) => e);
+    const bad = new ThrowawayMail({
+      baseUrl: "http://x",
+      apiKey: "tm_invalid",
+      fetch: (u, i) => Promise.resolve(t.app.request(new URL(u).pathname, i)),
+    });
+    const err = await bad
+      .events()
+      .next()
+      .catch((e) => e);
     expect(err).toBeInstanceOf(ThrowawayMailError);
     expect(err.status).toBe(401);
   });

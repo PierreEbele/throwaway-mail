@@ -13,7 +13,15 @@ export interface CategoryParams {
 }
 
 const body = (p: CategoryParams) =>
-  compact({ name: p.name, color: p.color, pinned: p.pinned, hidden: p.hidden, auto_match: p.autoMatch, retention_days: p.retentionDays, position: p.position });
+  compact({
+    name: p.name,
+    color: p.color,
+    pinned: p.pinned,
+    hidden: p.hidden,
+    auto_match: p.autoMatch,
+    retention_days: p.retentionDays,
+    position: p.position,
+  });
 
 export class Categories {
   constructor(private http: HttpClient) {}

@@ -1,12 +1,66 @@
-body.options{width:auto;max-width:520px;max-height:none;display:block;overflow:visible;padding:16px 20px}
-.options h1{font-size:20px;margin:0 0 6px}
-.options form{display:flex;flex-direction:column;gap:6px;margin-top:12px}
-.options form>label{font-size:11px;color:var(--muted);margin-top:6px}
-.options input,.options select{padding:8px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font:12px system-ui,sans-serif}
-.options .actions{margin-top:12px}
-.options #clear{align-self:flex-start;margin-top:6px}
-.options code{font-size:11px}
-.options .toggles{border:1px solid var(--line);border-radius:10px;margin:12px 0 0;padding:8px 12px;display:flex;flex-direction:column;gap:6px}
-.options .toggles legend{font-size:11px;color:var(--muted);padding:0 4px}
-.options .actions{border:0;padding:0;background:none}
-.options h1{font-size:18px}
+body.options {
+  width: auto;
+  max-width: 520px;
+  max-height: none;
+  display: block;
+  overflow: visible;
+  padding: 16px 20px;
+}
+.options h1 {
+  font-size: 20px;
+  margin: 0 0 6px;
+}
+.options form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+.options form > label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.options input,
+.options select {
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--ink);
+  font:
+    12px system-ui,
+    sans-serif;
+}
+.options .actions {
+  margin-top: 12px;
+}
+.options #clear {
+  align-self: flex-start;
+  margin-top: 6px;
+}
+.options code {
+  font-size: 11px;
+}
+.options .toggles {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.options .toggles legend {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 0 4px;
+}
+.options .actions {
+  border: 0;
+  padding: 0;
+  background: none;
+}
+.options h1 {
+  font-size: 18px;
+}

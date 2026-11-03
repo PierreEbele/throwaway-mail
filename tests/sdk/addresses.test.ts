@@ -24,7 +24,9 @@ describe("SDK: addresses", () => {
     const a = await tm.addresses.create({ siteName: "Shop", localPart: "shop1" });
     const b = await tm.addresses.create({ siteName: "Forum", localPart: "forum1" });
     await tm.addresses.update(b.id, { pinned: true });
-    expect(await ingest(t, a.email, simpleEml({ subject: "Your code", text: "Your verification code is 482913" }))).toMatchObject({ status: 200 });
+    expect(await ingest(t, a.email, simpleEml({ subject: "Your code", text: "Your verification code is 482913" }))).toMatchObject({
+      status: 200,
+    });
 
     expect((await tm.addresses.list({ pinned: true })).map((x) => x.id)).toEqual([b.id]);
     expect((await tm.addresses.list({ hasCode: true, unread: true, sinceHours: 1 })).map((x) => x.id)).toEqual([a.id]);

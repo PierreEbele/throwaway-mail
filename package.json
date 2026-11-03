@@ -2,7 +2,14 @@
   "name": "throwaway-mail",
   "version": "1.0.0",
   "private": true,
+  "description": "Self-hosted disposable e-mail addresses on Cloudflare Email Routing, with code extraction, forwarding and a web UI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PierreEbele/throwaway-mail.git"
+  },
   "type": "module",
+  "packageManager": "pnpm@12.14.0",
   "engines": {
     "node": ">=22"
   },
@@ -18,7 +25,10 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "simulate": "tsx scripts/simulate-mail.ts",
-    "fake-oidc": "tsx scripts/fake-idp.ts"
+    "fake-oidc": "tsx scripts/fake-idp.ts",
+    "lint": "tsc --noEmit --noUnusedLocals --noUnusedParameters -p tsconfig.json && tsc --noEmit --noUnusedLocals --noUnusedParameters -p app/web/tsconfig.json && prettier --check .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
@@ -48,6 +58,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "drizzle-kit": "^0.31.11",
     "esbuild": "^0.28.2",
+    "prettier": "^3.9.10",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^7.18.5",
@@ -56,6 +67,5 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"
-  },
-  "packageManager": "pnpm@12.14.0"
+  }
 }

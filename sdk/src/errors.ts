@@ -9,7 +9,14 @@ export class ThrowawayMailError extends Error {
   /** Seconds from the `Retry-After` header, when the server sent one (429). */
   readonly retryAfter: number | null;
 
-  constructor(status: number, code: string, message: string, details?: unknown, retryAfter: number | null = null, options?: { cause?: unknown }) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    details?: unknown,
+    retryAfter: number | null = null,
+    options?: { cause?: unknown },
+  ) {
     super(message, options);
     this.status = status;
     this.code = code;

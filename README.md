@@ -86,7 +86,7 @@ Do **not** put Authelia's `forward_auth` in front of the app: `/ingest` (Cloudfl
 
 Firewall: open TCP 80 and 443 (and UDP 443 for HTTP/3). Nothing else is needed: no mail ports.
 
-DNS for the app: create an `A` (and `AAAA`) record for `APP_DOMAIN` pointing at the VPS. If that record is on Cloudflare, use **DNS only** (grey cloud) so Caddy can obtain its certificate. If you prefer the orange cloud, set SSL mode to *Full (strict)* after Caddy has its certificate.
+DNS for the app: create an `A` (and `AAAA`) record for `APP_DOMAIN` pointing at the VPS. If that record is on Cloudflare, use **DNS only** (grey cloud) so Caddy can obtain its certificate. If you prefer the orange cloud, set SSL mode to _Full (strict)_ after Caddy has its certificate.
 
 Updating:
 
@@ -102,19 +102,19 @@ Logs are JSON lines: `docker compose logs -f app`. Health: `https://APP_DOMAIN/h
 
 Every mail domain must use Cloudflare DNS, in the same account as the Worker.
 
-Create an API token (*My Profile → API Tokens → Create custom token*) with:
+Create an API token (_My Profile → API Tokens → Create custom token_) with:
 
-| Scope | Permission | Used for |
-|---|---|---|
-| Zone → Zone | Read | find the zone of a domain |
-| Zone → Zone Settings | Read | read Email Routing status and required DNS records (**Edit** only if the app must enable Email Routing on a zone that doesn't have it yet) |
-| Zone → Email Routing Rules | Edit | read and set the catch-all rule |
-| Zone → DNS | Read | report missing MX/SPF records |
-| Account → Email Routing Addresses | Edit | create destinations (sends the verification mail), read their state |
+| Scope                             | Permission | Used for                                                                                                                                   |
+| --------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Zone → Zone                       | Read       | find the zone of a domain                                                                                                                  |
+| Zone → Zone Settings              | Read       | read Email Routing status and required DNS records (**Edit** only if the app must enable Email Routing on a zone that doesn't have it yet) |
+| Zone → Email Routing Rules        | Edit       | read and set the catch-all rule                                                                                                            |
+| Zone → DNS                        | Read       | report missing MX/SPF records                                                                                                              |
+| Account → Email Routing Addresses | Edit       | create destinations (sends the verification mail), read their state                                                                        |
 
-Zone resources: *All zones* (or only your mail domains). Account resources: your account. `CF_ACCOUNT_ID` is shown on the dashboard overview page.
+Zone resources: _All zones_ (or only your mail domains). Account resources: your account. `CF_ACCOUNT_ID` is shown on the dashboard overview page.
 
-If the zone has no Email Routing yet and the token only has Zone Settings: Read, enable Email Routing once from the dashboard (*Email → Email Routing → Get started*) and press **Re-check**; the app then only sets the catch-all rule.
+If the zone has no Email Routing yet and the token only has Zone Settings: Read, enable Email Routing once from the dashboard (_Email → Email Routing → Get started_) and press **Re-check**; the app then only sets the catch-all rule.
 
 The DNS records that Email Routing needs (three MX records plus an SPF TXT record) are added by Cloudflare when Email Routing is enabled. The domain page in the app lists any that are missing.
 
@@ -159,22 +159,22 @@ Login is SSO only: there are no local passwords, setup tokens or invites. A user
 2. Add the client to Authelia's `configuration.yml` under `identity_providers.oidc.clients`, then restart Authelia:
 
    ```yaml
-   - client_id: 'throwaway-mail'
-     client_name: 'Throwaway Mail'
-     client_secret: '$pbkdf2-sha512$...'          # the digest
+   - client_id: "throwaway-mail"
+     client_name: "Throwaway Mail"
+     client_secret: "$pbkdf2-sha512$..." # the digest
      public: false
-     authorization_policy: 'two_factor'           # or one of your policies
-     consent_mode: 'implicit'
+     authorization_policy: "two_factor" # or one of your policies
+     consent_mode: "implicit"
      require_pkce: true
-     pkce_challenge_method: 'S256'
+     pkce_challenge_method: "S256"
      redirect_uris:
-       - 'https://jetable.example.com/v1/auth/oidc/callback'
-     scopes: ['openid', 'profile', 'email', 'groups']
-     response_types: ['code']
-     grant_types: ['authorization_code']
-     userinfo_signed_response_alg: 'none'
-     id_token_signed_response_alg: 'RS256'
-     token_endpoint_auth_method: 'client_secret_basic'
+       - "https://jetable.example.com/v1/auth/oidc/callback"
+     scopes: ["openid", "profile", "email", "groups"]
+     response_types: ["code"]
+     grant_types: ["authorization_code"]
+     userinfo_signed_response_alg: "none"
+     id_token_signed_response_alg: "RS256"
+     token_endpoint_auth_method: "client_secret_basic"
    ```
 
 3. In the app's `.env`: `OIDC_ISSUER=https://auth.example.com`, `OIDC_CLIENT_ID=throwaway-mail`, `OIDC_CLIENT_SECRET=$SECRET`. The redirect URI is always `APP_URL` + `/v1/auth/oidc/callback`.
@@ -187,7 +187,7 @@ Any OpenID Connect provider works the same way (Keycloak, Authentik, Zitadel…)
 
 1. finds the Cloudflare zone (the domain itself or a parent zone),
 2. enables Email Routing,
-3. sets the catch-all rule to *Send to Worker → `WORKER_NAME`*,
+3. sets the catch-all rule to _Send to Worker → `WORKER_NAME`_,
 4. checks DNS.
 
 Status is **active** when all is in place, **pending** with a list of missing DNS records, or **error** with Cloudflare's message. Fix the problem and press **Re-check**.
@@ -196,10 +196,10 @@ Status is **active** when all is in place, **pending** with a list of missing DN
 
 Every zone whose catch-all points to the Worker must be added in the app. Mail for a domain the app doesn't know is rejected.
 
-*Unknown addresses* policy per domain:
+_Unknown addresses_ policy per domain:
 
 - `reject` (default): mail to addresses that do not exist is rejected.
-- `inbox`: kept in an *Unassigned* box owned by the admin who added the domain.
+- `inbox`: kept in an _Unassigned_ box owned by the admin who added the domain.
 - `auto_create`: the address is created on the fly for that admin, named after the sender's domain (catch-all style).
 
 ## 7. Add a destination (personal mailbox)
@@ -331,30 +331,30 @@ Adding a parser fixture: drop an `.eml` in `tests/fixtures` and add its expected
 
 ## 11. Configuration reference
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `APP_DOMAIN` | `localhost` | Hostname Caddy serves (Compose only) |
-| `APP_URL` | `https://$APP_DOMAIN` | Primary public URL (SSO redirect URI, OpenAPI) |
-| `APP_EXTRA_URLS` | empty | Other public URLs of the same app; register `<url>/v1/auth/oidc/callback` for each in the IdP |
-| `INGEST_SECRET` | dev value | HMAC secret shared with the Worker (required in production unless `CF_MOCK=1`) |
-| `CF_API_TOKEN`, `CF_ACCOUNT_ID` | | Cloudflare credentials (domain and destination actions fail clearly without them) |
-| `WORKER_NAME` | `throwaway-mail-ingest` | Worker the catch-all rules point to |
-| `CF_MOCK` | `0` | `1` = fake Cloudflare |
-| `RETENTION_DAYS` | `30` | Message retention, `0` = forever |
-| `MAX_INGEST_BYTES` | 25 MB | Larger mails get 413 (the Worker then uses its fallback) |
-| `RATE_LIMIT_PER_MINUTE` | `240` | Per API key / user / IP |
-| `LOGIN_RATE_LIMIT_PER_MINUTE` | `20` | Per IP on SSO login and callback |
-| `SESSION_TTL_DAYS` | `14` | Browser session lifetime |
-| `OIDC_ISSUER`, `OIDC_CLIENT_SECRET` | | SSO provider and client secret (required in production) |
-| `OIDC_CLIENT_ID` | `throwaway-mail` | SSO client id |
-| `OIDC_ADMIN_GROUP` | `admins` | IdP group mapped to the admin role |
-| `OIDC_ALLOWED_GROUPS` | empty | Comma-separated groups allowed to sign in |
-| `OIDC_PROVIDER_NAME` | `Authelia` | Label of the sign-in button |
-| `APP_PORT` | `3310` | Host port (127.0.0.1) when behind your own proxy |
-| `LOG_LEVEL` | `info` | Codes and bodies are never logged above `debug` |
-| `BACKUP_KEEP_DAYS` | `14` | Backup rotation |
-| `PARSER_LLM_FALLBACK` | `0` | Enables the (stub) LLM fallback hook |
-| `DATA_DIR` / `DATABASE_PATH` | `./data` / `$DATA_DIR/throwaway.db` | Storage |
+| Variable                            | Default                             | Meaning                                                                                       |
+| ----------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------- |
+| `APP_DOMAIN`                        | `localhost`                         | Hostname Caddy serves (Compose only)                                                          |
+| `APP_URL`                           | `https://$APP_DOMAIN`               | Primary public URL (SSO redirect URI, OpenAPI)                                                |
+| `APP_EXTRA_URLS`                    | empty                               | Other public URLs of the same app; register `<url>/v1/auth/oidc/callback` for each in the IdP |
+| `INGEST_SECRET`                     | dev value                           | HMAC secret shared with the Worker (required in production unless `CF_MOCK=1`)                |
+| `CF_API_TOKEN`, `CF_ACCOUNT_ID`     |                                     | Cloudflare credentials (domain and destination actions fail clearly without them)             |
+| `WORKER_NAME`                       | `throwaway-mail-ingest`             | Worker the catch-all rules point to                                                           |
+| `CF_MOCK`                           | `0`                                 | `1` = fake Cloudflare                                                                         |
+| `RETENTION_DAYS`                    | `30`                                | Message retention, `0` = forever                                                              |
+| `MAX_INGEST_BYTES`                  | 25 MB                               | Larger mails get 413 (the Worker then uses its fallback)                                      |
+| `RATE_LIMIT_PER_MINUTE`             | `240`                               | Per API key / user / IP                                                                       |
+| `LOGIN_RATE_LIMIT_PER_MINUTE`       | `20`                                | Per IP on SSO login and callback                                                              |
+| `SESSION_TTL_DAYS`                  | `14`                                | Browser session lifetime                                                                      |
+| `OIDC_ISSUER`, `OIDC_CLIENT_SECRET` |                                     | SSO provider and client secret (required in production)                                       |
+| `OIDC_CLIENT_ID`                    | `throwaway-mail`                    | SSO client id                                                                                 |
+| `OIDC_ADMIN_GROUP`                  | `admins`                            | IdP group mapped to the admin role                                                            |
+| `OIDC_ALLOWED_GROUPS`               | empty                               | Comma-separated groups allowed to sign in                                                     |
+| `OIDC_PROVIDER_NAME`                | `Authelia`                          | Label of the sign-in button                                                                   |
+| `APP_PORT`                          | `3310`                              | Host port (127.0.0.1) when behind your own proxy                                              |
+| `LOG_LEVEL`                         | `info`                              | Codes and bodies are never logged above `debug`                                               |
+| `BACKUP_KEEP_DAYS`                  | `14`                                | Backup rotation                                                                               |
+| `PARSER_LLM_FALLBACK`               | `0`                                 | Enables the (stub) LLM fallback hook                                                          |
+| `DATA_DIR` / `DATABASE_PATH`        | `./data` / `$DATA_DIR/throwaway.db` | Storage                                                                                       |
 
 Design choices and assumptions are recorded in [DECISIONS.md](DECISIONS.md).
 
@@ -362,12 +362,12 @@ Design choices and assumptions are recorded in [DECISIONS.md](DECISIONS.md).
 
 `extension/` is a fork of Fable 1.7.0 (MIT, by Numeriane), a fake-identity form filler. The fork keeps everything Fable does and adds:
 
-- **Real disposable addresses.** With a server and API key configured, *Remplir le formulaire* first creates an address for the open site (`site_name` = host name, label `Fable · <fake name>`) and fills it instead of the `@example.com` address. One address per site and profile; it is reused if you fill again on the same host.
-- **Verification code.** The popup then shows a *Code de vérification* panel: *Attendre le code* long-polls `GET /v1/addresses/:id/code` (up to 2 × 55 s, the popup must stay open), then *Copier* or *Coller dans la page* (an `autocomplete="one-time-code"` field, the focused field, a field named like code/otp, or one-digit boxes). Mails with only a confirmation link show the link. Nothing is ever submitted.
-- **Automatic prompt.** On a page that looks like a sign-up form (new-password field, two password fields, or an e-mail field with sign-up wording), a small card offers *Générer et remplir*: a fresh identity, a new address for that site, filled in one click. *Ne plus proposer sur ce site* remembers the host.
+- **Real disposable addresses.** With a server and API key configured, _Remplir le formulaire_ first creates an address for the open site (`site_name` = host name, label `Fable · <fake name>`) and fills it instead of the `@example.com` address. One address per site and profile; it is reused if you fill again on the same host.
+- **Verification code.** The popup then shows a _Code de vérification_ panel: _Attendre le code_ long-polls `GET /v1/addresses/:id/code` (up to 2 × 55 s, the popup must stay open), then _Copier_ or _Coller dans la page_ (an `autocomplete="one-time-code"` field, the focused field, a field named like code/otp, or one-digit boxes). Mails with only a confirmation link show the link. Nothing is ever submitted.
+- **Automatic prompt.** On a page that looks like a sign-up form (new-password field, two password fields, or an e-mail field with sign-up wording), a small card offers _Générer et remplir_: a fresh identity, a new address for that site, filled in one click. _Ne plus proposer sur ce site_ remembers the host.
 - **Code pasted automatically.** After a fill with a disposable address, the page waits for the mail (through the background script, 20 s long polls, up to 15 min) and pastes the code into the code field as soon as it arrives, even after the site moves to its "enter the code" page.
-- **"Fill code" chip.** Even without a fill in progress, when a page shows a one-time-code field (`autocomplete="one-time-code"`, a name/id/placeholder like code/otp/verification/2fa, a 4–8 character numeric field, or 4–8 one-digit boxes), the extension looks up this site's address (the current identity's, the pending one, or `GET /v1/addresses?site=<host>` with an exact `site_name` match), fetches the latest code from the last 15 min and shows a small *Remplir le code 123456* chip under the field; clicking fills it (input/change events).
-- **Right-click menu.** *Générer une adresse Throwaway ici* on any editable field reuses this site's address (or creates one) and inserts it.
+- **"Fill code" chip.** Even without a fill in progress, when a page shows a one-time-code field (`autocomplete="one-time-code"`, a name/id/placeholder like code/otp/verification/2fa, a 4–8 character numeric field, or 4–8 one-digit boxes), the extension looks up this site's address (the current identity's, the pending one, or `GET /v1/addresses?site=<host>` with an exact `site_name` match), fetches the latest code from the last 15 min and shows a small _Remplir le code 123456_ chip under the field; clicking fills it (input/change events).
+- **Right-click menu.** _Générer une adresse Throwaway ici_ on any editable field reuses this site's address (or creates one) and inserts it.
 - **Toolbar badge.** For the active tab's site, the badge shows the address's unread count, or a red `!` if a leak was detected. Refreshed on tab switch/load and every 2 min.
 - **Permissions.** Host access is `http://*/*` + `https://*/*` (not `<all_urls>`): the sign-up prompt and code paste run as content scripts on every web page and the background fills tabs with `scripting` without a click, so per-site access is still required; `file://`/`ftp://` are no longer requested.
 - **New identity for every new site** by default; filling again on the same site keeps the same identity.
@@ -376,10 +376,10 @@ Design choices and assumptions are recorded in [DECISIONS.md](DECISIONS.md).
 
 Setup:
 
-1. In the app: *API keys → Create*, name it `firefox`.
+1. In the app: _API keys → Create_, name it `firefox`.
 2. Build: `./scripts/pack-extension.sh` → `dist/fable-throwaway-<version>.xpi`.
-3. Firefox: `about:debugging#/runtime/this-firefox` → *Load Temporary Add-on* → pick `extension/manifest.json` (removed at restart). For a permanent install, sign it as *unlisted* on addons.mozilla.org (`web-ext sign --channel unlisted`), or use Firefox Developer Edition with `xpinstall.signatures.required=false`.
-4. Extension settings (*Réglages Throwaway Mail* in the popup footer): server `https://mail.example.com`, paste the key, *Tester la connexion*, pick the domain, *Enregistrer*. Firefox asks for access to that server only.
+3. Firefox: `about:debugging#/runtime/this-firefox` → _Load Temporary Add-on_ → pick `extension/manifest.json` (removed at restart). For a permanent install, sign it as _unlisted_ on addons.mozilla.org (`web-ext sign --channel unlisted`), or use Firefox Developer Edition with `xpinstall.signatures.required=false`.
+4. Extension settings (_Réglages Throwaway Mail_ in the popup footer): server `https://mail.example.com`, paste the key, _Tester la connexion_, pick the domain, _Enregistrer_. Firefox asks for access to that server only.
 
 The key is stored in the extension's local storage and only sent to the configured server. The API is reached directly with the Bearer key (no Authelia); Firefox extensions with host permission are not subject to CORS, so the server needs no change.
 
@@ -387,11 +387,10 @@ The key is stored in the extension's local storage and only sent to the configur
 
 The app answers the SimpleLogin and addy.io alias APIs, so the username generator of the Bitwarden clients (browser extension, desktop, mobile, web vault — all work with Vaultwarden) can create addresses here and save them straight into the login item.
 
-1. In the app: *API keys → Create*, name it `bitwarden`.
-2. In Bitwarden: *Generator → Username → Forwarded email alias*, then either:
-   - **SimpleLogin** (recommended): API key = the `tm_…` key, *Self-host server URL* = `https://mail.example.com`. The address goes to your first active domain.
-   - **addy.io**: same key and server URL, plus *Email domain* = one of your domains (e.g. `example.dev`) to choose it.
-3. Click *Regenerate* in a login item: the address is created, with the website as its site name (from the `hostname` parameter, or the "Website: … Generated by Bitwarden" note).
+1. In the app: _API keys → Create_, name it `bitwarden`.
+2. In Bitwarden: _Generator → Username → Forwarded email alias_, then either:
+   - **SimpleLogin** (recommended): API key = the `tm_…` key, _Self-host server URL_ = `https://mail.example.com`. The address goes to your first active domain.
+   - **addy.io**: same key and server URL, plus _Email domain_ = one of your domains (e.g. `example.dev`) to choose it.
+3. Click _Regenerate_ in a login item: the address is created, with the website as its site name (from the `hostname` parameter, or the "Website: … Generated by Bitwarden" note).
 
 Endpoints: `POST /api/alias/random/new[?hostname=]` (header `Authentication: tm_…`, returns `{ alias }`) and `POST /api/v1/aliases` (`Authorization: Bearer tm_…`, body `{ domain, description }`, returns `{ data: { email } }`). They accept any origin (CORS `*`, no cookies) because the web vault and desktop app call them cross-origin; only the API key authenticates.
-

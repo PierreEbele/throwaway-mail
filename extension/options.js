@@ -1,5 +1,5 @@
 "use strict";
-const $ = id => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 function status(message, error = false) {
   $("status").textContent = message;
   $("status").dataset.tone = error ? "error" : "normal";
@@ -24,18 +24,25 @@ async function formConfig() {
 }
 
 const TOGGLES = { "auto-prompt": "autoPrompt", "auto-code": "autoCode", "always-new": "alwaysNew" };
-const toggles = () => ({ ...Object.fromEntries(Object.entries(TOGGLES).map(([id, key]) => [key, $(id).checked])), bitwardenMode: $("bitwarden-mode").checked, identityTtlHours: Number($("identity-ttl").value) });
+const toggles = () => ({
+  ...Object.fromEntries(Object.entries(TOGGLES).map(([id, key]) => [key, $(id).checked])),
+  bitwardenMode: $("bitwarden-mode").checked,
+  identityTtlHours: Number($("identity-ttl").value),
+});
 // Désactivés par défaut / 24 h par défaut, contrairement aux autres automatismes.
-for (const id of ["bitwarden-mode", "identity-ttl"]) $(id).addEventListener("change", async () => {
-  await browser.storage.local.set(toggles());
-  await browser.runtime.sendMessage({ type: "purge" }).catch(() => {});
-  status("Automatismes enregistrés.");
-});
-for (const id of Object.keys(TOGGLES)) $(id).addEventListener("change", async () => {
-  await browser.storage.local.set(toggles());
-  if ($("auto-prompt").checked || $("auto-code").checked) await browser.permissions.request({ origins: ["http://*/*", "https://*/*"] }).catch(() => {});
-  status("Automatismes enregistrés.");
-});
+for (const id of ["bitwarden-mode", "identity-ttl"])
+  $(id).addEventListener("change", async () => {
+    await browser.storage.local.set(toggles());
+    await browser.runtime.sendMessage({ type: "purge" }).catch(() => {});
+    status("Automatismes enregistrés.");
+  });
+for (const id of Object.keys(TOGGLES))
+  $(id).addEventListener("change", async () => {
+    await browser.storage.local.set(toggles());
+    if ($("auto-prompt").checked || $("auto-code").checked)
+      await browser.permissions.request({ origins: ["http://*/*", "https://*/*"] }).catch(() => {});
+    status("Automatismes enregistrés.");
+  });
 
 $("test").addEventListener("click", async () => {
   try {
@@ -44,17 +51,21 @@ $("test").addEventListener("click", async () => {
     const me = await Throwaway.request("/v1/auth/me", { cfg });
     const n = await loadDomains(cfg, cfg.domain);
     status(`Connecté en tant que ${me.user?.name || me.user?.email || "?"} · ${n} domaine(s) disponible(s).`);
-  } catch (e) { status(e.status === 401 ? "Clé API invalide ou révoquée." : `Échec : ${e.message}`, true); }
+  } catch (e) {
+    status(e.status === 401 ? "Clé API invalide ou révoquée." : `Échec : ${e.message}`, true);
+  }
 });
 
-$("form").addEventListener("submit", async event => {
+$("form").addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
     const cfg = await formConfig();
     await Throwaway.request("/v1/auth/me", { cfg });
     await browser.storage.local.set({ tmServer: cfg.server, tmApiKey: cfg.apiKey, tmDomain: cfg.domain, ...toggles() });
     status("Enregistré. Les prochains remplissages utiliseront Throwaway Mail.");
-  } catch (e) { status(e.status === 401 ? "Clé API invalide ou révoquée : rien n’a été enregistré." : `Échec : ${e.message}`, true); }
+  } catch (e) {
+    status(e.status === 401 ? "Clé API invalide ou révoquée : rien n’a été enregistré." : `Échec : ${e.message}`, true);
+  }
 });
 
 $("clear").addEventListener("click", async () => {
@@ -73,8 +84,12 @@ $("clear").addEventListener("click", async () => {
   $("server").value = cfg.server || "https://mail.example.com";
   $("api-key").value = cfg.apiKey;
   if (cfg.server && cfg.apiKey) {
-    try { await loadDomains(cfg, cfg.domain); status("Throwaway Mail est actif."); }
-    catch { status("Serveur injoignable ou clé invalide.", true); }
+    try {
+      await loadDomains(cfg, cfg.domain);
+      status("Throwaway Mail est actif.");
+    } catch {
+      status("Serveur injoignable ou clé invalide.", true);
+    }
   }
 })();
 

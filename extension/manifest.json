@@ -3,13 +3,7 @@
   "name": "Fable × Throwaway Mail",
   "version": "1.11.0",
   "description": "Fork de Fable 1.7.0 : identités fictives + vraies adresses jetables Throwaway Mail, avec récupération du code de vérification.",
-  "permissions": [
-    "alarms",
-    "activeTab",
-    "menus",
-    "scripting",
-    "storage"
-  ],
+  "permissions": ["alarms", "activeTab", "menus", "scripting", "storage"],
   "action": {
     "default_title": "Fable × Throwaway Mail",
     "default_popup": "popup.html",
@@ -28,9 +22,7 @@
       "id": "throwaway-mail@extension",
       "strict_min_version": "140.0",
       "data_collection_permissions": {
-        "required": [
-          "none"
-        ]
+        "required": ["none"]
       }
     }
   },
@@ -38,26 +30,14 @@
     "page": "options.html",
     "open_in_tab": true
   },
-  "host_permissions": [
-    "http://*/*",
-    "https://*/*"
-  ],
+  "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
-    "scripts": [
-      "generator.js",
-      "throwaway.js",
-      "background.js"
-    ]
+    "scripts": ["generator.js", "throwaway.js", "background.js"]
   },
   "content_scripts": [
     {
-      "matches": [
-        "http://*/*",
-        "https://*/*"
-      ],
-      "js": [
-        "content.js"
-      ],
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
       "run_at": "document_idle"
     }
   ]

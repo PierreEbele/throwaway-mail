@@ -185,7 +185,11 @@ export class Addresses {
 
   /** Creates a fresh address with the same settings; returns the new one. */
   async replace(id: string, p: { archiveOld?: boolean } = {}, opts?: RequestOptions): Promise<{ address: Address; replacedId: string }> {
-    const r = await this.http.post<{ address: Address; replaced_id: string }>(`/v1/addresses/${seg(id)}/replace`, { archive_old: p.archiveOld ?? false }, opts);
+    const r = await this.http.post<{ address: Address; replaced_id: string }>(
+      `/v1/addresses/${seg(id)}/replace`,
+      { archive_old: p.archiveOld ?? false },
+      opts,
+    );
     return { address: r.address, replacedId: r.replaced_id };
   }
 

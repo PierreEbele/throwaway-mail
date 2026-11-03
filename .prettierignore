@@ -1,0 +1,7 @@
+dist
+data
+pnpm-lock.yaml
+app/server/db/migrations
+test-results
+playwright-report
+extension/icons

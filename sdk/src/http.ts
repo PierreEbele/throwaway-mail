@@ -105,7 +105,13 @@ async function toError(res: Response): Promise<ThrowawayMailError> {
   } catch {
     /* not JSON */
   }
-  return new ThrowawayMailError(res.status, `http_${res.status}`, text.slice(0, 200) || res.statusText || `HTTP ${res.status}`, undefined, retryAfter);
+  return new ThrowawayMailError(
+    res.status,
+    `http_${res.status}`,
+    text.slice(0, 200) || res.statusText || `HTTP ${res.status}`,
+    undefined,
+    retryAfter,
+  );
 }
 
 /** `encodeURIComponent` for path segments. */

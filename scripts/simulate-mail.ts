@@ -21,7 +21,10 @@ async function main() {
     /* no .env */
   }
   const to = arg("to");
-  const file = process.argv.slice(2).filter((a, i, all) => !a.startsWith("--") && !all[i - 1]?.startsWith("--")).pop();
+  const file = process.argv
+    .slice(2)
+    .filter((a, i, all) => !a.startsWith("--") && !all[i - 1]?.startsWith("--"))
+    .pop();
   if (!to || !file) {
     console.error("usage: pnpm simulate --to <address> [--from sender@x] [--url http://localhost:3000] [--secret ...] <file.eml>");
     process.exit(2);

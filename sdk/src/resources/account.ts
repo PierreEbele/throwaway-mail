@@ -34,7 +34,9 @@ export class Account {
 
   /** Pauses every address (or one category's); `undo` resumes them. */
   async panic(p: { action?: "pause" | "undo"; categoryId?: string | null } = {}, opts?: RequestOptions): Promise<number> {
-    return (await this.http.post<{ affected: number }>("/v1/panic", compact({ action: p.action ?? "pause", category_id: p.categoryId }), opts)).affected;
+    return (
+      await this.http.post<{ affected: number }>("/v1/panic", compact({ action: p.action ?? "pause", category_id: p.categoryId }), opts)
+    ).affected;
   }
 
   /** Categories and addresses as JSON (no messages). */

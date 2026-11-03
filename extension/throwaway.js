@@ -21,13 +21,13 @@ const Throwaway = (() => {
   }
 
   async function request(path, { method = "GET", body, cfg } = {}) {
-    const c = cfg || await config();
+    const c = cfg || (await config());
     if (!c.server || !c.apiKey) throw new Error("NOT_CONFIGURED");
     const res = await fetch(c.server + path, {
       method,
       headers: { authorization: "Bearer " + c.apiKey, ...(body ? { "content-type": "application/json" } : {}) },
       body: body ? JSON.stringify(body) : undefined,
-      credentials: "omit"
+      credentials: "omit",
     });
     if (res.status === 204) return null;
     const data = await res.json().catch(() => null);
@@ -46,7 +46,12 @@ const Throwaway = (() => {
     const data = await request("/v1/addresses", {
       method: "POST",
       cfg: c,
-      body: { site_name: url.hostname, site_url: url.origin, label: label ? `Fable · ${label}` : "Fable", ...(c.domain ? { domain: c.domain } : {}) }
+      body: {
+        site_name: url.hostname,
+        site_url: url.origin,
+        label: label ? `Fable · ${label}` : "Fable",
+        ...(c.domain ? { domain: c.domain } : {}),
+      },
     });
     return { id: data.id, email: data.email, host: url.hostname, createdAt: data.address?.created_at ?? Date.now() };
   }
@@ -54,7 +59,7 @@ const Throwaway = (() => {
   // Adresse déjà créée pour ce site (site_name = nom d'hôte exact ; `site` côté serveur est un LIKE).
   async function siteAddress(host) {
     const data = await request(`/v1/addresses?site=${encodeURIComponent(host)}&status=active&limit=50`);
-    return (data?.addresses || []).find(a => String(a.site_name || "").toLowerCase() === host.toLowerCase()) || null;
+    return (data?.addresses || []).find((a) => String(a.site_name || "").toLowerCase() === host.toLowerCase()) || null;
   }
 
   // Attend (long polling, 55 s max par appel) un code arrivé après `since`.

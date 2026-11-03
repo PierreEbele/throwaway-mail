@@ -66,7 +66,12 @@ export async function startFakeIdp(opts: { port?: number; clientId: string; clie
         denyNext = null;
       } else {
         const code = crypto.randomBytes(16).toString("hex");
-        codes.set(code, { user: current, nonce: p.get("nonce") ?? undefined, challenge: p.get("code_challenge") ?? "", redirectUri: redirect.href.split("?")[0]! });
+        codes.set(code, {
+          user: current,
+          nonce: p.get("nonce") ?? undefined,
+          challenge: p.get("code_challenge") ?? "",
+          redirectUri: redirect.href.split("?")[0]!,
+        });
         redirect.searchParams.set("code", code);
       }
       redirect.searchParams.set("state", p.get("state") ?? "");
@@ -84,7 +89,10 @@ export async function startFakeIdp(opts: { port?: number; clientId: string; clie
       const entry = codes.get(form.get("code") ?? "");
       codes.delete(form.get("code") ?? "");
       if (!entry) return send(400, { error: "invalid_grant" });
-      const challenge = crypto.createHash("sha256").update(form.get("code_verifier") ?? "").digest("base64url");
+      const challenge = crypto
+        .createHash("sha256")
+        .update(form.get("code_verifier") ?? "")
+        .digest("base64url");
       if (challenge !== entry.challenge) return send(400, { error: "invalid_grant", error_description: "PKCE mismatch" });
       const access = crypto.randomBytes(16).toString("hex");
       tokens.set(access, entry.user);
@@ -124,7 +132,11 @@ export async function startFakeIdp(opts: { port?: number; clientId: string; clie
 // CLI: pnpm fake-oidc  (port 3298, client throwaway-mail / dev-secret)
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop()!)) {
   const port = Number(process.env.FAKE_IDP_PORT ?? 3298);
-  startFakeIdp({ port, clientId: process.env.OIDC_CLIENT_ID ?? "throwaway-mail", clientSecret: process.env.OIDC_CLIENT_SECRET ?? "dev-oidc-secret" }).then((idp) => {
+  startFakeIdp({
+    port,
+    clientId: process.env.OIDC_CLIENT_ID ?? "throwaway-mail",
+    clientSecret: process.env.OIDC_CLIENT_SECRET ?? "dev-oidc-secret",
+  }).then((idp) => {
     console.log(`fake OIDC provider on ${idp.issuer} (switch user: ${idp.issuer}/_as?user=alice)`);
   });
 }

@@ -14,7 +14,7 @@ import { ThrowawayMail, ThrowawayMailError } from "@throwaway-mail/sdk";
 const tm = new ThrowawayMail({
   baseUrl: "https://mail-app.example.com",
   apiKey: process.env.TM_API_KEY!, // tm_…, created under "API keys"
-  timeoutMs: 30_000,               // optional, per request
+  timeoutMs: 30_000, // optional, per request
   // fetch: customFetch,           // optional
 });
 ```
@@ -91,15 +91,15 @@ try {
 
 ## Other resources
 
-| Namespace | Methods |
-| --- | --- |
-| `categories` | `list`, `create`, `update`, `delete`, `reorder` |
-| `smartFolders` | `list`, `create`, `delete` |
-| `directories` | `list`, `create`, `delete` |
-| `destinations` | `list`, `create`, `update` (PGP key), `refresh`, `resendVerification`, `delete` |
-| `notifications` | `list`, `create`, `update`, `delete`, `test` |
-| `addresses` | also `get`, `replace`, `senders`, `setFeed`, `stats` |
-| `account` | `digest`, `leaks`, `blockLeak`, `staleAddresses`, `cleanupStale`, `panic`, `export`, `import`, `keys.list/create/revoke` |
+| Namespace       | Methods                                                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `categories`    | `list`, `create`, `update`, `delete`, `reorder`                                                                          |
+| `smartFolders`  | `list`, `create`, `delete`                                                                                               |
+| `directories`   | `list`, `create`, `delete`                                                                                               |
+| `destinations`  | `list`, `create`, `update` (PGP key), `refresh`, `resendVerification`, `delete`                                          |
+| `notifications` | `list`, `create`, `update`, `delete`, `test`                                                                             |
+| `addresses`     | also `get`, `replace`, `senders`, `setFeed`, `stats`                                                                     |
+| `account`       | `digest`, `leaks`, `blockLeak`, `staleAddresses`, `cleanupStale`, `panic`, `export`, `import`, `keys.list/create/revoke` |
 
 ## Build
 

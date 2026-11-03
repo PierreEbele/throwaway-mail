@@ -50,7 +50,12 @@ async function sign(secret: string, prefix: string, body: Uint8Array): Promise<s
 /** Builds a cloudflare:email EmailMessage (injected so tests run outside workerd). */
 export type MakeEmail = (from: string, to: string, raw: string) => unknown;
 
-export async function handleEmail(message: EmailMessageLike, env: Env, fetchImpl: typeof fetch = fetch, makeEmail?: MakeEmail): Promise<Outcome> {
+export async function handleEmail(
+  message: EmailMessageLike,
+  env: Env,
+  fetchImpl: typeof fetch = fetch,
+  makeEmail?: MakeEmail,
+): Promise<Outcome> {
   const raw = new Uint8Array(await new Response(message.raw).arrayBuffer());
   const ts = String(Math.floor(Date.now() / 1000));
   const timeout = Number(env.INGEST_TIMEOUT_MS || 5000);
@@ -78,33 +83,36 @@ export async function handleEmail(message: EmailMessageLike, env: Env, fetchImpl
   }
 
   switch (decision.action) {
-    case "forward":
-      {
-        const targets = decision.forward_to_all?.length ? decision.forward_to_all : decision.forward_to ? [decision.forward_to] : [];
-        let ok = 0;
-        for (const to of targets) {
-          try {
-            await message.forward(to);
-            ok++;
-          } catch (err) {
-            // Stored in the app already; a forwarding failure (e.g. destination unverified) must not bounce the mail.
-            console.error(JSON.stringify({ msg: "forward failed", to, err: String(err) }));
-          }
+    case "forward": {
+      const targets = decision.forward_to_all?.length ? decision.forward_to_all : decision.forward_to ? [decision.forward_to] : [];
+      let ok = 0;
+      for (const to of targets) {
+        try {
+          await message.forward(to);
+          ok++;
+        } catch (err) {
+          // Stored in the app already; a forwarding failure (e.g. destination unverified) must not bounce the mail.
+          console.error(JSON.stringify({ msg: "forward failed", to, err: String(err) }));
         }
-        for (const m of decision.send ?? []) {
-          try {
-            if (!env.SEND_EMAIL || !makeEmail) throw new Error("SEND_EMAIL binding missing (needed for PGP-encrypted forwarding)");
-            const raw = new TextDecoder().decode(Uint8Array.from(atob(m.raw_base64), (c) => c.charCodeAt(0)));
-            await env.SEND_EMAIL.send(makeEmail(m.from, m.to, raw));
-            ok++;
-          } catch (err) {
-            console.error(JSON.stringify({ msg: "encrypted send failed", to: m.to, err: String(err) }));
-          }
-        }
-        return ok ? "forwarded" : "stored";
       }
+      for (const m of decision.send ?? []) {
+        try {
+          if (!env.SEND_EMAIL || !makeEmail) throw new Error("SEND_EMAIL binding missing (needed for PGP-encrypted forwarding)");
+          const raw = new TextDecoder().decode(Uint8Array.from(atob(m.raw_base64), (c) => c.charCodeAt(0)));
+          await env.SEND_EMAIL.send(makeEmail(m.from, m.to, raw));
+          ok++;
+        } catch (err) {
+          console.error(JSON.stringify({ msg: "encrypted send failed", to: m.to, err: String(err) }));
+        }
+      }
+      return ok ? "forwarded" : "stored";
+    }
     case "reject":
-      message.setReject(decision.reason === "unknown_recipient" || decision.reason === "unknown_domain" ? "Unknown recipient" : "Recipient not accepting mail");
+      message.setReject(
+        decision.reason === "unknown_recipient" || decision.reason === "unknown_domain"
+          ? "Unknown recipient"
+          : "Recipient not accepting mail",
+      );
       return "rejected";
     default:
       return "stored";
@@ -148,7 +156,9 @@ async function fallback(message: EmailMessageLike, env: Env): Promise<Outcome> {
 export default {
   async email(message: EmailMessageLike, env: Env): Promise<void> {
     // Only resolvable inside workerd; loaded lazily so the module stays testable in Node.
-    const mod = (await import("cloudflare:email" as string).catch(() => null)) as { EmailMessage: new (from: string, to: string, raw: string) => unknown } | null;
+    const mod = (await import("cloudflare:email" as string).catch(() => null)) as {
+      EmailMessage: new (from: string, to: string, raw: string) => unknown;
+    } | null;
     await handleEmail(message, env, fetch, mod ? (from, to, raw) => new mod.EmailMessage(from, to, raw) : undefined);
   },
 };

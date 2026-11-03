@@ -24,7 +24,12 @@ export class Messages {
   }
 
   /** Bulk action on one address's messages: give either `ids` or `scope`. Returns the affected count. */
-  async bulk(addressId: string, action: BulkMessageAction, target: { ids: string[] } | { scope: BulkMessageScope }, opts?: RequestOptions): Promise<number> {
+  async bulk(
+    addressId: string,
+    action: BulkMessageAction,
+    target: { ids: string[] } | { scope: BulkMessageScope },
+    opts?: RequestOptions,
+  ): Promise<number> {
     const r = await this.http.post<{ affected: number }>(`/v1/addresses/${seg(addressId)}/messages/bulk`, { action, ...target }, opts);
     return r.affected;
   }

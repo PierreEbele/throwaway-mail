@@ -62,7 +62,8 @@ export interface NotifyTargetParams {
   enabled?: boolean;
 }
 
-const notifyBody = (p: NotifyTargetParams) => compact({ name: p.name, url: p.url, token: p.token, chat_id: p.chatId, events: p.events, enabled: p.enabled });
+const notifyBody = (p: NotifyTargetParams) =>
+  compact({ name: p.name, url: p.url, token: p.token, chat_id: p.chatId, events: p.events, enabled: p.enabled });
 
 export class Notifications {
   constructor(private http: HttpClient) {}
