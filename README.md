@@ -45,7 +45,7 @@ No mail server to run: Cloudflare receives and forwards, the app stores, parses 
 
 **Operations**
 
-- Single sign-on only (OpenID Connect, e.g. Authelia), roles from identity-provider groups, multi-user
+- Multi-user: local accounts with invite links, and/or single sign-on (OpenID Connect, e.g. Authelia) with roles from identity-provider groups
 - The app configures Cloudflare itself (zones, catch-all rule, destinations)
 - Docker Compose, online SQLite backups, health page, Prometheus metrics
 
@@ -78,7 +78,7 @@ pnpm simulate --to <address> tests/fixtures/github-device-verification.eml
 
 - A domain whose DNS is on Cloudflare (free plan) with Email Routing
 - Docker, or Node.js 22+ and pnpm
-- An OpenID Connect provider (Authelia, Authentik, Keycloak, Zitadel…)
+- Optional: an OpenID Connect provider (Authelia, Authentik, Keycloak, Zitadel…); without one, local accounts are used
 
 ## Contributing and security
 

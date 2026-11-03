@@ -20,3 +20,6 @@ reverse proxy or identity provider.
 - Run the app without network access to sensitive internal services: outbound requests (notifications, webhooks,
   one-click unsubscribe) refuse private addresses after DNS resolution, but DNS can change between check and connect.
 - `INGEST_SECRET` authenticates the Worker; keep it long and random.
+- With local accounts (`LOCAL_LOGIN`), finish the first-run setup right after the first start: until an admin
+  exists, anyone reaching the app can create it. Invite and reset links are bearer secrets; send them over a
+  private channel. Prefer single sign-on with two-factor authentication when you have an identity provider.

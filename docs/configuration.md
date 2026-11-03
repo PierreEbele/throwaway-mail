@@ -14,9 +14,10 @@ All settings are environment variables, usually in `.env` next to `docker-compos
 | `RETENTION_DAYS`                    | `30`                                | Message retention, `0` = forever                                                              |
 | `MAX_INGEST_BYTES`                  | 25 MB                               | Larger mails get 413 (the Worker then uses its fallback)                                      |
 | `RATE_LIMIT_PER_MINUTE`             | `240`                               | Per API key / user / IP                                                                       |
-| `LOGIN_RATE_LIMIT_PER_MINUTE`       | `10`                                | Per IP on SSO login and callback                                                              |
+| `LOGIN_RATE_LIMIT_PER_MINUTE`       | `10`                                | Per IP on sign-in endpoints (SSO, password, setup, invites)                                   |
 | `SESSION_TTL_DAYS`                  | `14`                                | Browser session lifetime                                                                      |
-| `OIDC_ISSUER`, `OIDC_CLIENT_SECRET` |                                     | SSO provider and client secret (required in production)                                       |
+| `LOCAL_LOGIN`                       | `auto`                              | Local accounts: `auto` (only without SSO), `true` (with SSO too), `false` (SSO only)          |
+| `OIDC_ISSUER`, `OIDC_CLIENT_SECRET` |                                     | SSO provider and client secret (optional; required when `LOCAL_LOGIN=false`)                  |
 | `OIDC_CLIENT_ID`                    | `throwaway-mail`                    | SSO client id                                                                                 |
 | `OIDC_ADMIN_GROUP`                  | `admins`                            | IdP group mapped to the admin role                                                            |
 | `OIDC_ALLOWED_GROUPS`               | empty                               | Comma-separated groups allowed to sign in                                                     |

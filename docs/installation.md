@@ -6,7 +6,7 @@ verification mails.
 1. [Server](#1-server)
 2. [Cloudflare token](#2-cloudflare-token)
 3. [Email Worker](#3-email-worker)
-4. [Single sign-on](#4-single-sign-on)
+4. [Accounts and single sign-on](#4-accounts-and-single-sign-on)
 5. [Add a domain](#5-add-a-domain)
 6. [Add a destination](#6-add-a-destination)
 7. [Install the extension and Bitwarden integration](#7-browser-extension-and-bitwarden)
@@ -23,7 +23,7 @@ sudo cp .env.example .env && sudo nano .env      # see below
 sudo docker compose --profile caddy up -d --build     # bundled Caddy with automatic TLS
 ```
 
-In `.env` set at least `APP_DOMAIN`, `INGEST_SECRET` (`openssl rand -hex 32`), the `OIDC_*` settings ([single sign-on](#4-single-sign-on)), and later `CF_API_TOKEN` / `CF_ACCOUNT_ID`. The app starts without Cloudflare credentials; domain and destination actions then show a clear error.
+In `.env` set at least `APP_DOMAIN`, `INGEST_SECRET` (`openssl rand -hex 32`), optionally the `OIDC_*` settings ([single sign-on](#4-accounts-and-single-sign-on)), and later `CF_API_TOKEN` / `CF_ACCOUNT_ID`. The app starts without Cloudflare credentials; domain and destination actions then show a clear error.
 
 **Behind an existing reverse proxy** (e.g. Caddy on the host): run `docker compose up -d` without the profile. The app listens on `127.0.0.1:${APP_PORT:-3310}`. A host Caddy block:
 
@@ -110,9 +110,41 @@ read -s CLOUDFLARE_API_TOKEN && export CLOUDFLARE_API_TOKEN
 pnpm exec wrangler deploy -c wrangler.local.toml
 ```
 
-## 4. Single sign-on
+## 4. Accounts and single sign-on
 
-Login is SSO only: there are no local passwords, setup tokens or invites. A user is created at their first sign-in. Members of `OIDC_ADMIN_GROUP` (default `admins`) are admins, and the role is re-synced at every sign-in. `OIDC_ALLOWED_GROUPS` can restrict who may sign in; otherwise Authelia's `authorization_policy` decides. Admins can disable a user in **Admin → Users**, which also signs them out and stops their API keys.
+Two ways to sign in, chosen with `LOCAL_LOGIN`:
+
+| `LOCAL_LOGIN`    | Local accounts                       | Single sign-on  |
+| ---------------- | ------------------------------------ | --------------- |
+| `auto` (default) | only when `OIDC_*` is not configured | when configured |
+| `true`           | yes                                  | when configured |
+| `false`          | no                                   | required        |
+
+The app refuses to start when neither is available. Admins can disable any user in **Admin → Users**, which also
+signs them out and stops their API keys.
+
+### Local accounts
+
+E-mail and password, hashed with scrypt.
+
+- **First run**: while there is no user at all, opening the app shows a setup page that creates the first admin.
+  It is refused as soon as any user exists.
+- **Invites**: in **Admin → Users**, enter an e-mail and a role to get a one-time link (`APP_URL/invite/…`, valid
+  7 days). Send it yourself; the app does not e-mail it. Opening it lets the person choose a password and signs
+  them in. Pending links can be revoked; creating a new link for the same e-mail replaces the old one.
+- **Password reset**: **Reset password** next to a local user creates the same kind of link for their existing
+  account. Using it sets a new password and signs out all their sessions. Users change their own password in
+  **Account** (other sessions are signed out).
+- **Roles** of local accounts are set by admins in **Admin → Users**; the last admin cannot be demoted.
+- Password logins share the `LOGIN_RATE_LIMIT_PER_MINUTE` budget per IP.
+
+When both methods are on, a local account and a single sign-on identity are never merged: a single sign-on login
+whose e-mail belongs to a local account is refused (`local_account_exists`), and SSO accounts cannot get a password
+or an invite. There is no automatic linking: give each person one kind of account.
+
+### Single sign-on
+
+A user is created at their first sign-in. Members of `OIDC_ADMIN_GROUP` (default `admins`) are admins, and the role is re-synced at every sign-in. `OIDC_ALLOWED_GROUPS` can restrict who may sign in; otherwise Authelia's `authorization_policy` decides.
 
 1. Generate a client secret and its digest:
 
