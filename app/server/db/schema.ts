@@ -410,9 +410,64 @@ export const notifyTargets = sqliteTable(
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
     lastOkAt: integer("last_ok_at"),
     lastError: text("last_error"),
+    /** Webhooks: deliveries that failed for good in a row (reset by a success). */
+    consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+    /** Webhooks: set when paused automatically after repeated failures (cleared by resuming). */
+    pausedAt: integer("paused_at"),
     createdAt: integer("created_at").notNull(),
   },
   (t) => [index("notify_targets_user_idx").on(t.userId)],
+);
+
+/** Outbox of webhook deliveries: one row per (event, webhook target), retried with exponential backoff. */
+export const webhookDeliveries = sqliteTable(
+  "webhook_deliveries",
+  {
+    id: text("id").primaryKey(),
+    targetId: text("target_id")
+      .notNull()
+      .references(() => notifyTargets.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Stable event id, the same for every target and every attempt (receivers deduplicate on it). */
+    eventId: text("event_id").notNull(),
+    eventType: text("event_type").notNull(),
+    /** JSON body, signed again at every attempt. */
+    payload: text("payload").notNull(),
+    status: text("status", { enum: ["pending", "delivered", "failed"] })
+      .notNull()
+      .default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: integer("next_attempt_at").notNull(),
+    lastStatus: integer("last_status"),
+    lastError: text("last_error"),
+    createdAt: integer("created_at").notNull(),
+    deliveredAt: integer("delivered_at"),
+  },
+  (t) => [
+    index("webhook_deliveries_due_idx").on(t.status, t.nextAttemptAt),
+    index("webhook_deliveries_target_idx").on(t.targetId, t.createdAt),
+  ],
+);
+
+/** App passwords for the SMTP submission server (only the SHA-256 of the random password is stored). */
+export const smtpPasswords = sqliteTable(
+  "smtp_passwords",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    passwordHash: text("password_hash").notNull().unique(),
+    /** First characters, to tell passwords apart in the UI. */
+    hint: text("hint").notNull(),
+    createdAt: integer("created_at").notNull(),
+    lastUsedAt: integer("last_used_at"),
+    revokedAt: integer("revoked_at"),
+  },
+  (t) => [index("smtp_passwords_user_idx").on(t.userId)],
 );
 
 /** Every mail whose sender does not match the address's site (the address column only keeps the latest). */
@@ -555,6 +610,7 @@ export type Destination = typeof destinations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type ReverseContact = typeof reverseContacts.$inferSelect;
 export type NotifyTarget = typeof notifyTargets.$inferSelect;
+export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
 export type ExtractedItem = typeof extractedItems.$inferSelect;
 export type Rule = typeof rules.$inferSelect;
 export type DeliveryFailure = typeof deliveryFailures.$inferSelect;
