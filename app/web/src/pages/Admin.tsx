@@ -9,6 +9,7 @@ import { fullDate, timeAgo } from "../util";
 
 import { AddDomainForm, POLICY_HELP } from "./admin/AddDomainForm";
 import { MailboxPanel } from "./admin/MailboxPanel";
+import { BackupCard, ProbeCard, type BackupHealth, type ProbeHealth } from "./admin/ReliabilityCards";
 
 export function DomainsPage() {
   const qc = useQueryClient();
@@ -347,6 +348,8 @@ interface Health {
   }>;
   ingest: Array<{ action: string; reason: string; count: number }>;
   jobs: Record<string, { at: number; ok: boolean; detail: string }>;
+  backup: BackupHealth;
+  probe: ProbeHealth;
 }
 
 const bytes = (n: number) => (n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`);
@@ -420,6 +423,10 @@ export function HealthPage() {
               </tbody>
             </table>
           </section>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <BackupCard b={h.backup} />
+            <ProbeCard p={h.probe} />
+          </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="card p-5">
               <h2 className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">Ingest since start</h2>
