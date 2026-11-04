@@ -233,6 +233,8 @@ expiring soon, new addresses, addresses silent for 30 days, and the leak history
 
 - **Export / import** JSON of addresses and categories (no mail). _Export encrypted_ protects the file with a
   passphrase (PBKDF2 + AES-256-GCM, done in the browser). Import skips existing addresses and unknown domains.
+- **Import from SimpleLogin or addy.io**: upload their alias export, preview, then import onto one of your domains;
+  **Export CSV** writes a simple `alias,note,enabled,…` file. See [Import from SimpleLogin and addy.io](import.md).
 - **Panic button**: pause every active address at once; _Undo_ resumes exactly those. A category's settings also
   have _Pause all_.
 - **API keys** for scripts, the extension and Bitwarden.

@@ -2,6 +2,7 @@ import { useAuth } from "../../auth";
 import { Badge, PageHeader } from "../../components/ui";
 import { fullDate } from "../../util";
 import { BackupCard } from "./BackupCard";
+import { ImportAliasesCard } from "./ImportAliasesCard";
 import { DirectoriesCard } from "./DirectoriesCard";
 import { NotificationsCard } from "./NotificationsCard";
 import { PanicCard } from "./PanicCard";
@@ -38,6 +39,7 @@ export function AccountPage() {
       <DirectoriesCard />
       <PanicCard />
       <BackupCard />
+      <ImportAliasesCard />
     </>
   );
 }

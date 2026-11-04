@@ -6,6 +6,9 @@ import { newId } from "../lib/crypto.js";
 import { LOCAL_PART_RE } from "../lib/email.js";
 import { parseList } from "../lib/senders.js";
 import { CATEGORY_COLORS } from "../services/categories.js";
+import { csvLine } from "../lib/csv.js";
+import { badRequest } from "../lib/errors.js";
+import { importAliases, parseAliasFile } from "../services/importers.js";
 
 /** Export and import of addresses and categories. */
 export function registerBackup(r: ApiRouter) {
@@ -171,6 +174,89 @@ export function registerBackup(r: ApiRouter) {
       d.bus.publish(user.id, { type: "category.changed" });
       d.bus.publish(user.id, { type: "address.created", address_id: "" });
       return c.json(result);
+    },
+  );
+
+  r.add(
+    {
+      method: "post",
+      path: "/v1/import/aliases",
+      summary: "Import aliases exported by SimpleLogin or addy.io (or a Throwaway Mail CSV), with a dry-run preview",
+      description:
+        "`content` is the exported file (CSV or JSON). `dry_run` (default true) only returns the plan. Without `domain`, each alias keeps its own domain, which must be a domain of this instance (e.g. your custom domain moved here).",
+      tags: ["addresses"],
+      auth: "user",
+      body: z.object({
+        content: z
+          .string()
+          .min(1)
+          .max(5 * 1024 * 1024),
+        format: z.enum(["auto", "simplelogin", "addy", "throwaway"]).default("auto"),
+        domain: z.string().trim().toLowerCase().optional(),
+        local_part: z.enum(["keep", "random"]).default("keep"),
+        category: z.string().trim().min(1).max(40).optional(),
+        include_disabled: z.boolean().default(true).describe("Import disabled aliases as paused addresses"),
+        dry_run: z.boolean().default(true),
+      }),
+    },
+    (c, { body }) => {
+      const d = c.get("deps");
+      const user = c.get("user")!;
+      const { format, aliases } = parseAliasFile(body.content, body.format);
+      if (aliases.length > 10_000) throw badRequest("At most 10 000 aliases per import");
+      const report = importAliases(d, user, aliases, body);
+      if (!body.dry_run && report.created) {
+        d.bus.publish(user.id, { type: "category.changed" });
+        d.bus.publish(user.id, { type: "address.created", address_id: "" });
+      }
+      return c.json({ format, ...report });
+    },
+  );
+
+  r.add(
+    {
+      method: "get",
+      path: "/v1/export/aliases.csv",
+      summary: "Export own addresses as CSV (alias,note,enabled,site_name,site_url,category,created_at)",
+      description: "The first three columns follow SimpleLogin's export layout; the file can be imported back with /v1/import/aliases.",
+      tags: ["addresses"],
+      auth: "user",
+    },
+    (c) => {
+      const d = c.get("deps");
+      const user = c.get("user")!;
+      const catName = new Map(
+        d.db
+          .select()
+          .from(categories)
+          .where(eq(categories.userId, user.id))
+          .all()
+          .map((x) => [x.id, x.name]),
+      );
+      const rows = d.db
+        .select({ a: addresses, domain: domains.name })
+        .from(addresses)
+        .innerJoin(domains, eq(domains.id, addresses.domainId))
+        .where(and(eq(addresses.userId, user.id), eq(addresses.isUnassigned, false)))
+        .orderBy(asc(addresses.createdAt))
+        .all();
+      const lines = [csvLine(["alias", "note", "enabled", "site_name", "site_url", "category", "created_at"])];
+      for (const { a, domain } of rows)
+        lines.push(
+          csvLine([
+            `${a.localPart}@${domain}`,
+            a.label,
+            a.status === "active" ? "true" : "false",
+            a.siteName,
+            a.siteUrl,
+            a.categoryId ? catName.get(a.categoryId) : null,
+            new Date(a.createdAt).toISOString(),
+          ]),
+        );
+      return c.body(lines.join("\r\n") + "\r\n", 200, {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="throwaway-mail-aliases.csv"`,
+      });
     },
   );
 }
