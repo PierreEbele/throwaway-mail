@@ -141,6 +141,13 @@
       "when": 1793763368450,
       "tag": "0019_security",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1793763389812,
+      "tag": "0020_mail_features",
+      "breakpoints": true
     }
   ]
 }

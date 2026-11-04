@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, uniqueIndex, index, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 /**
  * Users come from single sign-on (created at the first OpenID Connect login, role synced from IdP groups) or are
@@ -112,6 +112,10 @@ export const domains = sqliteTable("domains", {
   unknownPolicy: text("unknown_policy", { enum: ["reject", "inbox", "auto_create"] })
     .notNull()
     .default("reject"),
+  /** auto_create policy: owner of the created addresses (null: the domain owner). */
+  autoCreateUserId: text("auto_create_user_id").references(() => users.id, { onDelete: "set null" }),
+  /** auto_create policy: category of the created addresses (null: matched from the sender like a new address). */
+  autoCreateCategoryId: text("auto_create_category_id").references((): AnySQLiteColumn => categories.id, { onDelete: "set null" }),
   /** Catch-all rule that existed in Cloudflare before the app took it over (JSON), restored when the domain is removed. */
   previousCatchAllJson: text("previous_catch_all_json"),
   /** While set, mail to unknown addresses keeps being forwarded here (the old catch-all) and is queued for review. */
@@ -246,6 +250,8 @@ export const addresses = sqliteTable(
     burnedAt: integer("burned_at"),
     /** Set when the "expires soon" reminder was sent for the current expires_at. */
     expiryRemindedAt: integer("expiry_reminded_at"),
+    /** Reverse-alias replies: forwarded mail gets a per-sender Reply-To so replies go out from the alias. */
+    repliesEnabled: integer("replies_enabled", { mode: "boolean" }).notNull().default(false),
     /** Secret token of the address's RSS / JSON feed (null: feed disabled). */
     feedToken: text("feed_token").unique(),
   },
@@ -410,6 +416,28 @@ export const leakEvents = sqliteTable(
   (t) => [index("leak_events_user_idx").on(t.userId, t.senderDomain), index("leak_events_address_idx").on(t.addressId)],
 );
 
+/**
+ * Reverse-alias contacts: one per (address, external sender). Mail forwarded from the sender carries
+ * Reply-To: r+<token>@<domain>; a reply from a verified destination to it is sent from the alias to `email`.
+ */
+export const reverseContacts = sqliteTable(
+  "reverse_contacts",
+  {
+    id: text("id").primaryKey(),
+    addressId: text("address_id")
+      .notNull()
+      .references(() => addresses.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    name: text("name"),
+    token: text("token").notNull().unique(),
+    blocked: integer("blocked", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at").notNull(),
+    lastReplyAt: integer("last_reply_at"),
+    replyCount: integer("reply_count").notNull().default(0),
+  },
+  (t) => [uniqueIndex("reverse_contacts_address_email_uq").on(t.addressId, t.email)],
+);
+
 export const auditLog = sqliteTable(
   "audit_log",
   {
@@ -437,5 +465,6 @@ export type Address = typeof addresses.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type Destination = typeof destinations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
+export type ReverseContact = typeof reverseContacts.$inferSelect;
 export type NotifyTarget = typeof notifyTargets.$inferSelect;
 export type ExtractedItem = typeof extractedItems.$inferSelect;
