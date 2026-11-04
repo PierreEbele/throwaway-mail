@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, uniqueIndex, index, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, blob, uniqueIndex, index, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 /**
  * Users come from single sign-on (created at the first OpenID Connect login, role synced from IdP groups) or are
@@ -23,6 +23,11 @@ export const users = sqliteTable("users", {
   totpEnabledAt: integer("totp_enabled_at"),
   /** Last accepted TOTP time step, so a code cannot be replayed. */
   totpLastStep: integer("totp_last_step"),
+  /**
+   * JSON array of original header names kept when forwarding (lower case), besides the ones a mail needs to be read.
+   * Null: forwards keep every original header.
+   */
+  forwardHeaderAllowlistJson: text("forward_header_allowlist_json"),
 });
 
 /** One-time two-factor recovery codes (sha256 hashes). */
@@ -177,6 +182,8 @@ export const destinations = sqliteTable(
     verifySentAt: integer("verify_sent_at"),
     /** Replace the visible subject of encrypted forwards with "...". */
     pgpHideSubject: integer("pgp_hide_subject", { mode: "boolean" }).notNull().default(false),
+    /** Position in the user's fallback chain (null: not a fallback): tried in order when forwarding to the primary fails. */
+    fallbackPosition: integer("fallback_position"),
   },
   (t) => [uniqueIndex("destinations_user_email_uq").on(t.userId, t.email)],
 );
@@ -254,6 +261,8 @@ export const addresses = sqliteTable(
     repliesEnabled: integer("replies_enabled", { mode: "boolean" }).notNull().default(false),
     /** Secret token of the address's RSS / JSON feed (null: feed disabled). */
     feedToken: text("feed_token").unique(),
+    /** JSON array of destination ids tried in order when forwarding fails (null: the user's fallback chain). */
+    fallbackDestinationIdsJson: text("fallback_destination_ids_json"),
   },
   (t) => [uniqueIndex("addresses_domain_local_uq").on(t.domainId, t.localPart), index("addresses_user_idx").on(t.userId)],
 );
@@ -300,6 +309,14 @@ export const messages = sqliteTable(
     unsubscribeMailto: text("unsubscribe_mailto"),
     unsubscribeOneClick: integer("unsubscribe_one_click", { mode: "boolean" }).notNull().default(false),
     unsubscribedAt: integer("unsubscribed_at"),
+    /** The original header section as received (up to 256 KB), for the "original headers" view. */
+    rawHeaders: text("raw_headers"),
+    /** JSON [{id, name}] of the rules that matched this mail, in evaluation order. */
+    matchedRulesJson: text("matched_rules_json"),
+    /** Set while a rule holds the mail in quarantine (stored, not forwarded). */
+    quarantinedAt: integer("quarantined_at"),
+    /** A rule asked to remove attachments from the forwarded copy. */
+    stripAttachments: integer("strip_attachments", { mode: "boolean" }).notNull().default(false),
   },
   (t) => [
     uniqueIndex("messages_address_msgid_uq").on(t.addressId, t.messageIdHeader),
@@ -459,6 +476,77 @@ export const systemState = sqliteTable("system_state", {
   updatedAt: integer("updated_at").notNull(),
 });
 
+/**
+ * Per-user mail rules, evaluated in `position` order for every stored mail. A rule applies to all the user's
+ * addresses, or only to one address / one category.
+ */
+export const rules = sqliteTable(
+  "rules",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    addressId: text("address_id").references(() => addresses.id, { onDelete: "cascade" }),
+    categoryId: text("category_id").references(() => categories.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    position: integer("position").notNull().default(0),
+    /** "all": every condition must match; "any": one is enough. */
+    match: text("match", { enum: ["all", "any"] })
+      .notNull()
+      .default("all"),
+    conditionsJson: text("conditions_json").notNull(),
+    actionsJson: text("actions_json").notNull(),
+    matchCount: integer("match_count").notNull().default(0),
+    lastMatchedAt: integer("last_matched_at"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [index("rules_user_idx").on(t.userId, t.position)],
+);
+
+/**
+ * Raw MIME of a message, kept only while it may still be needed: quarantined mail (until released or deleted) and
+ * recently forwarded mail (so a failed delivery can be retried).
+ */
+export const messageRaw = sqliteTable("message_raw", {
+  messageId: text("message_id")
+    .primaryKey()
+    .references(() => messages.id, { onDelete: "cascade" }),
+  raw: blob("raw", { mode: "buffer" }).notNull(),
+  /** Deleted after this time (null: kept as long as the message is quarantined). */
+  keepUntil: integer("keep_until"),
+});
+
+/** Forwards that failed or were refused, with a plain-English reason. */
+export const deliveryFailures = sqliteTable(
+  "delivery_failures",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    addressId: text("address_id").references(() => addresses.id, { onDelete: "set null" }),
+    messageId: text("message_id").references(() => messages.id, { onDelete: "set null" }),
+    destination: text("destination").notNull(),
+    /** "cloudflare" (reported by the Worker) or "smtp" (IMAP domains, releases and retries). */
+    transport: text("transport", { enum: ["cloudflare", "smtp"] }).notNull(),
+    /** failed: temporary or unknown error; rejected: the destination refused it for good; bounced: returned later. */
+    kind: text("kind", { enum: ["failed", "rejected", "bounced"] }).notNull(),
+    reason: text("reason").notNull(),
+    detail: text("detail"),
+    /** The fallback destination that received the mail instead (null: nobody did). */
+    deliveredTo: text("delivered_to"),
+    retryCount: integer("retry_count").notNull().default(0),
+    lastRetryAt: integer("last_retry_at"),
+    /** Delivered by a retry, or dismissed by the user. */
+    resolvedAt: integer("resolved_at"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("delivery_failures_user_idx").on(t.userId, t.createdAt), index("delivery_failures_message_idx").on(t.messageId)],
+);
+
 export type User = typeof users.$inferSelect;
 export type Domain = typeof domains.$inferSelect;
 export type Address = typeof addresses.$inferSelect;
@@ -468,3 +556,5 @@ export type Message = typeof messages.$inferSelect;
 export type ReverseContact = typeof reverseContacts.$inferSelect;
 export type NotifyTarget = typeof notifyTargets.$inferSelect;
 export type ExtractedItem = typeof extractedItems.$inferSelect;
+export type Rule = typeof rules.$inferSelect;
+export type DeliveryFailure = typeof deliveryFailures.$inferSelect;
