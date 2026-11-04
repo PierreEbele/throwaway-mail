@@ -22,8 +22,11 @@ services:
       TZ: ${TZ:-UTC}
     volumes:
       - data:/data
+      # SMTP submission (SUBMISSION_* in .env): mount the certificate and publish the port.
+      # - /etc/letsencrypt/live/${APP_DOMAIN}:/certs:ro
     ports:
       - "127.0.0.1:${APP_PORT:-3310}:3000"
+      # - "587:587"   # SMTP submission (STARTTLS); use "465:465" with SUBMISSION_TLS=implicit
     mem_limit: 384m
     stop_grace_period: 15s
     logging:

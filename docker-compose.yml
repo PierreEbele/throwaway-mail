@@ -43,11 +43,22 @@ services:
       BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
       PROBE_SMTP_URL: ${PROBE_SMTP_URL:-}
       PROBE_FROM: ${PROBE_FROM:-}
+      SMTP_RELAY_URL: ${SMTP_RELAY_URL:-}
+      SMTP_RELAY_FROM: ${SMTP_RELAY_FROM:-}
+      # SMTP submission (send new mail from an alias with any mail client), off by default. Uncomment the
+      # variables, the certificate volume and the port below (docs/installation.md#smtp-submission-optional).
+      # SUBMISSION_PORT: 587
+      # SUBMISSION_TLS: starttls
+      # SUBMISSION_TLS_CERT: /certs/fullchain.pem
+      # SUBMISSION_TLS_KEY: /certs/privkey.pem
+      # SUBMISSION_HOSTNAME: ${APP_DOMAIN}
       TZ: ${TZ:-Europe/Paris}
     volumes:
       - data:/data
+      # - /etc/letsencrypt/live/${APP_DOMAIN}:/certs:ro
     ports:
       - "127.0.0.1:${APP_PORT:-3310}:3000"
+      # - "587:587"   # SMTP submission (STARTTLS); use "465:465" with SUBMISSION_TLS=implicit
     mem_limit: 384m
     stop_grace_period: 15s
     logging:

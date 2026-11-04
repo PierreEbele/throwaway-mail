@@ -127,6 +127,34 @@ permanent) and mailbox. _Retry_ sends the mail again to that mailbox over SMTP: 
 kept that long) when the app has an outgoing SMTP server for the domain. _Dismiss_ marks it handled. The mail itself
 is always kept in the app.
 
+## Sending new mail
+
+You can write to someone first, from any active alias, without waiting for them to mail you. Each recipient becomes a
+contact of the alias (see _Replies_ above), so the answer comes back through the alias and can be answered the same
+way. The mail leaves from the alias with the display name you choose; headers that identify you (`Received`,
+`X-Originating-IP`, `User-Agent`, `X-Mailer`, `Bcc`...) are removed. It needs the same outbound SMTP as replies.
+
+- **In the app**: _New mail_ in the address's _Replies_ card (from name, to, cc, subject, text).
+- **Through the API**: `POST /v1/addresses/:id/send` or `tm.addresses.send(id, {...})` (see [API](api.md#sending-new-mail)).
+- **From a mail client** (when the admin enabled SMTP submission): on _Account → Send from your aliases_, create an
+  SMTP password per device (shown once, revocable). The card shows the server, port and security to use; the user
+  name is your account e-mail. The From address must be one of your active aliases, anything else is refused. To
+  answer a contact you may also write to its reply address `r+…@domain`.
+
+Sending is limited per hour (shown on the card). Client setup, with the values from the card:
+
+- **Thunderbird**: _Account Settings → Outgoing Server (SMTP) → Add_: server name, port, _Connection security_
+  STARTTLS (587) or SSL/TLS (465), _Authentication method_ "Normal password", user name = your account e-mail. Then
+  for each alias, _Manage Identities → Add_: the alias as e-mail address, with the new outgoing server.
+- **iOS / iPadOS Mail**: _Settings → Apps → Mail → Mail Accounts → Add Account → Other → Add Mail Account_, e-mail =
+  the alias. For incoming mail enter your real mailbox (forwarding delivers there); for _Outgoing Mail Server_ enter
+  the server, your account e-mail and the SMTP password, then in the account's _SMTP_ settings turn _Use SSL_ on and
+  set the port.
+- **Android** (Thunderbird for Android / K-9 Mail, FairEmail): add an identity with the alias as address and an
+  outgoing server: the server above, port and STARTTLS or SSL/TLS as shown, user name = your account e-mail,
+  password = the SMTP password. Gmail's "Send mail as" works too, but first mails a confirmation link to the alias:
+  turn forwarding on before adding it.
+
 ## Leaks and protection
 
 An address belongs to one site. When a mail arrives from a sender whose domain does not match the site's (same brand
@@ -152,10 +180,16 @@ _Block everywhere_.
   - **ntfy**: full topic URL, optional access token.
   - **Gotify**: server URL and application token.
   - **Telegram**: bot token and chat id.
-  - **Webhook**: any URL, JSON body signed with HMAC-SHA256 (see [API → webhooks](api.md#webhooks)).
+  - **Webhook**: any URL (n8n, Zapier, Home Assistant...), JSON body signed with HMAC-SHA256 (see
+    [API → webhooks](api.md#webhooks)).
 
   Choose the events: verification codes (the code is in the title), every mail, possible leaks, address about to
-  expire, address burned. _Test_ sends a sample. Private or LAN URLs are reserved to admins.
+  expire, address burned, and for automation also address created / deleted / expired, mail blocked, mail sent from
+  an alias and forward failed. _Test_ sends a sample. Private or LAN URLs are reserved to admins.
+
+  Webhooks are queued and retried while the endpoint is down (for about an hour). _Recent deliveries_ shows each
+  delivery with its attempts, HTTP status and body; _Resend_ sends one again. After 5 deliveries in a row fail for
+  good, the webhook is paused and says so; _Resume_ turns it back on.
 
 ## On-the-fly addresses
 

@@ -12,7 +12,11 @@ Sender → MX (Cloudflare) → Email Routing catch-all → Email Worker
                     a failed target is replaced by the first fallback_to that accepts it; failures → POST /ingest/report
 ```
 
-There is no SMTP server and no port 25: Cloudflare receives and forwards, the app stores, parses and decides. If the
+There is no inbound SMTP server and no port 25: Cloudflare receives and forwards, the app stores, parses and decides.
+An optional SMTP _submission_ server (`services/submission.ts`, port 587/465, off by default) lets users send new mail
+from their aliases; it shares `services/sending.ts` with the compose dialog and `POST /v1/addresses/:id/send`, and
+leaves through the same outbound path as reverse-alias replies. Webhook notifications go through a persistent outbox
+(`services/webhooks.ts`, table `webhook_deliveries`) retried by a 15-second background job. If the
 app is unreachable, the Worker forwards to the address's cached destinations (`ROUTES` KV) or `FALLBACK_FORWARD`,
 queues a copy for the app (`RETRY_QUEUE`), or else rejects with a temporary error (see operations.md).
 

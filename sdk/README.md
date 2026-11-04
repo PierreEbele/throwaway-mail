@@ -42,7 +42,12 @@ const recent = await tm.addresses.list({ hasCode: true, sinceHours: 24 });
 
 await tm.addresses.move([addr.id], null); // bulk move to "uncategorised"; also addresses.bulk(ids, "archive" | "pin" | ...)
 await tm.addresses.extend(addr.id, 30);
+// New mail from the alias (needs outbound SMTP on the server); recipients become reverse-alias contacts.
+await tm.addresses.send(addr.id, { to: "support@example.com", subject: "Question", text: "Hello", fromName: "Alex" });
 await tm.addresses.delete(addr.id);
+
+// Webhook delivery log: deliveries(targetId), resend(targetId, deliveryId), resume(targetId).
+const log = await tm.notifications.deliveries("ntf_…");
 ```
 
 ## Waiting for a verification code

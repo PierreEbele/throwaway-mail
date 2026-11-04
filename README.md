@@ -42,7 +42,8 @@ app polls a catch-all mailbox of any provider over IMAP and forwards over SMTP. 
 
 **Integrations**
 
-- Push notifications: ntfy, Gotify, Telegram, signed webhooks
+- Push notifications: ntfy, Gotify, Telegram, signed webhooks with retries and a delivery log (n8n, Zapier, Home Assistant)
+- Send new mail from any alias: compose dialog, API, or any mail client through the optional SMTP submission server
 - Firefox and Chrome extension: fills sign-up forms with a fresh address and pastes the code
 - Bitwarden / Vaultwarden username generator (SimpleLogin and addy.io compatible API)
 - REST API with OpenAPI docs, live events (SSE) and a [Node.js SDK](sdk/README.md)

@@ -66,7 +66,28 @@ jetable.example.com {
 
 Do **not** put Authelia's `forward_auth` in front of the app: `/ingest` (Cloudflare Worker, HMAC-signed) and the API (Bearer keys) must reach it without an Authelia cookie. The app enforces SSO itself for everything else.
 
-Firewall: open TCP 80 and 443 (and UDP 443 for HTTP/3). Nothing else is needed: no mail ports.
+Firewall: open TCP 80 and 443 (and UDP 443 for HTTP/3). Nothing else is needed: no mail ports (unless you enable the
+optional [SMTP submission server](#smtp-submission-optional)).
+
+### SMTP submission (optional)
+
+Users can send **new** mail from their aliases with Thunderbird, iOS Mail, Android or any client. The app then needs an
+outbound path (`SMTP_RELAY_URL`, or the domain's own SMTP server for IMAP domains) and a listening port:
+
+1. Set `SUBMISSION_PORT=587` (STARTTLS) or `SUBMISSION_PORT=465` with `SUBMISSION_TLS=implicit`.
+2. Give a certificate for the name users will type (`SUBMISSION_HOSTNAME`, default the host of `APP_URL`):
+   `SUBMISSION_TLS_CERT` and `SUBMISSION_TLS_KEY` (PEM). The app refuses to start without one, because passwords would
+   travel in clear (`SUBMISSION_ALLOW_INSECURE=true` is for local development only). With certbot use
+   `/etc/letsencrypt/live/<domain>/fullchain.pem` and `privkey.pem`; a host Caddy keeps its certificates under
+   `/var/lib/caddy/.local/share/caddy/certificates/<issuer>/<domain>/`. Mount the directory read-only into the
+   container and restart the app after a renewal (the certificate is read at startup).
+3. Publish the port in `docker-compose.yml` (`- "587:587"`, commented out there) and open it in the firewall
+   (TCP 587 or 465). Port 25 is never needed.
+4. The relay must be allowed to send as your domains (SPF include and DKIM at the relay), or mail lands in spam.
+
+Each user creates an SMTP password on the Account page (see [user guide](user-guide.md#sending-new-mail)). Sending is
+limited to `SEND_RATE_LIMIT_PER_HOUR` mails per user; failed sign-ins count against the same per-IP budget and
+per-account lockout as the web login.
 
 DNS for the app: create an `A` (and `AAAA`) record for `APP_DOMAIN` pointing at the VPS. If that record is on Cloudflare, use **DNS only** (grey cloud) so Caddy can obtain its certificate. If you prefer the orange cloud, set SSL mode to _Full (strict)_ after Caddy has its certificate.
 
