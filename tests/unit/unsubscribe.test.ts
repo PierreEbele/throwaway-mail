@@ -61,6 +61,12 @@ describe("body links", () => {
     const text = "Thanks for reading.\nTo unsubscribe, visit https://n.io/l/42\nhttps://n.io/blog";
     expect(bodyUnsubscribeLinks({ text }).map((c) => c.url)).toEqual(["https://n.io/l/42"]);
   });
+  it("finds a small footer link next to privacy and terms", () => {
+    const html = `<table><tr><td style="font-size:11px"><p>OpenAI<br>1st Floor, Dublin 1</p>
+      <a href="https://e.customeriomail.com/unsubscribe/dgTQ7wQDAJ_ZBQGXYa1" style="color:#6e6e80;text-decoration:underline" target="_blank">Unsubscribe</a><br>
+      <a href="https://openai.com/policies/privacy-policy">Privacy</a> · <a href="https://openai.com/policies/terms-of-use">Terms</a></td></tr></table>`;
+    expect(links(html)).toEqual(["https://e.customeriomail.com/unsubscribe/dgTQ7wQDAJ_ZBQGXYa1"]);
+  });
   it("deduplicates repeated links", () =>
     expect(links(`<a href="https://n.io/u">Unsubscribe</a> <a href="https://n.io/u">unsubscribe</a>`)).toHaveLength(1));
 });

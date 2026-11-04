@@ -1,5 +1,6 @@
 import { addressFallbackIds } from "./ingest/forwarding.js";
 import { parseList } from "../lib/senders.js";
+import { candidatesOf } from "./unsubscribe.js";
 import type { Address, Destination, Domain, ExtractedItem, Message, User } from "../db/schema.js";
 
 export function userOut(u: User) {
@@ -127,10 +128,7 @@ export function messageSummaryOut(m: Message, items: ExtractedItem[]) {
     trackers_removed: m.trackersRemoved,
     auth_warning: m.authWarning,
     is_bulk: m.isBulk,
-    unsubscribe:
-      m.unsubscribeUrl || m.unsubscribeMailto
-        ? { url: m.unsubscribeUrl, mailto: m.unsubscribeMailto, one_click: m.unsubscribeOneClick, done_at: m.unsubscribedAt }
-        : null,
+    unsubscribe: unsubscribeOut(m),
     code: ex.code?.value ?? null,
     has_links: ex.links.length > 0,
     quarantined_at: m.quarantinedAt,
@@ -153,4 +151,12 @@ export function messageOut(m: Message, items: ExtractedItem[]) {
     raw_headers: m.rawHeaders,
     extracted: itemsOut(items),
   };
+}
+
+/** Stored List-Unsubscribe target, or one found in the body (mail received before body detection existed). */
+function unsubscribeOut(m: Message) {
+  if (m.unsubscribeUrl || m.unsubscribeMailto)
+    return { url: m.unsubscribeUrl, mailto: m.unsubscribeMailto, one_click: m.unsubscribeOneClick, done_at: m.unsubscribedAt };
+  const best = candidatesOf(m)[0];
+  return best ? { url: best.url, mailto: best.mailto, one_click: false, done_at: m.unsubscribedAt } : null;
 }

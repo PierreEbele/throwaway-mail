@@ -5,23 +5,8 @@ import { addresses, messages } from "../db/schema.js";
 import { badRequest, notFound } from "../lib/errors.js";
 import { checkOutboundUrl } from "../lib/outbound.js";
 import { ownedAddress } from "../services/addresses.js";
-import { pickUnsubscribe, unsubscribeCandidates, type UnsubscribeCandidate } from "../parser/unsubscribe.js";
-
-type Row = typeof messages.$inferSelect;
-
-function candidatesOf(m: Row): UnsubscribeCandidate[] {
-  let headers: Array<{ key: string; value: string }> = [];
-  try {
-    headers = m.headersJson ? JSON.parse(m.headersJson) : [];
-  } catch {
-    /* ignore */
-  }
-  const found = unsubscribeCandidates({ headers, text: m.text, html: m.html });
-  // Stored at ingest (from the original, unsanitized body): keep it in case the sanitized HTML lost it.
-  if (m.unsubscribeUrl || m.unsubscribeMailto)
-    found.push({ kind: m.unsubscribeOneClick ? "one_click" : "body", url: m.unsubscribeUrl, mailto: m.unsubscribeMailto });
-  return pickUnsubscribe(found);
-}
+import { pickUnsubscribe, type UnsubscribeCandidate } from "../parser/unsubscribe.js";
+import { candidatesOf } from "../services/unsubscribe.js";
 
 /** Newsletter handling (List-Unsubscribe). */
 export function registerNewsletters(r: ApiRouter) {

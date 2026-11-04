@@ -413,7 +413,7 @@ function DemoBanner() {
 export function Layout({ children, bare }: { children: ReactNode; bare?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="flex h-dvh flex-col">
+    <div className="relative flex h-dvh flex-col overflow-hidden">
       <DemoBanner />
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <a
