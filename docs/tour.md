@@ -38,6 +38,30 @@ the inbox, sorted automatically by keywords, and keep mail for their own retenti
 A summary of the last days: possible leaks (mail from a sender that does not match the site), the busiest addresses,
 new addresses, addresses about to expire, and addresses that have been silent for a month and could be cleaned up.
 
+## Rules
+
+![Rules](images/rules.png)
+
+Rules run from top to bottom on every mail that arrives. Each one checks a few things (sender, subject, category,
+attachments, failed DMARC, newsletter, verification code…) and then blocks the mail, quarantines it, removes its
+attachments, forwards it elsewhere, moves the address or pauses it. "Test" replays a rule on the last 20 mails before
+you turn it on. Quarantined mail waits in **Quarantine** until you release or delete it.
+
+## Failed deliveries
+
+![Failed deliveries](images/deliveries.png)
+
+Every forward that did not reach its mailbox, with the reason in plain words and where the mail went instead when a
+fallback mailbox took it. Retry when the problem is fixed.
+
+## Account
+
+![Account](images/account.png)
+
+How new addresses look (readable words, random characters or your own template) and their default expiry and mail
+limit, which domain new addresses use and the sites that rejected one, passkeys, two-factor authentication, SMTP
+passwords for sending from your aliases with a mail client, push notifications and import from SimpleLogin or addy.io.
+
 ## Destinations
 
 ![Destinations](images/destinations.png)
