@@ -14,6 +14,7 @@ import { AccountPage } from "./pages/settings/AccountPage";
 import { DestinationsPage } from "./pages/settings/DestinationsPage";
 import { KeysPage } from "./pages/settings/KeysPage";
 import { AuditPage, DomainsPage, UsersPage, HealthPage } from "./pages/Admin";
+import { SetupCheckPage } from "./pages/admin/SetupCheck";
 import { ReviewPage } from "./pages/Review";
 import { DigestPage } from "./pages/Digest";
 import { ApiError } from "./api";
@@ -121,6 +122,14 @@ function App() {
         element={
           <Protected admin>
             <HealthPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/admin/setup-check"
+        element={
+          <Protected admin>
+            <SetupCheckPage />
           </Protected>
         }
       />

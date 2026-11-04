@@ -65,6 +65,7 @@ const ICONS = {
   log: "M6 3h9l4 4v14H6zM9 12h7M9 16h7",
   digest: "M4 20V10M10 20V4M16 20v-7M22 20H2",
   search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-5-5",
+  check: "M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5",
 };
 
 function EyeIcon({ off }: { off?: boolean }) {
@@ -349,6 +350,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             </NavLink>
             <NavLink to="/admin/health" className={navCls}>
               <Icon d={ICONS.digest} /> Health
+            </NavLink>
+            <NavLink to="/admin/setup-check" className={navCls}>
+              <Icon d={ICONS.check} /> Setup check
             </NavLink>
           </>
         )}

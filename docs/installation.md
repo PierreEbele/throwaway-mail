@@ -49,7 +49,7 @@ sudo docker compose --profile caddy up -d --build     # bundled Caddy with autom
 
 ### Settings
 
-In `.env` set at least `APP_DOMAIN`, `INGEST_SECRET` (`openssl rand -hex 32`), optionally the `OIDC_*` settings ([single sign-on](#4-accounts-and-single-sign-on)), and later `CF_API_TOKEN` / `CF_ACCOUNT_ID`. The app starts without Cloudflare credentials; domain and destination actions then show a clear error. Once it runs, _Admin → Setup check_ (or `docker compose exec app node dist/doctor.js`) tells you what is still missing.
+In `.env` set at least `APP_DOMAIN`, `INGEST_SECRET` (`openssl rand -hex 32`), optionally the `OIDC_*` settings ([single sign-on](#4-accounts-and-single-sign-on)), and later `CF_API_TOKEN` / `CF_ACCOUNT_ID`. The app starts without Cloudflare credentials; domain and destination actions then show a clear error. Once it runs, _Admin → Setup check_ (or `docker compose exec app node dist/doctor.js`, see [Setup check](operations.md#setup-check)) tells you what is still missing.
 
 **Behind an existing reverse proxy** (e.g. Caddy on the host): run `docker compose up -d` without the profile. The app listens on `127.0.0.1:${APP_PORT:-3310}`. A host Caddy block:
 

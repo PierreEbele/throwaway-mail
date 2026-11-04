@@ -83,7 +83,7 @@ const { code } = await tm.addresses.waitForCode(addr.id, { since: Date.now(), ti
 | Forwarding    | `/v1/destinations` (+ `/refresh`, `/resend`, PGP key via `PATCH`)                                                                           |
 | Notifications | `/v1/notify-targets` (+ `/test`)                                                                                                            |
 | Account       | `/v1/keys`, `GET /v1/export`, `POST /v1/import`                                                                                             |
-| Admin         | `/v1/domains`, `/v1/admin/users`, `/v1/admin/audit`, `/v1/admin/health`                                                                     |
+| Admin         | `/v1/domains`, `/v1/admin/users`, `/v1/admin/audit`, `/v1/admin/health`, `/v1/admin/diagnostics`                                            |
 
 ## Live events
 
