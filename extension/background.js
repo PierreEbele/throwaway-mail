@@ -45,7 +45,7 @@ async function settings() {
     autoPrompt: s.autoPrompt !== false,
     autoCode: s.autoCode !== false,
     alwaysNew: s.alwaysNew !== false,
-    selectedFields: Array.isArray(s.selectedFields) ? s.selectedFields : Object.keys(FableGenerator.fields),
+    selectedFields: Array.isArray(s.selectedFields) ? s.selectedFields : Object.keys(ThrowawayGenerator.fields),
     lockedFields: Array.isArray(s.lockedFields) ? s.lockedFields : [],
     countryMode: s.countryMode || "random",
     profile: s.profile || null,
@@ -79,7 +79,7 @@ async function fillNewIdentity(tabId, pageUrl) {
   // Bitwarden mode: e-mail and password are left to Bitwarden (which saves them).
   const fields = s.bitwardenMode ? s.selectedFields.filter((k) => k !== "email" && k !== "password") : s.selectedFields;
   const keepPrevious = s.profile && (!s.alwaysNew || s.profile.throwaway?.host === host || (s.bitwardenMode && s.profile.site === host));
-  let profile = keepPrevious ? s.profile : FableGenerator.generate(s.countryMode, s.profile, s.lockedFields);
+  let profile = keepPrevious ? s.profile : ThrowawayGenerator.generate(s.countryMode, s.profile, s.lockedFields);
   if (!keepPrevious && s.lockedFields.includes("email") && s.profile?.throwaway) profile.throwaway = s.profile.throwaway;
   profile = { ...profile, site: host };
   if (!s.bitwardenMode && s.selectedFields.includes("email") && (await Throwaway.enabled()) && profile.throwaway?.host !== host) {
@@ -91,7 +91,7 @@ async function fillNewIdentity(tabId, pageUrl) {
   await browser.scripting.executeScript({ target: { tabId }, files: ["filler.js"] });
   const [res] = await browser.scripting.executeScript({
     target: { tabId },
-    func: (data, options) => globalThis.FableFill.fill(data, options),
+    func: (data, options) => globalThis.ThrowawayFill.fill(data, options),
     args: [profile, { overwrite: true, fields }],
   });
   if (s.bitwardenMode) return { report: res?.result || null, name: profile.fullName, bitwarden: true };

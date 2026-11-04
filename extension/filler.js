@@ -1,7 +1,7 @@
 (function (root) {
   "use strict";
   // The popup reinjects this file on each fill; keep the last transaction alive.
-  if (root.FableFill?.version === "1.9") return;
+  if (root.ThrowawayFill?.version === "1.9") return;
   let lastFill = null;
   const fieldKeys = ["firstName", "lastName", "address", "city", "postalCode", "country", "email", "phone", "birthDate", "password"];
   function allowed(key, selected) {
@@ -805,5 +805,5 @@
     }
     return report;
   }
-  root.FableFill = { version: "1.6", fill, fillCard, undo, classify };
+  root.ThrowawayFill = { version: "1.6", fill, fillCard, undo, classify };
 })(globalThis);

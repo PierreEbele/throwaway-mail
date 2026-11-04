@@ -5,8 +5,8 @@
 // Nothing is sent until the user clicks; only the code wait (after a fill) queries the
 // Throwaway Mail server, through the background script.
 (() => {
-  if (window.top !== window || window.__fableContent) return;
-  window.__fableContent = true;
+  if (window.top !== window || window.__throwawayContent) return;
+  window.__throwawayContent = true;
 
   const SIGNUP_WORDS =
     /(sign\s?up|register|registration|create (an |your )?account|join|get started|inscri|cr[ée]er (un|votre) compte|nouveau compte|registrieren|crear cuenta)/i;
@@ -32,7 +32,7 @@
     root = null;
   function ui() {
     if (root) return root;
-    host = document.createElement("fable-throwaway");
+    host = document.createElement("throwaway-mail-host");
     host.style.cssText = "all:initial;position:fixed;z-index:2147483647;right:16px;bottom:16px";
     root = host.attachShadow({ mode: "closed" });
     root.innerHTML = `<style>
@@ -183,7 +183,7 @@
   let chip = null;
   function showChip(field, code) {
     chip?.remove();
-    chip = document.createElement("fable-throwaway-chip");
+    chip = document.createElement("throwaway-mail-chip");
     const r = field.getBoundingClientRect();
     chip.style.cssText = `all:initial;position:absolute;z-index:2147483647;left:${Math.round(r.left + scrollX)}px;top:${Math.round(r.bottom + scrollY + 4)}px`;
     const sh = chip.attachShadow({ mode: "closed" });

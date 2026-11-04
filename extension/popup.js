@@ -1,6 +1,6 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
-const fieldLabels = FableGenerator.fields;
+const fieldLabels = ThrowawayGenerator.fields;
 const fieldKeys = Object.keys(fieldLabels);
 let profile = null;
 let revision = 0;
@@ -25,7 +25,7 @@ function showPanel(name) {
 }
 $("tab-profile").addEventListener("click", () => showPanel("profile"));
 $("tab-card").addEventListener("click", () => showPanel("card"));
-for (const [key, name] of Object.entries(FableGenerator.banks)) $("card-bank").add(new Option(name + " (simulated)", key));
+for (const [key, name] of Object.entries(ThrowawayGenerator.banks)) $("card-bank").add(new Option(name + " (simulated)", key));
 function syncCardSettings() {
   const bankMode = $("card-mode").value === "bank-bin";
   $("card-network").querySelector('[value="visa"]').textContent = bankMode ? "Visa" : "CB / Visa";
@@ -34,7 +34,7 @@ function syncCardSettings() {
     option.disabled =
       bankMode &&
       option.value !== "random" &&
-      !FableGenerator.bankBins.some(
+      !ThrowawayGenerator.bankBins.some(
         (entry) => ($("card-bank").value === "random" || entry.bankCode === $("card-bank").value) && entry.networkCode === option.value,
       );
   if ($("card-network").selectedOptions[0]?.disabled) $("card-network").value = "random";
@@ -80,7 +80,7 @@ function renderCard() {
 }
 $("generate-card").addEventListener("click", async () => {
   if (busy) return;
-  const generated = FableGenerator.generateCard($("card-bank").value, $("card-network").value, profile?.fullName, $("card-mode").value);
+  const generated = ThrowawayGenerator.generateCard($("card-bank").value, $("card-network").value, profile?.fullName, $("card-mode").value);
   if (!generated) {
     cardStatus("No known BIN for this bank/network combination. Pick another network.", true);
     return;
@@ -137,7 +137,7 @@ function syncControls() {
   $("reveal-password").disabled = busy || !profile;
   $("undo").disabled = busy;
   $("overwrite").disabled = busy;
-  const countryLocked = !!profile && FableGenerator.isCountryLocked([...lockedFields]);
+  const countryLocked = !!profile && ThrowawayGenerator.isCountryLocked([...lockedFields]);
   $("country-mode").disabled = busy || countryLocked;
   $("country-hint").hidden = !countryLocked;
   $("country-hint").textContent = countryLocked ? `Country kept: ${profile.country} (location details locked).` : "";
@@ -240,7 +240,7 @@ $("generate").addEventListener("click", async () => {
   }
   // The disposable address follows the e-mail: kept only if the e-mail is locked.
   const keptAlias = lockedFields.has("email") ? profile?.throwaway : undefined;
-  profile = FableGenerator.generate($("country-mode").value, profile, [...lockedFields]);
+  profile = ThrowawayGenerator.generate($("country-mode").value, profile, [...lockedFields]);
   revision++;
   if (keptAlias) profile.throwaway = keptAlias;
   tmCode = null;
@@ -283,7 +283,7 @@ $("fill").addEventListener("click", async () => {
     await browser.scripting.executeScript({ target: { tabId }, files: ["filler.js"] });
     const results = await browser.scripting.executeScript({
       target: { tabId },
-      func: (data, options) => globalThis.FableFill.fill(data, options),
+      func: (data, options) => globalThis.ThrowawayFill.fill(data, options),
       args: [
         profile,
         {
@@ -347,7 +347,7 @@ $("fill-card").addEventListener("click", async () => {
     await browser.scripting.executeScript({ target: { tabId }, files: ["filler.js"] });
     const results = await browser.scripting.executeScript({
       target: { tabId },
-      func: (card, options) => globalThis.FableFill.fillCard(card, options),
+      func: (card, options) => globalThis.ThrowawayFill.fillCard(card, options),
       args: [testCard, { overwrite: $("card-overwrite").checked }],
     });
     const report = results[0]?.result;
@@ -379,7 +379,7 @@ async function undoFill(cardMode = false) {
     const tabId = await activeTabId();
     const results = await browser.scripting.executeScript({
       target: { tabId },
-      func: () => globalThis.FableFill?.undo?.() || { available: false, restored: 0, skipped: 0, failed: 0 },
+      func: () => globalThis.ThrowawayFill?.undo?.() || { available: false, restored: 0, skipped: 0, failed: 0 },
     });
     const report = results[0]?.result;
     if (!report?.available) notify("Nothing to undo on this page.");
@@ -474,7 +474,7 @@ async function ensureIdentity() {
   if (profile && (alwaysNew === false || sameSite)) return true;
   if (profile && lockedFields.size === fieldKeys.length) return true;
   const keptAlias = lockedFields.has("email") ? profile?.throwaway : undefined;
-  profile = FableGenerator.generate($("country-mode").value, profile, [...lockedFields]);
+  profile = ThrowawayGenerator.generate($("country-mode").value, profile, [...lockedFields]);
   revision++;
   if (keptAlias) profile.throwaway = keptAlias;
   tmCode = null;
@@ -592,14 +592,14 @@ syncControls();
       "cardNetworkMode",
     ]);
     if (!cardSettingsTouched) {
-      if (saved.cardBankMode === "random" || Object.hasOwn(FableGenerator.banks, saved.cardBankMode))
+      if (saved.cardBankMode === "random" || Object.hasOwn(ThrowawayGenerator.banks, saved.cardBankMode))
         $("card-bank").value = saved.cardBankMode;
-      if (saved.cardNetworkMode === "random" || Object.hasOwn(FableGenerator.cardNetworks, saved.cardNetworkMode))
+      if (saved.cardNetworkMode === "random" || Object.hasOwn(ThrowawayGenerator.cardNetworks, saved.cardNetworkMode))
         $("card-network").value = saved.cardNetworkMode;
       if (["stripe", "bank-bin"].includes(saved.cardMode)) $("card-mode").value = saved.cardMode;
       syncCardSettings();
     }
-    if (!testCard && FableGenerator.isTestCard(saved.testCard)) {
+    if (!testCard && ThrowawayGenerator.isTestCard(saved.testCard)) {
       testCard = saved.testCard;
       renderCard();
       cardStatus("Last test card restored.");
@@ -641,12 +641,12 @@ syncControls();
     ) {
       profile = saved.profile;
       let upgradedProfile = false;
-      if (!FableGenerator.validBirthDate(profile.birthDate)) {
-        profile = { ...profile, birthDate: FableGenerator.generateBirthDate() };
+      if (!ThrowawayGenerator.validBirthDate(profile.birthDate)) {
+        profile = { ...profile, birthDate: ThrowawayGenerator.generateBirthDate() };
         upgradedProfile = true;
       }
       if (typeof profile.password !== "string" || !profile.password) {
-        profile = { ...profile, password: FableGenerator.generatePassword() };
+        profile = { ...profile, password: ThrowawayGenerator.generatePassword() };
         upgradedProfile = true;
       }
       revision = saved.revision || 1;

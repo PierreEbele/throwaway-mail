@@ -323,7 +323,7 @@
     profile.createdAt = Date.now(); // for automatic expiry (background.js)
     return profile;
   }
-  root.FableGenerator = {
+  root.ThrowawayGenerator = {
     generate,
     generatePassword,
     generateBirthDate,
@@ -337,5 +337,5 @@
     bankBins,
     luhnValid,
   };
-  if (typeof module !== "undefined" && module.exports) module.exports = root.FableGenerator;
+  if (typeof module !== "undefined" && module.exports) module.exports = root.ThrowawayGenerator;
 })(globalThis);
