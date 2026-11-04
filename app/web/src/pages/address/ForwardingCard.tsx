@@ -1,8 +1,66 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { put } from "../../api";
 import type { Address, Destination } from "../../types";
-import { Toggle } from "../../components/ui";
+import { Toggle, useToast } from "../../components/ui";
+import { invalidateAddress } from "../../queries";
 import { fullDate, timeAgo } from "../../util";
+
+/** This address's own fallback mailboxes, in order (none: the account's fallback chain on the Destinations page). */
+function AddressFallbacks({ a, verified }: { a: Address; verified: Destination[] }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const ids = a.fallback_destination_ids ?? [];
+  const save = useMutation({
+    mutationFn: (next: string[]) => put(`/v1/addresses/${a.id}/fallbacks`, { destination_ids: next }),
+    onSuccess: () => invalidateAddress(qc, a.id),
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+  const email = (id: string) => verified.find((d) => d.id === id)?.email ?? "(removed mailbox)";
+  return (
+    <div>
+      <p className="label">If forwarding fails, try</p>
+      {ids.length ? (
+        <ol className="space-y-1 text-sm">
+          {ids.map((id, i) => (
+            <li key={id} className="flex items-center gap-2">
+              <span className="text-zinc-500">{i + 1}.</span> {email(id)}
+              <button className="btn-ghost px-1 py-0 text-xs" onClick={() => save.mutate(ids.filter((x) => x !== id))}>
+                remove
+              </button>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="text-xs text-zinc-500">
+          The account's fallback mailboxes (
+          <Link to="/destinations" className="underline">
+            Destinations
+          </Link>
+          ).
+        </p>
+      )}
+      {verified.some((d) => !ids.includes(d.id)) && (
+        <select
+          aria-label="Add a fallback mailbox for this address"
+          className="input mt-1 w-auto text-sm"
+          value=""
+          onChange={(e) => e.target.value && save.mutate([...ids, e.target.value])}
+        >
+          <option value="">Add a fallback for this address…</option>
+          {verified
+            .filter((d) => !ids.includes(d.id))
+            .map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.email}
+              </option>
+            ))}
+        </select>
+      )}
+    </div>
+  );
+}
 
 export function ForwardingCard({
   a,
@@ -95,6 +153,7 @@ export function ForwardingCard({
           </Link>
         </p>
       )}
+      {verified.length > 1 && <AddressFallbacks a={a} verified={verified} />}
       <p className="text-xs text-zinc-500">Changes apply to the next mail received.</p>
       <dl className="grid grid-cols-2 gap-1 text-xs text-zinc-500">
         <dt>Created</dt>

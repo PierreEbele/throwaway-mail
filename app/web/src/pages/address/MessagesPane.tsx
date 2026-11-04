@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { post } from "../../api";
 import type { Address, MessageSummary } from "../../types";
@@ -24,7 +25,9 @@ export function MessagesPane({
 }) {
   const qc = useQueryClient();
   const toast = useToast();
-  const [selected, setSelected] = useState<string | null>(null);
+  // ?message=<id> (links from the Quarantine and Failed deliveries pages) opens that message.
+  const [params] = useSearchParams();
+  const [selected, setSelected] = useState<string | null>(params.get("message"));
   const bulk = useMutation({
     mutationFn: (b: { action: string; scope: string }) => post<{ affected: number }>(`/v1/addresses/${a.id}/messages/bulk`, b),
     onSuccess: (r) => {
@@ -119,6 +122,14 @@ export function MessagesPane({
                     </code>
                   )}
                   {m.forwarded && <span>↪ forwarded</span>}
+                  {m.quarantined_at && (
+                    <span
+                      className="rounded bg-amber-100 px-1 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                      title="Held by a rule: see Quarantine"
+                    >
+                      quarantined
+                    </span>
+                  )}
                   {m.attachments.some((x) => !x.inline) && (
                     <span title="Has attachments (not stored)">
                       <PaperclipIcon />

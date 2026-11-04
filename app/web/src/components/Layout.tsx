@@ -66,6 +66,9 @@ const ICONS = {
   digest: "M4 20V10M10 20V4M16 20v-7M22 20H2",
   search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-5-5",
   check: "M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5",
+  rules: "M4 6h16M4 12h10M4 18h6M16 15l2 2 4-4",
+  quarantine: "M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM12 8v5M12 16h.01",
+  failed: "M4 6h16v12H4zM4 6l8 7 8-7M15 14l4 4M19 14l-4 4",
 };
 
 function EyeIcon({ off }: { off?: boolean }) {
@@ -325,6 +328,17 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             ))}
           </>
         )}
+
+        <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Filtering</p>
+        <NavLink to="/rules" className={navCls}>
+          <Icon d={ICONS.rules} /> Rules
+        </NavLink>
+        <NavLink to="/quarantine" className={navCls}>
+          <Icon d={ICONS.quarantine} /> Quarantine
+        </NavLink>
+        <NavLink to="/deliveries" className={navCls}>
+          <Icon d={ICONS.failed} /> Failed deliveries
+        </NavLink>
 
         <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Settings</p>
         <NavLink to="/destinations" className={navCls}>

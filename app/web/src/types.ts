@@ -43,6 +43,8 @@ export interface Address {
   max_messages: number | null;
   burn_after_code: boolean;
   replies_enabled: boolean;
+  /** Destination ids tried in order when forwarding fails (empty: the user's fallback chain). */
+  fallback_destination_ids: string[];
   /** Only on single-address responses: why reverse-alias replies cannot be used (null: they can). */
   replies_unavailable?: string | null;
   burned: { reason: string; at: number } | null;
@@ -80,6 +82,8 @@ export interface MessageSummary {
   auth_warning: "auth_failed" | "lookalike" | null;
   is_bulk: boolean;
   unsubscribe: { url: string | null; mailto: string | null; one_click: boolean; done_at: number | null } | null;
+  quarantined_at: number | null;
+  matched_rules: Array<{ id: string; name: string }>;
 }
 export interface ExtractedCode {
   value: string;
@@ -102,6 +106,8 @@ export interface MessageFull extends MessageSummary {
   text: string | null;
   html: string | null;
   headers: Array<{ key: string; value: string }>;
+  /** The original header section as received (null for older mail). */
+  raw_headers: string | null;
   extracted: { code: ExtractedCode | null; alternatives: ExtractedCode[]; links: ExtractedLink[] };
 }
 export interface CodeResult {
@@ -169,6 +175,7 @@ export interface Destination {
   pgp: { fingerprint: string; hide_subject: boolean } | null;
   verification: "cloudflare" | "app";
   verify_sent_at: number | null;
+  fallback_position: number | null;
 }
 export interface ApiKey {
   id: string;
@@ -236,4 +243,88 @@ export interface SavedSearch {
   params: Record<string, string>;
   position: number;
   created_at: number;
+}
+
+export type RuleCondition =
+  | { type: "sender"; op: "is" | "contains" | "ends_with"; value: string; negate?: boolean }
+  | { type: "sender_domain"; value: string; negate?: boolean }
+  | { type: "subject_contains"; value: string; negate?: boolean }
+  | { type: "recipient_matches"; value: string; negate?: boolean }
+  | { type: "category"; value: string; negate?: boolean }
+  | { type: "has_attachments"; negate?: boolean }
+  | { type: "size_over_kb"; value: number; negate?: boolean }
+  | { type: "header_exists"; name: string; negate?: boolean }
+  | { type: "header_equals"; name: string; value: string; negate?: boolean }
+  | { type: "auth_failed"; value: "any" | "spf" | "dkim" | "dmarc"; negate?: boolean }
+  | { type: "is_newsletter"; negate?: boolean }
+  | { type: "has_code"; negate?: boolean };
+export type RuleAction =
+  | { type: "block" }
+  | { type: "quarantine" }
+  | { type: "strip_attachments" }
+  | { type: "forward_to"; destination_id: string }
+  | { type: "set_category"; category_id: string }
+  | { type: "mark_read" }
+  | { type: "block_sender" }
+  | { type: "pause_address" }
+  | { type: "stop" };
+export interface Rule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  position: number;
+  match: "all" | "any";
+  conditions: RuleCondition[];
+  actions: RuleAction[];
+  address_id: string | null;
+  category_id: string | null;
+  match_count: number;
+  last_matched_at: number | null;
+  created_at: number;
+  updated_at: number;
+}
+export interface RuleTestResult {
+  tested: number;
+  matched: number;
+  results: Array<{
+    message_id: string;
+    address_id: string;
+    from: string | null;
+    subject: string | null;
+    received_at: number;
+    matched: boolean;
+  }>;
+}
+export interface QuarantinedMessage {
+  id: string;
+  address_id: string;
+  address: string;
+  site_name: string;
+  from: string | null;
+  from_name: string | null;
+  subject: string | null;
+  received_at: number;
+  quarantined_at: number;
+  matched_rules: Array<{ id: string; name: string }>;
+  auth: { spf: string | null; dkim: string | null; dmarc: string | null };
+  raw_size: number;
+}
+export interface DeliveryFailure {
+  id: string;
+  message_id: string | null;
+  address_id: string | null;
+  address: string | null;
+  subject: string | null;
+  from: string | null;
+  destination: string;
+  transport: "cloudflare" | "smtp";
+  kind: "failed" | "rejected" | "bounced";
+  reason: string;
+  detail: string | null;
+  delivered_to: string | null;
+  retry_count: number;
+  last_retry_at: number | null;
+  resolved_at: number | null;
+  created_at: number;
+  can_retry: boolean;
 }

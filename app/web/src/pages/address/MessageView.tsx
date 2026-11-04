@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, patch } from "../../api";
 import type { MessageFull } from "../../types";
@@ -95,6 +96,26 @@ export function MessageView({ id, onGone }: { id: string; onGone: () => void }) 
           ))}
         </p>
       </div>
+      {m.quarantined_at && (
+        <div
+          role="status"
+          className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <strong>Quarantined.</strong> A rule held this mail back: it was not forwarded.{" "}
+          <Link className="underline" to="/quarantine">
+            Release or delete it
+          </Link>
+          .
+        </div>
+      )}
+      {m.matched_rules.length > 0 && (
+        <p className="text-xs text-zinc-500">
+          Rules applied: {m.matched_rules.map((r) => r.name).join(", ")} ·{" "}
+          <Link className="underline" to="/rules">
+            manage rules
+          </Link>
+        </p>
+      )}
       {m.auth_warning && (
         <div
           role="alert"
@@ -172,16 +193,27 @@ export function MessageView({ id, onGone }: { id: string; onGone: () => void }) 
           {m.text ?? "(no text part)"}
         </pre>
       )}
-      {mode === "headers" && (
-        <dl className="max-h-[60vh] overflow-auto rounded-md bg-zinc-100 p-3 font-mono text-xs dark:bg-zinc-800">
-          {m.headers.map((h, i) => (
-            <div key={i} className="break-all">
-              <dt className="inline font-semibold">{h.key}: </dt>
-              <dd className="inline">{h.value}</dd>
+      {mode === "headers" &&
+        (m.raw_headers ? (
+          <>
+            <div className="flex items-center justify-between text-xs text-zinc-500">
+              <span>The original headers, exactly as received.</span>
+              <CopyButton text={m.raw_headers} />
             </div>
-          ))}
-        </dl>
-      )}
+            <pre className="max-h-[60vh] overflow-auto rounded-md bg-zinc-100 p-3 font-mono text-xs break-all whitespace-pre-wrap dark:bg-zinc-800">
+              {m.raw_headers}
+            </pre>
+          </>
+        ) : (
+          <dl className="max-h-[60vh] overflow-auto rounded-md bg-zinc-100 p-3 font-mono text-xs dark:bg-zinc-800">
+            {m.headers.map((h, i) => (
+              <div key={i} className="break-all">
+                <dt className="inline font-semibold">{h.key}: </dt>
+                <dd className="inline">{h.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ))}
     </div>
   );
 }

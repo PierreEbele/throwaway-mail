@@ -9,6 +9,7 @@ import { invalidate } from "../../queries";
 import { timeAgo } from "../../util";
 import { useDestinations } from "../Addresses";
 import { useAuth } from "../../auth";
+import { FallbackCard, HeaderAllowlistCard } from "./ForwardingOptionsCard";
 
 export function DestinationsPage() {
   const qc = useQueryClient();
@@ -139,6 +140,8 @@ export function DestinationsPage() {
           ))}
         </ul>
       )}
+      {!!dests.data?.length && <FallbackCard dests={dests.data} />}
+      <HeaderAllowlistCard />
     </>
   );
 }

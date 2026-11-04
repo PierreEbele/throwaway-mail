@@ -17,6 +17,9 @@ import { AuditPage, DomainsPage, UsersPage, HealthPage } from "./pages/Admin";
 import { SetupCheckPage } from "./pages/admin/SetupCheck";
 import { ReviewPage } from "./pages/Review";
 import { DigestPage } from "./pages/Digest";
+import { RulesPage } from "./pages/rules/RulesPage";
+import { QuarantinePage } from "./pages/rules/QuarantinePage";
+import { DeliveriesPage } from "./pages/rules/DeliveriesPage";
 import { ApiError } from "./api";
 
 const qc = new QueryClient({
@@ -90,6 +93,30 @@ function App() {
         element={
           <Protected>
             <DigestPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/rules"
+        element={
+          <Protected>
+            <RulesPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/quarantine"
+        element={
+          <Protected>
+            <QuarantinePage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/deliveries"
+        element={
+          <Protected>
+            <DeliveriesPage />
           </Protected>
         }
       />
