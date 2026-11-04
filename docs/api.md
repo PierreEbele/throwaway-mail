@@ -83,7 +83,23 @@ const { code } = await tm.addresses.waitForCode(addr.id, { since: Date.now(), ti
 | Forwarding    | `/v1/destinations` (+ `/refresh`, `/resend`, PGP key via `PATCH`)                                                                           |
 | Notifications | `/v1/notify-targets` (+ `/test`)                                                                                                            |
 | Account       | `/v1/keys`, `GET /v1/export`, `POST /v1/import`                                                                                             |
-| Admin         | `/v1/domains`, `/v1/admin/users`, `/v1/admin/audit`, `/v1/admin/health`, `/v1/admin/diagnostics`                                            |
+| Admin         | `/v1/domains`, `/v1/admin/users` (+ `DELETE /:id/2fa`), `/v1/admin/audit`, `/v1/admin/health`, `/v1/admin/diagnostics`                      |
+| Two-factor    | `GET /v1/auth/2fa`, `POST /v1/auth/2fa/setup`, `/enable`, `/disable`, `/recovery-codes`; `POST /v1/auth/login/2fa`                          |
+
+### Sign-in with two-factor authentication
+
+`POST /v1/auth/login` answers `{"two_factor_required": true, "challenge": "…", "expires_in": 300}` (no session yet)
+for accounts with TOTP turned on. Send `POST /v1/auth/login/2fa` with `{"challenge", "code"}` (6-digit TOTP code or a
+recovery code) within 5 minutes; a challenge allows 5 attempts. Login-like endpoints answer `429` with `Retry-After`
+when the IP or account budget is spent (see `LOGIN_*` in [configuration](configuration.md)).
+
+### Audit log
+
+`GET /v1/admin/audit?limit=&offset=&action=&user_id=&target=&ip=` returns `{entries, total, offset, limit, actions}`,
+newest first. `action` is exact, or a prefix when it ends with `.` (`auth.`, `user.`, `invite.`, `domain.`,
+`destination.`). Actions include `auth.login`, `auth.login_failed`, `auth.recovery_code_used`, `user.password_changed`,
+`user.2fa_enabled`, `user.2fa_disabled`, `user.2fa_recovery_regenerated`, `user.2fa_reset`, `invite.created`,
+`domain.added`, `domain.deleted`, `destination.created`, `destination.deleted`.
 
 ## Live events
 

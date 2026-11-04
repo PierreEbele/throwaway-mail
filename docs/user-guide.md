@@ -121,6 +121,16 @@ expiring soon, new addresses, addresses silent for 30 days, and the leak history
 - **Panic button**: pause every active address at once; _Undo_ resumes exactly those. A category's settings also
   have _Pause all_.
 - **API keys** for scripts, the extension and Bitwarden.
+- **Two-factor authentication** (local accounts, optional): _Account → Two-factor authentication_. Confirm your
+  password, scan the QR code with an authenticator app (or type the key), then enter a code to turn it on. Save the
+  ten one-time recovery codes shown once; _New recovery codes_ replaces them. Signing in then asks for a 6-digit code
+  (or a recovery code) after the password. _Turn off_ needs your password or a code. If you lose both the app and the
+  codes, an admin can _Reset 2FA_ on the Users page. SSO accounts use their identity provider's two-factor settings.
+- Repeated wrong passwords or codes lock the account for a while (see `LOGIN_MAX_FAILURES`), even for the right
+  password; wait for the time shown and try again.
+
+Admins also see the **Audit log** (sign-ins and failures, password and two-factor changes, invites, users, domains and
+destinations), filterable by action group, action and user.
 
 ## Keyboard shortcuts
 
