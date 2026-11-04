@@ -10,6 +10,7 @@ import { authWarning } from "../../lib/phishing.js";
 import { listInfo } from "../../lib/listheaders.js";
 import { listed, looksLikeLeak, parseList, senderDomain } from "../../lib/senders.js";
 import { runParser } from "../../parser/index.js";
+import { pauseExpired } from "../reminders.js";
 import { authResult } from "./auth.js";
 import { afterStore, recordLeak, rejectLockedLeak } from "./effects.js";
 import { forwardDecision, forwardTargets } from "./forwarding.js";
@@ -44,7 +45,10 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
   }
   const { address, preservedForward } = resolved;
   if (address.status !== "active") return { action: "reject", reason: `address_${address.status}` };
-  if (address.expiresAt && address.expiresAt <= deps.now()) return { action: "reject", reason: "address_expired" };
+  if (address.expiresAt && address.expiresAt <= deps.now()) {
+    pauseExpired(deps, address.id);
+    return { action: "reject", reason: "address_expired" };
+  }
 
   const email = await PostalMime.parse(input.raw);
   const fromDomain = senderDomain(email.from?.address) ?? sender?.domain ?? null;

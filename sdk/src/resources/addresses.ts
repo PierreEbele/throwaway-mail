@@ -21,6 +21,8 @@ export interface CreateAddressParams {
   /** Epoch ms or ISO date; `null` for no expiry. */
   expiresAt?: number | string | null;
   expiresInDays?: number;
+  /** Pause the address automatically after this many mails. */
+  maxMessages?: number | null;
 }
 
 export interface UpdateAddressParams {
@@ -102,6 +104,7 @@ function addressBody(p: CreateAddressParams | UpdateAddressParams) {
     category: p.category,
     create_category: p.createCategory,
     expires_at: p.expiresAt,
+    max_messages: p.maxMessages,
   };
 }
 
@@ -157,7 +160,6 @@ export class Addresses {
       pinned: p.pinned,
       block_promos: p.blockPromos,
       site_lock: p.siteLock,
-      max_messages: p.maxMessages,
       burn_after_code: p.burnAfterCode,
     });
     return (await this.http.patch<{ address: Address }>(`/v1/addresses/${seg(id)}`, body, opts)).address;

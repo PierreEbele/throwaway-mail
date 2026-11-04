@@ -79,7 +79,14 @@ export function registerLifecycle(r: ApiRouter) {
       const { a, domain } = ownedAddress(d, user, c.req.param("id")!);
       const now = d.now();
       const expiresAt = body.days === null ? null : Math.max(a.expiresAt ?? now, now) + body.days * DAY;
-      d.db.update(addresses).set({ expiresAt, expiryRemindedAt: null, updatedAt: now }).where(eq(addresses.id, a.id)).run();
+      // Extending an address that was paused because it expired brings it back.
+      const revive =
+        a.status === "paused" && a.burnReason === "expired" ? { status: "active" as const, burnReason: null, burnedAt: null } : {};
+      d.db
+        .update(addresses)
+        .set({ expiresAt, expiryRemindedAt: null, updatedAt: now, ...revive })
+        .where(eq(addresses.id, a.id))
+        .run();
       d.bus.publish(user.id, { type: "address.updated", address_id: a.id });
       return c.json({ address: addressOut(d.db.select().from(addresses).where(eq(addresses.id, a.id)).get()!, domain) });
     },

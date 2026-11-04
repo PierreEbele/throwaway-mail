@@ -77,6 +77,8 @@ export interface NewAddress {
   category_id?: string | null;
   expires_at?: number | null;
   expires_in_days?: number;
+  /** Pause the address automatically after this many mails. */
+  max_messages?: number | null;
 }
 
 /** Creates an address for `user`. Shared by `POST /v1/addresses` and the alias-service compatibility API. */
@@ -111,6 +113,7 @@ export function createAddress(d: Deps, user: User, body: NewAddress): { a: Addre
       destinationId: body.destination_id ?? null,
       categoryId: body.category_id === undefined ? matchCategory(d, user.id, body.site_name, body.site_url ?? null) : body.category_id,
       expiresAt,
+      maxMessages: body.max_messages ?? null,
       createdAt: now,
       updatedAt: now,
     };

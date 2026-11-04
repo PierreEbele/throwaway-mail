@@ -42,6 +42,14 @@ export function registerAddresses(r: ApiRouter) {
         create_category: z.boolean().default(false).describe("Create `category` if it does not exist yet"),
         expires_at: ExpiresAt.optional(),
         expires_in_days: z.number().int().min(1).max(3650).optional(),
+        max_messages: z
+          .number()
+          .int()
+          .min(1)
+          .max(100_000)
+          .nullable()
+          .optional()
+          .describe("Pause the address automatically after this many mails"),
       }),
       responses: { 201: "Created: { id, email, address }" },
     },

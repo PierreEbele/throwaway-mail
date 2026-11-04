@@ -129,7 +129,9 @@ export function AddressHeader({
             ? "it received its verification code."
             : a.burned.reason === "max_messages"
               ? `it reached ${a.max_messages} mail(s).`
-              : "panic button."}
+              : a.burned.reason === "expired"
+                ? "it expired. Extend it to accept mail again."
+                : "panic button."}
         </p>
       )}
       {a.leak && <LeakBanner a={a} onPause={() => onUpdate({ status: "paused" })} />}

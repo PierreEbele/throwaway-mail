@@ -27,6 +27,8 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
   const [localPart, setLocalPart] = useState("");
   const [forward, setForward] = useState(false);
   const [destinationId, setDestinationId] = useState("");
+  const [expiresDays, setExpiresDays] = useState("");
+  const [maxMessages, setMaxMessages] = useState("");
   const categories = useCategories(open);
   const [categoryId, setCategoryId] = useState("");
   const qc = useQueryClient();
@@ -38,6 +40,8 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
       setSiteUrl("");
       setLocalPart("");
       setForward(false);
+      setExpiresDays("");
+      setMaxMessages("");
     } else setCategoryId(defaultCategory ?? "");
   }, [open, defaultCategory]);
   useEffect(() => {
@@ -54,6 +58,8 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
         forward,
         destination_id: forward && destinationId ? destinationId : undefined,
         category_id: categoryId || undefined,
+        expires_in_days: expiresDays ? Number(expiresDays) : undefined,
+        max_messages: maxMessages ? Number(maxMessages) : undefined,
       }),
     onSuccess: (r) => {
       invalidate(qc, ["addresses"], ["categories"]);
@@ -134,6 +140,41 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
                 ))}
               </select>
             </div>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="na-expires" className="label">
+                Expires
+              </label>
+              <select id="na-expires" className="input" value={expiresDays} onChange={(e) => setExpiresDays(e.target.value)}>
+                <option value="">Never</option>
+                <option value="1">After 1 day</option>
+                <option value="7">After 7 days</option>
+                <option value="30">After 30 days</option>
+                <option value="90">After 90 days</option>
+                <option value="365">After 1 year</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="na-max" className="label">
+                Max mails <span className="font-normal text-zinc-400">(blank = unlimited)</span>
+              </label>
+              <input
+                id="na-max"
+                className="input"
+                type="number"
+                min={1}
+                max={100000}
+                placeholder="e.g. 3"
+                value={maxMessages}
+                onChange={(e) => setMaxMessages(e.target.value)}
+              />
+            </div>
+          </div>
+          {(expiresDays || maxMessages) && (
+            <p className="-mt-2 text-xs text-zinc-500">
+              Once expired or full, the address is paused automatically and new mail is rejected.
+            </p>
           )}
           <div className="rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
             <div className="flex items-center justify-between gap-3">

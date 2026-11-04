@@ -61,7 +61,14 @@ $("form").addEventListener("submit", async (event) => {
   try {
     const cfg = await formConfig();
     await Throwaway.request("/v1/auth/me", { cfg });
-    await browser.storage.local.set({ tmServer: cfg.server, tmApiKey: cfg.apiKey, tmDomain: cfg.domain, ...toggles() });
+    await browser.storage.local.set({
+      tmServer: cfg.server,
+      tmApiKey: cfg.apiKey,
+      tmDomain: cfg.domain,
+      tmExpiresDays: Number($("expires-days").value) || 0,
+      tmMaxMessages: Number($("max-messages").value) || 0,
+      ...toggles(),
+    });
     status("Saved. Next fills will use Throwaway Mail.");
   } catch (e) {
     status(e.status === 401 ? "Invalid or revoked API key: nothing was saved." : `Failed: ${e.message}`, true);
@@ -83,6 +90,8 @@ $("clear").addEventListener("click", async () => {
   const cfg = await Throwaway.config();
   $("server").value = cfg.server || "";
   $("api-key").value = cfg.apiKey;
+  $("expires-days").value = String(cfg.expiresDays || 0);
+  $("max-messages").value = cfg.maxMessages ? String(cfg.maxMessages) : "";
   if (cfg.server && cfg.apiKey) {
     try {
       await loadDomains(cfg, cfg.domain);

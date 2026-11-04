@@ -5,7 +5,7 @@ import { buildDeps } from "./build-deps.js";
 import { createApp } from "./app.js";
 import { runRetention } from "./services/retention.js";
 import { pruneIconCache } from "./services/icons.js";
-import { runExpiryReminders } from "./services/reminders.js";
+import { pauseExpired, runExpiryReminders } from "./services/reminders.js";
 import { metrics } from "./services/metrics.js";
 import { backfillAuthResults } from "./services/maintenance.js";
 import { scheduledBackup } from "./services/backup/index.js";
@@ -60,7 +60,8 @@ const retention = () => {
 const reminders = () => {
   try {
     const n = runExpiryReminders(deps);
-    metrics.job("expiry_reminders", true, `${n} reminder(s) sent`);
+    const paused = pauseExpired(deps);
+    metrics.job("expiry_reminders", true, `${n} reminder(s) sent, ${paused} expired address(es) paused`);
   } catch (e) {
     metrics.job("expiry_reminders", false, (e as Error).message);
     logger.error("expiry reminders failed", { err: e as Error });

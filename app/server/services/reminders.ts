@@ -5,6 +5,36 @@ import { notify } from "./notify.js";
 
 export const EXPIRY_WARNING_MS = 24 * 3600_000;
 
+/**
+ * Pauses active addresses whose expiry date has passed (burn reason "expired"), so they show as disabled and the
+ * Worker rejects their mail like any paused address. Only one address when `addressId` is given. Returns the count.
+ */
+export function pauseExpired(deps: Deps, addressId?: string): number {
+  const now = deps.now();
+  const rows = deps.db
+    .select({ id: addresses.id, userId: addresses.userId })
+    .from(addresses)
+    .where(
+      and(
+        eq(addresses.status, "active"),
+        isNotNull(addresses.expiresAt),
+        lte(addresses.expiresAt, now),
+        ...(addressId ? [eq(addresses.id, addressId)] : []),
+      ),
+    )
+    .all();
+  for (const r of rows) {
+    deps.db
+      .update(addresses)
+      .set({ status: "paused", burnReason: "expired", burnedAt: now, updatedAt: now })
+      .where(eq(addresses.id, r.id))
+      .run();
+    deps.bus.publish(r.userId, { type: "address.updated", address_id: r.id });
+  }
+  if (rows.length && !addressId) deps.logger.info("expired addresses paused", { count: rows.length });
+  return rows.length;
+}
+
 /** Notifies once per address when it expires within 24 h. Returns the number of reminders sent. */
 export function runExpiryReminders(deps: Deps): number {
   const now = deps.now();

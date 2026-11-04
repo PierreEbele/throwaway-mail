@@ -90,7 +90,23 @@ export function AddressRow({
                 {category.name}
               </span>
             )}
-            {a.status !== "active" && <span className="rounded border border-zinc-300 px-1 dark:border-zinc-700">{a.status}</span>}
+            {a.status !== "active" && (
+              <span className="rounded border border-zinc-300 px-1 dark:border-zinc-700">
+                {a.burned?.reason === "expired" ? "expired" : a.burned?.reason === "max_messages" ? "quota reached" : a.status}
+              </span>
+            )}
+            {a.status === "active" && (a.expires_at || a.max_messages) && (
+              <span
+                title={[
+                  a.expires_at ? `Expires ${new Date(a.expires_at).toLocaleString()}` : "",
+                  a.max_messages ? `${a.message_count}/${a.max_messages} mail(s)` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              >
+                ⏳{a.max_messages ? ` ${a.message_count}/${a.max_messages}` : ""}
+              </span>
+            )}
             {a.forward_enabled && <span title="Forwarded">↪</span>}
             {a.leak && (
               <span

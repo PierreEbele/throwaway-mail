@@ -2,7 +2,7 @@
 // Throwaway Mail API client (Bearer API key). Shared by the popup and the options page.
 // The key stays in this browser profile's extension storage (browser.storage.local) and is only sent to the configured server.
 const Throwaway = (() => {
-  const KEYS = ["tmServer", "tmApiKey", "tmDomain"];
+  const KEYS = ["tmServer", "tmApiKey", "tmDomain", "tmExpiresDays", "tmMaxMessages"];
 
   function normalizeServer(raw) {
     const url = new URL(String(raw || "").trim());
@@ -12,7 +12,13 @@ const Throwaway = (() => {
 
   async function config() {
     const saved = await browser.storage.local.get(KEYS);
-    return { server: saved.tmServer || "", apiKey: saved.tmApiKey || "", domain: saved.tmDomain || "" };
+    return {
+      server: saved.tmServer || "",
+      apiKey: saved.tmApiKey || "",
+      domain: saved.tmDomain || "",
+      expiresDays: Number(saved.tmExpiresDays) || 0,
+      maxMessages: Number(saved.tmMaxMessages) || 0,
+    };
   }
 
   async function enabled() {
@@ -51,6 +57,8 @@ const Throwaway = (() => {
         site_url: url.origin,
         label: label ? `Throwaway Mail · ${label}` : "Throwaway Mail",
         ...(c.domain ? { domain: c.domain } : {}),
+        ...(c.expiresDays ? { expires_in_days: c.expiresDays } : {}),
+        ...(c.maxMessages ? { max_messages: c.maxMessages } : {}),
       },
     });
     return { id: data.id, email: data.email, host: url.hostname, createdAt: data.address?.created_at ?? Date.now() };
