@@ -4,7 +4,7 @@ import vm from "node:vm";
 import { describe, expect, it } from "vitest";
 import { addDomain, makeTestApp, setupAdmin } from "../helpers.js";
 
-// Exécute le script de fond de l'extension (generator + throwaway + background) avec un faux `browser`.
+// Runs the extension's background scripts (generator + throwaway + background) against a fake `browser`.
 function loadBackground(t: ReturnType<typeof makeTestApp>, store: Record<string, any>) {
   let onMessage: any;
   const filled: any[] = [];
@@ -66,7 +66,7 @@ async function setup() {
   const t = makeTestApp();
   const admin = await setupAdmin(t);
   await addDomain(admin, "mail.example.test");
-  const key = (await admin.post("/v1/keys", { name: "fable" })).json.key;
+  const key = (await admin.post("/v1/keys", { name: "extension" })).json.key;
   const store: Record<string, any> = { tmServer: "https://mail.example.test", tmApiKey: key };
   return { t, admin, store, ...loadBackground(t, store) };
 }
@@ -81,9 +81,9 @@ describe("extension background", () => {
     expect(fields).not.toContain("email");
     expect(fields).not.toContain("password");
     expect(fields).toContain("firstName");
-    expect((await admin.get("/v1/addresses")).json.addresses).toHaveLength(0); // aucune adresse créée par Fable
+    expect((await admin.get("/v1/addresses")).json.addresses).toHaveLength(0); // the extension created no address
 
-    // Bitwarden crée l'alias (API compatible) et le remplit dans la page
+    // Bitwarden creates the alias (compatible API) and fills it in the page
     const alias = (await admin.post("/v1/addresses", { site_name: "shop.example.org" })).json.address;
     expect(await send({ type: "adopt-email", email: "someone@gmail.com" })).toEqual({ ok: false });
     expect(await send({ type: "adopt-email", email: alias.email.toUpperCase() })).toEqual({ ok: true, email: alias.email });
@@ -108,10 +108,10 @@ describe("extension background", () => {
     await send({ type: "purge" });
     expect(store.profile).toBeUndefined();
     store.profile = { firstName: "B", createdAt: 0 };
-    store.identityTtlHours = 0; // jamais
+    store.identityTtlHours = 0; // never
     await send({ type: "purge" });
     expect(store.profile).toBeDefined();
-    store.profile = { firstName: "C" }; // ancienne identité sans date : datée, pas effacée
+    store.profile = { firstName: "C" }; // old identity without a date: gets dated, not cleared
     store.identityTtlHours = 1;
     await send({ type: "purge" });
     expect(store.profile.createdAt).toBeGreaterThan(0);

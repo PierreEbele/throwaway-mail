@@ -28,7 +28,7 @@ describe("Firefox extension client", () => {
     const t = makeTestApp();
     const admin = await setupAdmin(t);
     await addDomain(admin, "mail.example.test");
-    const key = await admin.post("/v1/keys", { name: "fable" });
+    const key = await admin.post("/v1/keys", { name: "extension" });
     expect(key.status).toBe(201);
 
     const tm = loadClient(t, { tmServer: "https://mail.example.test", tmApiKey: key.json.key });

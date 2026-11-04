@@ -37,7 +37,7 @@ describe("site icons", () => {
 
     expect((await user.get("/v1/icons/unknown.example")).status).toBe(404);
     expect((await user.get("/v1/icons/unknown.example")).status).toBe(404);
-    expect(fetchMock).toHaveBeenCalledTimes(2); // le raté est mémorisé
+    expect(fetchMock).toHaveBeenCalledTimes(2); // the miss is cached
     expect((await user.get("/v1/icons/not_a_host")).status).toBe(404);
   });
 });
