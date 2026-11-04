@@ -47,6 +47,28 @@ export interface UpdateAddressParams {
   repliesEnabled?: boolean;
 }
 
+export interface SendMailParams {
+  to: string | string[];
+  cc?: string[];
+  bcc?: string[];
+  subject?: string;
+  text: string;
+  html?: string;
+  /** Display name shown next to the alias. */
+  fromName?: string;
+  /** Message-ID of the mail being answered (sets In-Reply-To and References). */
+  inReplyTo?: string;
+}
+
+export interface SentMail {
+  address_id: string;
+  from: string;
+  /** Real recipients (reverse addresses resolved to the contacts they stand for). */
+  to: string[];
+  message_id: string;
+  via: "mailbox" | "relay";
+}
+
 export interface ListAddressesParams {
   site?: string;
   domain?: string;
@@ -166,6 +188,25 @@ export class Addresses {
       replies_enabled: p.repliesEnabled,
     });
     return (await this.http.patch<{ address: Address }>(`/v1/addresses/${seg(id)}`, body, opts)).address;
+  }
+
+  /**
+   * Sends a new mail from this address. Recipients become reverse-alias contacts, so their answers come back
+   * through the address. Fails with 403 (not allowed), 429 (hourly limit), 502 (refused by the outbound server)
+   * or 503 (no outbound server).
+   */
+  async send(id: string, p: SendMailParams, opts?: RequestOptions): Promise<SentMail> {
+    const body = compact({
+      to: p.to,
+      cc: p.cc,
+      bcc: p.bcc,
+      subject: p.subject,
+      text: p.text,
+      html: p.html,
+      from_name: p.fromName,
+      in_reply_to: p.inReplyTo,
+    });
+    return (await this.http.post<{ sent: SentMail }>(`/v1/addresses/${seg(id)}/send`, body, opts)).sent;
   }
 
   async delete(id: string, opts?: RequestOptions): Promise<void> {

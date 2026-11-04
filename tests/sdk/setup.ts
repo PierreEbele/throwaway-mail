@@ -1,11 +1,11 @@
 import { ThrowawayMail } from "../../sdk/src/index.js";
-import { addDomain, makeTestApp, setupAdmin, type TestApp } from "../helpers.js";
+import { addDomain, makeTestApp, setupAdmin, type Deps, type TestApp } from "../helpers.js";
 
 export const DOMAIN = "mail.example.test";
 
 /** Real app + an SDK client whose fetch is routed to app.request (no network). */
-export async function sdkFixture() {
-  const t: TestApp = makeTestApp();
+export async function sdkFixture(env: Record<string, string> = {}, overrides: Partial<Deps> = {}) {
+  const t: TestApp = makeTestApp(env, overrides);
   const admin = await setupAdmin(t);
   await addDomain(admin, DOMAIN);
   const k = await admin.post("/v1/keys", { name: "sdk-test" });

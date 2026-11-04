@@ -1,5 +1,5 @@
 import { compact, seg, type HttpClient, type RequestOptions } from "../http.js";
-import type { ApiKey, Destination, Directory, NotifyEvent, NotifyKind, NotifyTarget, SmartFolder } from "../types.js";
+import type { ApiKey, Destination, Directory, NotifyEvent, NotifyKind, NotifyTarget, SmartFolder, WebhookDelivery } from "../types.js";
 
 export class SmartFolders {
   constructor(private http: HttpClient) {}
@@ -83,6 +83,19 @@ export class Notifications {
   /** Sends a test notification; resolves with the server's delivery result. */
   test(id: string, opts?: RequestOptions): Promise<Record<string, unknown>> {
     return this.http.post(`/v1/notify-targets/${seg(id)}/test`, {}, opts);
+  }
+  /** Recent deliveries of a webhook target, newest first. */
+  async deliveries(id: string, p: { limit?: number } = {}, opts?: RequestOptions): Promise<WebhookDelivery[]> {
+    return (await this.http.get<{ deliveries: WebhookDelivery[] }>(`/v1/notify-targets/${seg(id)}/deliveries`, { limit: p.limit }, opts))
+      .deliveries;
+  }
+  /** Sends a delivery again (same event id). */
+  async resend(id: string, deliveryId: string, opts?: RequestOptions): Promise<{ ok: boolean; error?: string; delivery: WebhookDelivery }> {
+    return this.http.post(`/v1/notify-targets/${seg(id)}/deliveries/${seg(deliveryId)}/resend`, {}, opts);
+  }
+  /** Resumes a webhook paused after repeated failures. */
+  async resume(id: string, opts?: RequestOptions): Promise<NotifyTarget> {
+    return (await this.http.post<{ target: NotifyTarget }>(`/v1/notify-targets/${seg(id)}/resume`, {}, opts)).target;
   }
 }
 

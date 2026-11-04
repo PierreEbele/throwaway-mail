@@ -13,6 +13,8 @@ export type {
   GetCodeParams,
   WaitForCodeOptions,
   Since,
+  SendMailParams,
+  SentMail,
 } from "./resources/addresses.js";
 export type { BulkMessageAction, BulkMessageScope } from "./resources/messages.js";
 export type { CategoryParams } from "./resources/categories.js";

@@ -143,7 +143,19 @@ export interface Destination {
 }
 
 export type NotifyKind = "ntfy" | "gotify" | "telegram" | "webhook";
-export type NotifyEvent = "message.received" | "code.received" | "leak.detected" | "address.expiring" | "address.burned";
+export type NotifyEvent =
+  | "message.received"
+  | "code.received"
+  | "leak.detected"
+  | "address.expiring"
+  | "address.burned"
+  | "system.alert"
+  | "message.sent"
+  | "address.created"
+  | "address.deleted"
+  | "address.expired"
+  | "message.blocked"
+  | "forward.failed";
 
 export interface NotifyTarget {
   id: string;
@@ -157,7 +169,36 @@ export interface NotifyTarget {
   enabled: boolean;
   last_ok_at: number | null;
   last_error: string | null;
+  /** Webhooks: deliveries that failed for good in a row. */
+  consecutive_failures: number;
+  /** Webhooks: set when paused automatically after repeated failures. */
+  paused_at: number | null;
   created_at: number;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  event_id: string;
+  event_type: NotifyEvent;
+  status: "pending" | "delivered" | "failed";
+  attempts: number;
+  next_attempt_at: number | null;
+  last_status: number | null;
+  last_error: string | null;
+  created_at: number;
+  delivered_at: number | null;
+  payload: WebhookPayload;
+}
+
+/** Body of every webhook request (see docs/api.md). */
+export interface WebhookPayload {
+  id: string;
+  type: NotifyEvent;
+  created_at: number;
+  title: string;
+  body: string;
+  url: string | null;
+  data: Record<string, unknown>;
 }
 
 export interface AddressStats {
