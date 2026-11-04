@@ -10,6 +10,7 @@ import { metrics } from "./services/metrics.js";
 import { backfillAuthResults } from "./services/maintenance.js";
 import { scheduledBackup } from "./services/backup/index.js";
 import { probeTick } from "./services/probe.js";
+import { startSubmission } from "./services/submission.js";
 
 // Local (non-Docker) runs may keep settings in .env.
 try {
@@ -70,6 +71,7 @@ const reminders = () => {
 retention();
 reminders();
 deps.mailboxes.start();
+const stopSubmission = startSubmission(deps);
 const retentionTimer = setInterval(retention, 60 * 60 * 1000);
 retentionTimer.unref();
 const reminderTimer = setInterval(reminders, 10 * 60 * 1000);
@@ -113,6 +115,7 @@ function shutdown(signal: string) {
   clearInterval(probeTimer);
   if (backupTimer) clearInterval(backupTimer);
   deps.mailboxes.stop();
+  void stopSubmission?.();
   const force = setTimeout(() => {
     logger.warn("forced exit after timeout");
     process.exit(1);

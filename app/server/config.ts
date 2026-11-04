@@ -84,6 +84,25 @@ const EnvSchema = z.object({
     .optional(),
   /** Envelope sender for mail sent through SMTP_RELAY_URL (default: the alias itself). */
   SMTP_RELAY_FROM: z.string().email().optional(),
+  /**
+   * SMTP submission server (send new mail from an alias with any mail client). Off unless set: 587 (STARTTLS) or 465
+   * (SUBMISSION_TLS=implicit). Users sign in with their e-mail and an SMTP password created in the web UI.
+   */
+  SUBMISSION_PORT: z.coerce.number().int().min(0).max(65535).default(0),
+  SUBMISSION_HOST: z.string().default("0.0.0.0"),
+  /** "starttls" (default, port 587) or "implicit" (TLS from the first byte, port 465). */
+  SUBMISSION_TLS: z.enum(["starttls", "implicit"]).default("starttls"),
+  /** PEM certificate chain and private key paths (e.g. the reverse proxy's Let's Encrypt files). */
+  SUBMISSION_TLS_CERT: z.string().optional(),
+  SUBMISSION_TLS_KEY: z.string().optional(),
+  /** Name announced in the SMTP greeting (default: the host of APP_URL). */
+  SUBMISSION_HOSTNAME: z.string().optional(),
+  /** Development only: accept AUTH over a plain connection when no certificate is configured. */
+  SUBMISSION_ALLOW_INSECURE: bool,
+  /** Mails a user may send per hour (SMTP submission, compose dialog and API together). */
+  SEND_RATE_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(30),
+  /** Recipients (To + Cc + Bcc) per sent mail. */
+  SEND_MAX_RECIPIENTS: z.coerce.number().int().min(1).default(20),
   /** Replies must pass SPF, DKIM or DMARC at the receiving server (Authentication-Results). Default true. */
   REPLY_REQUIRE_AUTH: z
     .string()
@@ -123,6 +142,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   }
   if (offsiteBackup && !parsed.BACKUP_PASSPHRASE)
     throw new Error("Off-site backups need BACKUP_PASSPHRASE (they are encrypted before upload)");
+  if (!!parsed.SUBMISSION_TLS_CERT !== !!parsed.SUBMISSION_TLS_KEY)
+    throw new Error("SMTP submission needs both SUBMISSION_TLS_CERT and SUBMISSION_TLS_KEY");
+  if (parsed.SUBMISSION_PORT > 0 && !parsed.SUBMISSION_TLS_CERT) {
+    if (parsed.SUBMISSION_TLS === "implicit") throw new Error("SUBMISSION_TLS=implicit needs SUBMISSION_TLS_CERT and SUBMISSION_TLS_KEY");
+    if (!parsed.SUBMISSION_ALLOW_INSECURE)
+      throw new Error(
+        "SMTP submission refuses passwords over plain connections: set SUBMISSION_TLS_CERT and SUBMISSION_TLS_KEY (or SUBMISSION_ALLOW_INSECURE=true for local development only)",
+      );
+  }
   const cookieSecure =
     parsed.COOKIE_SECURE !== undefined
       ? parsed.COOKIE_SECURE === "1" || parsed.COOKIE_SECURE === "true"

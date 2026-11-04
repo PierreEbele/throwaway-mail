@@ -13,6 +13,7 @@ export const NOTIFY_EVENTS = [
   "address.expiring",
   "address.burned",
   "system.alert",
+  "message.sent",
 ] as const;
 export type NotifyEventType = (typeof NOTIFY_EVENTS)[number];
 
