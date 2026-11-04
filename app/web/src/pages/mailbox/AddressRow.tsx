@@ -116,7 +116,16 @@ export function AddressRow({
                 leak?
               </span>
             )}
-            {!a.message_count && <span>no mail yet</span>}
+            {a.no_mail_warning ? (
+              <span
+                className="rounded bg-amber-100 px-1 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                title="Did the site send the code? It may reject this domain."
+              >
+                no mail yet?
+              </span>
+            ) : (
+              !a.message_count && <span>no mail yet</span>
+            )}
           </span>
         </span>
       </Link>

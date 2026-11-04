@@ -18,6 +18,34 @@ export function useSenderAction(id: string) {
   });
 }
 
+/**
+ * "This site rejected the address": records site + domain (new addresses for the site avoid it) and replaces the
+ * address with one on another domain when there is one.
+ */
+export function useSiteRejected(a: Address) {
+  const qc = useQueryClient();
+  const nav = useNavigate();
+  const toast = useToast();
+  return () =>
+    confirmAction(
+      `Report that ${a.site_name} rejected ${a.domain}? New addresses for this site will use another domain, and ${a.email} is replaced by one on another domain (when there is one).`,
+    ) &&
+    post<{ address: Address | null; other_domains: number }>(`/v1/addresses/${a.id}/rejected`, { replace: true }).then(
+      (r) => {
+        qc.invalidateQueries();
+        if (!r.address) return;
+        navigator.clipboard.writeText(r.address.email).catch(() => {});
+        toast(`New address ${r.address.email} copied — try it on the site`, "success");
+        nav(`/addresses/${r.address.id}`);
+      },
+      (e: Error) =>
+        post(`/v1/addresses/${a.id}/rejected`, { replace: false }).then(() => {
+          qc.invalidateQueries();
+          toast(`Rejection recorded. ${e.message}`, "error");
+        }),
+    );
+}
+
 /** Creates a fresh address for the site, pauses this one and opens the site so the user can switch. */
 export function useReplace(a: Address) {
   const qc = useQueryClient();

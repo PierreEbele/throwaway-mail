@@ -12,6 +12,7 @@ import { AddDomainForm, POLICY_HELP } from "./admin/AddDomainForm";
 import { MailboxPanel } from "./admin/MailboxPanel";
 import { BackupCard, ProbeCard, type BackupHealth, type ProbeHealth } from "./admin/ReliabilityCards";
 import { AutoCreatePanel } from "./admin/AutoCreatePanel";
+import { SiteRejectionsCard } from "./settings/DomainChoiceCard";
 
 export function DomainsPage() {
   const qc = useQueryClient();
@@ -213,6 +214,7 @@ export function DomainsPage() {
           </li>
         ))}
       </ul>
+      <SiteRejectionsCard />
     </>
   );
 }

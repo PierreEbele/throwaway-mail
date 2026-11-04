@@ -7,7 +7,8 @@ import { PinIcon } from "../../components/icons";
 import { invalidate } from "../../queries";
 import { hostOf, timeAgo } from "../../util";
 import { DOT, useCategories } from "../mailbox/shared";
-import { ExpiryBanner, LeakBanner } from "./Banners";
+import { ExpiryBanner, LeakBanner, NoMailBanner } from "./Banners";
+import { useSiteRejected } from "./hooks";
 
 /** Title, address, actions (pin, category, pause, delete) and the status banners. */
 export function AddressHeader({
@@ -25,6 +26,7 @@ export function AddressHeader({
   const nav = useNavigate();
   const toast = useToast();
   const categories = useCategories();
+  const rejected = useSiteRejected(a);
   const remove = useMutation({
     mutationFn: () => del(`/v1/addresses/${a.id}`),
     onSuccess: () => {
@@ -103,6 +105,11 @@ export function AddressHeader({
               {a.status === "archived" ? "Unarchive" : "Resume"}
             </button>
           )}
+          {!a.site_rejected && (
+            <button className="btn-secondary" onClick={rejected} title="Record it and get an address on another domain">
+              Site rejected it
+            </button>
+          )}
           {a.status !== "archived" && (
             <button className="btn-secondary" onClick={() => onUpdate({ status: "archived" })}>
               Archive
@@ -132,6 +139,12 @@ export function AddressHeader({
               : a.burned.reason === "expired"
                 ? "it expired. Extend it to accept mail again."
                 : "panic button."}
+        </p>
+      )}
+      {a.no_mail_warning && !a.site_rejected && <NoMailBanner a={a} />}
+      {a.site_rejected && (
+        <p className="mt-2 text-sm text-zinc-500">
+          You reported that {a.site_name} rejected {a.domain}: new addresses for this site use another domain.
         </p>
       )}
       {a.leak && <LeakBanner a={a} onPause={() => onUpdate({ status: "paused" })} />}

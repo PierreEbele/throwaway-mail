@@ -11,6 +11,10 @@ export interface User {
   two_factor: boolean;
   created_at: number;
   last_login_at: number | null;
+  /** Domain of new addresses when none is chosen. */
+  domain_choice: "first" | "random" | "rotate";
+  /** Minutes after which an address that received nothing is flagged (0: never). */
+  no_mail_warn_minutes: number;
 }
 export type AddressStatus = "active" | "paused" | "archived";
 export interface Address {
@@ -49,6 +53,10 @@ export interface Address {
   replies_unavailable?: string | null;
   burned: { reason: string; at: number } | null;
   leak: { sender: string; at: number } | null;
+  /** Nothing received some minutes after creation: the site may reject the domain. */
+  no_mail_warning?: boolean;
+  /** Only on single-address responses: the user reported that the site rejected this address. */
+  site_rejected?: boolean;
 }
 export type CategoryColor = "zinc" | "red" | "orange" | "amber" | "green" | "teal" | "blue" | "indigo" | "violet" | "pink";
 export interface Category {

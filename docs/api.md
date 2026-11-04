@@ -72,27 +72,29 @@ const { code } = await tm.addresses.waitForCode(addr.id, { since: Date.now(), ti
 
 ## Endpoint overview
 
-| Area          | Endpoints                                                                                                                                   |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Addresses     | `GET/POST /v1/addresses`, `GET/PATCH/DELETE /v1/addresses/:id`, `POST /v1/addresses/bulk`                                                   |
-| Filters       | `q`, `site`, `domain`, `status`, `category` (id or `none`), `pinned`, `unread`, `has_code`, `since_hours`, `leak`, `hide_hidden`            |
-| Messages      | `GET /v1/addresses/:id/messages`, `GET/PATCH/DELETE /v1/messages/:id`, `POST /v1/addresses/:id/messages/bulk`, `GET /v1/addresses/:id/code` |
-| Newsletters   | `POST /v1/messages/:id/unsubscribe`                                                                                                         |
-| Protection    | `POST /v1/addresses/:id/senders`, `/replace`, `/extend`, `/feed`; `POST /v1/panic`                                                          |
-| Insights      | `GET /v1/addresses/:id/stats`, `GET /v1/digest`, `GET /v1/leaks`, `POST /v1/leaks/block`, `GET/POST /v1/stale-addresses`                    |
-| Organisation  | `/v1/categories` (+ `/reorder`), `/v1/saved-searches`, `/v1/directories`                                                                    |
-| Forwarding    | `/v1/destinations` (+ `/refresh`, `/resend`, PGP key via `PATCH`)                                                                           |
-| Replies       | `PATCH /v1/addresses/:id` `{replies_enabled}`, `GET /v1/addresses/:id/contacts`, `PATCH/DELETE /v1/addresses/:id/contacts/:cid`             |
-| Rules         | `GET/POST /v1/rules`, `PATCH/DELETE /v1/rules/:id`, `POST /v1/rules/reorder` `{ids}`, `POST /v1/rules/test`                                 |
-| Quarantine    | `GET /v1/quarantine`, `POST /v1/quarantine/:id/release` `{forward}`, `DELETE /v1/quarantine/:id`                                            |
-| Deliveries    | `GET /v1/delivery-failures` (`status`, `kind`, `address_id`, `destination`, `before`, `limit`), `POST /:id/retry`, `POST /:id/dismiss`      |
-| Fallbacks     | `PUT /v1/forwarding/fallbacks` `{destination_ids}`, `PUT /v1/addresses/:id/fallbacks` `{destination_ids}`                                   |
-| Headers       | `GET/PUT /v1/forwarding/headers` `{allowlist: string[] \| null}`; `GET /v1/messages/:id` returns `raw_headers`                              |
-| Sending       | `POST /v1/addresses/:id/send`, `GET /v1/sending`, `POST /v1/sending/passwords`, `DELETE /v1/sending/passwords/:id`                          |
-| Notifications | `/v1/notify-targets` (+ `/test`, `/resume`, `GET /:id/deliveries`, `POST /:id/deliveries/:did/resend`)                                      |
-| Account       | `/v1/keys`, `GET /v1/export`, `POST /v1/import`                                                                                             |
-| Admin         | `/v1/domains`, `/v1/admin/users` (+ `DELETE /:id/2fa`), `/v1/admin/audit`, `/v1/admin/health`, `/v1/admin/diagnostics`                      |
-| Two-factor    | `GET /v1/auth/2fa`, `POST /v1/auth/2fa/setup`, `/enable`, `/disable`, `/recovery-codes`; `POST /v1/auth/login/2fa`                          |
+| Area          | Endpoints                                                                                                                                                           |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Addresses     | `GET/POST /v1/addresses`, `GET/PATCH/DELETE /v1/addresses/:id`, `POST /v1/addresses/bulk`                                                                           |
+| Filters       | `q`, `site`, `domain`, `status`, `category` (id or `none`), `pinned`, `unread`, `has_code`, `since_hours`, `leak`, `hide_hidden`                                    |
+| Messages      | `GET /v1/addresses/:id/messages`, `GET/PATCH/DELETE /v1/messages/:id`, `POST /v1/addresses/:id/messages/bulk`, `GET /v1/addresses/:id/code`                         |
+| Newsletters   | `POST /v1/messages/:id/unsubscribe`                                                                                                                                 |
+| Protection    | `POST /v1/addresses/:id/senders`, `/replace`, `/extend`, `/feed`; `POST /v1/panic`                                                                                  |
+| Rejections    | `POST /v1/addresses/:id/rejected` `{replace}`, `GET /v1/site-rejections`, `DELETE /v1/site-rejections/:id`, `GET /v1/sites/domain`, `GET /v1/admin/site-rejections` |
+| Preferences   | `PATCH /v1/auth/me/preferences` `{domain_choice, no_mail_warn_minutes}`; `POST /v1/addresses` accepts `preferred_domain` and returns `avoided_domains`              |
+| Insights      | `GET /v1/addresses/:id/stats`, `GET /v1/digest`, `GET /v1/leaks`, `POST /v1/leaks/block`, `GET/POST /v1/stale-addresses`                                            |
+| Organisation  | `/v1/categories` (+ `/reorder`), `/v1/saved-searches`, `/v1/directories`                                                                                            |
+| Forwarding    | `/v1/destinations` (+ `/refresh`, `/resend`, PGP key via `PATCH`)                                                                                                   |
+| Replies       | `PATCH /v1/addresses/:id` `{replies_enabled}`, `GET /v1/addresses/:id/contacts`, `PATCH/DELETE /v1/addresses/:id/contacts/:cid`                                     |
+| Rules         | `GET/POST /v1/rules`, `PATCH/DELETE /v1/rules/:id`, `POST /v1/rules/reorder` `{ids}`, `POST /v1/rules/test`                                                         |
+| Quarantine    | `GET /v1/quarantine`, `POST /v1/quarantine/:id/release` `{forward}`, `DELETE /v1/quarantine/:id`                                                                    |
+| Deliveries    | `GET /v1/delivery-failures` (`status`, `kind`, `address_id`, `destination`, `before`, `limit`), `POST /:id/retry`, `POST /:id/dismiss`                              |
+| Fallbacks     | `PUT /v1/forwarding/fallbacks` `{destination_ids}`, `PUT /v1/addresses/:id/fallbacks` `{destination_ids}`                                                           |
+| Headers       | `GET/PUT /v1/forwarding/headers` `{allowlist: string[] \| null}`; `GET /v1/messages/:id` returns `raw_headers`                                                      |
+| Sending       | `POST /v1/addresses/:id/send`, `GET /v1/sending`, `POST /v1/sending/passwords`, `DELETE /v1/sending/passwords/:id`                                                  |
+| Notifications | `/v1/notify-targets` (+ `/test`, `/resume`, `GET /:id/deliveries`, `POST /:id/deliveries/:did/resend`)                                                              |
+| Account       | `/v1/keys`, `GET /v1/export`, `POST /v1/import`                                                                                                                     |
+| Admin         | `/v1/domains`, `/v1/admin/users` (+ `DELETE /:id/2fa`), `/v1/admin/audit`, `/v1/admin/health`, `/v1/admin/diagnostics`                                              |
+| Two-factor    | `GET /v1/auth/2fa`, `POST /v1/auth/2fa/setup`, `/enable`, `/disable`, `/recovery-codes`; `POST /v1/auth/login/2fa`                                                  |
 
 ### Rules
 

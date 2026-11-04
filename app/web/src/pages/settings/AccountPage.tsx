@@ -5,6 +5,7 @@ import { BackupCard } from "./BackupCard";
 import { DirectoriesCard } from "./DirectoriesCard";
 import { NotificationsCard } from "./NotificationsCard";
 import { PanicCard } from "./PanicCard";
+import { DomainChoiceCard } from "./DomainChoiceCard";
 import { PasswordCard } from "./PasswordCard";
 import { TwoFactorCard } from "./TwoFactorCard";
 import { PushTargetsCard } from "./PushTargetsCard";
@@ -30,6 +31,7 @@ export function AccountPage() {
       </div>
       {user?.auth === "local" && <PasswordCard />}
       {user?.auth === "local" && <TwoFactorCard />}
+      <DomainChoiceCard />
       <NotificationsCard />
       <PushTargetsCard />
       <SmtpPasswordsCard />

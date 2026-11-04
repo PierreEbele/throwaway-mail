@@ -27,7 +27,7 @@ On top of the form filler it adds:
 3. Install:
    - **Firefox:** `about:debugging#/runtime/this-firefox` → _Load Temporary Add-on_ → pick `extension/manifest.json` (removed at restart). For a permanent install, sign it as _unlisted_ on addons.mozilla.org (`web-ext sign --channel unlisted`), or use Firefox Developer Edition with `xpinstall.signatures.required=false`.
    - **Chrome/Chromium:** unzip the `-chrome.zip` into a folder you keep, open `chrome://extensions`, enable _Developer mode_, _Load unpacked_ → that folder. (Or publish the zip on the Chrome Web Store.) Chrome 121 or later.
-4. Extension settings (the ⚙ _Settings_ icon in the popup header): server `https://mail.example.com`, paste the key, _Test connection_, pick the domain, _Save_. The browser asks for access to that server only.
+4. Extension settings (the ⚙ _Settings_ icon in the popup header): server `https://mail.example.com`, paste the key, _Test connection_, pick the preferred domain, _Save_. The domain is a preference: when a site is known to reject it (see [Sites that reject a domain](user-guide.md#sites-that-reject-a-domain)), the server picks another one. The browser asks for access to that server only.
 
 The key is stored in the extension's local storage and only sent to the configured server. The API is reached directly with the Bearer key (no Authelia); extensions with host permission are not subject to CORS, so the server needs no change.
 

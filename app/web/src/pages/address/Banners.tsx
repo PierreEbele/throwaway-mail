@@ -4,7 +4,7 @@ import type { Address } from "../../types";
 import { useToast } from "../../components/ui";
 import { invalidate } from "../../queries";
 import { fullDate, hostOf, timeAgo } from "../../util";
-import { useReplace, useSenderAction } from "./hooks";
+import { useReplace, useSenderAction, useSiteRejected } from "./hooks";
 
 export function ExpiryBanner({ a }: { a: Address }) {
   const qc = useQueryClient();
@@ -36,6 +36,26 @@ export function ExpiryBanner({ a }: { a: Address }) {
       </button>
       <button className={btn} onClick={() => extend(null)}>
         Never expire
+      </button>
+    </div>
+  );
+}
+
+/** An address created for a sign-up that received nothing yet: the site may not have sent its code, or reject the domain. */
+export function NoMailBanner({ a }: { a: Address }) {
+  const rejected = useSiteRejected(a);
+  const btn = "rounded border border-amber-300 px-2 py-0.5 hover:bg-amber-100 dark:border-amber-800 dark:hover:bg-amber-900/50";
+  return (
+    <div
+      data-testid="no-mail-warning"
+      className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200"
+    >
+      <span className="flex-1">
+        No mail yet, {timeAgo(a.created_at).replace(/ ago$/, "")} after creation. Did the site send the code? It may reject the domain{" "}
+        <code className="font-mono">{a.domain}</code>.
+      </span>
+      <button className={btn} onClick={rejected}>
+        The site rejected it
       </button>
     </div>
   );

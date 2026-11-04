@@ -7,6 +7,7 @@ Everything you can do from the web UI. Each feature is also available through th
 - [Organising: categories, pins, smart folders](#organising)
 - [Reading mail](#reading-mail)
 - [Forwarding](#forwarding)
+- [Sites that reject a domain](#sites-that-reject-a-domain)
 - [Leaks and protection](#leaks-and-protection)
 - [Notifications](#notifications)
 - [On-the-fly addresses](#on-the-fly-addresses)
@@ -154,6 +155,22 @@ Sending is limited per hour (shown on the card). Client setup, with the values f
   outgoing server: the server above, port and STARTTLS or SSL/TLS as shown, user name = your account e-mail,
   password = the SMTP password. Gmail's "Send mail as" works too, but first mails a confirmation link to the alias:
   turn forwarding on before adding it.
+
+## Sites that reject a domain
+
+Some sites refuse sign-ups from alias domains. On the address page, **Site rejected it** records the site and the
+domain, pauses the address and creates a new one for the same site on another of your domains (copied to the
+clipboard). Without another active domain the report is still kept.
+
+- **Per-site memory**: new addresses for that site (from the web UI, the API or the extension) skip the rejected domain
+  automatically. In the **+ New** dialog, the domain _Automatic_ shows which domain will be used and warns when the
+  site rejected the selected one. Reports are shared across the instance (only the site and the domain, never who reported it).
+- **Domain choice** (Account → Domains of new addresses): when no domain is chosen, use the first domain, a random
+  one, or rotate through them. Reports can be forgotten there too.
+- **No mail yet**: an address that received nothing some minutes after creation (15 by default, set it on the Account
+  page, 0 turns it off) is flagged in the list (_no mail yet?_) and on its page: did the site send the code? It may
+  reject the domain. The warning only shows during the address's first day.
+- Admins see which sites reject which domains under **Admin → Domains**.
 
 ## Leaks and protection
 

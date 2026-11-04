@@ -44,9 +44,21 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
       setMaxMessages("");
     } else setCategoryId(defaultCategory ?? "");
   }, [open, defaultCategory]);
+  // "Automatic": the server applies the domain choice and skips domains this site is known to reject.
+  const [siteQuery, setSiteQuery] = useState({ name: "", url: "" });
   useEffect(() => {
-    if (!domain && active[0]) setDomain(active[0].name);
-  }, [active, domain]);
+    const t = setTimeout(() => setSiteQuery({ name: siteName.trim(), url: siteUrl.trim() }), 300);
+    return () => clearTimeout(t);
+  }, [siteName, siteUrl]);
+  const suggestion = useQuery({
+    queryKey: ["site-domain", siteQuery],
+    enabled: open && active.length > 1,
+    queryFn: () =>
+      get<{ domain: string | null; avoided: string[] }>(
+        `/v1/sites/domain?${new URLSearchParams({ site_name: siteQuery.name, site_url: siteQuery.url })}`,
+      ),
+  });
+  const avoided = suggestion.data?.avoided ?? [];
   const verified = (dests.data ?? []).filter((d) => d.verified);
   const create = useMutation({
     mutationFn: () =>
@@ -118,12 +130,19 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
                 Domain
               </label>
               <select id="na-domain" className="input" value={domain} onChange={(e) => setDomain(e.target.value)}>
+                <option value="">Automatic{suggestion.data?.domain ? ` (@${suggestion.data.domain})` : ""}</option>
                 {active.map((d) => (
                   <option key={d.id} value={d.name}>
                     @{d.name}
                   </option>
                 ))}
               </select>
+              {avoided.length > 0 && (
+                <p className={`mt-1 text-xs ${avoided.includes(domain) ? "text-amber-700 dark:text-amber-400" : "text-zinc-500"}`}>
+                  This site rejected {avoided.map((x) => `@${x}`).join(", ")} before
+                  {avoided.includes(domain) ? ": pick another domain or Automatic." : "; Automatic skips it."}
+                </p>
+              )}
             </div>
           </div>
           {(categories.data?.length ?? 0) > 0 && (
