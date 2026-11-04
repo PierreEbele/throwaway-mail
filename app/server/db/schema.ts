@@ -18,6 +18,37 @@ export const users = sqliteTable("users", {
   disabled: integer("disabled", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at").notNull(),
   lastLoginAt: integer("last_login_at"),
+  /** TOTP secret (base32), "v1:…" when encrypted with APP_SECRET. Set during enrolment, active once totpEnabledAt is set. */
+  totpSecret: text("totp_secret"),
+  totpEnabledAt: integer("totp_enabled_at"),
+  /** Last accepted TOTP time step, so a code cannot be replayed. */
+  totpLastStep: integer("totp_last_step"),
+});
+
+/** One-time two-factor recovery codes (sha256 hashes). */
+export const recoveryCodes = sqliteTable(
+  "recovery_codes",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull(),
+    usedAt: integer("used_at"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("recovery_codes_user_idx").on(t.userId)],
+);
+
+/** Password accepted, second factor pending: short-lived, limited attempts. id is the sha256 of the token. */
+export const loginChallenges = sqliteTable("login_challenges", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  attempts: integer("attempts").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
 });
 
 export const sessions = sqliteTable(
@@ -390,7 +421,7 @@ export const auditLog = sqliteTable(
     ip: text("ip"),
     createdAt: integer("created_at").notNull(),
   },
-  (t) => [index("audit_created_idx").on(t.createdAt)],
+  (t) => [index("audit_created_idx").on(t.createdAt), index("audit_user_idx").on(t.userId), index("audit_action_idx").on(t.action)],
 );
 
 /** Small key/value store for instance-wide state: off-site backup status, end-to-end probe settings and results. */

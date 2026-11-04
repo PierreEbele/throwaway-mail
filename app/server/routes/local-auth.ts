@@ -12,6 +12,8 @@ import { audit } from "../services/audit.js";
 import { userOut } from "../services/serialize.js";
 import { signIn } from "./auth.js";
 import { accountFailed, accountSucceeded, checkAccount, limitIp } from "../auth/limits.js";
+import { CHALLENGE_TTL_MS, createChallenge, twoFactorEnabled } from "../auth/twofactor.js";
+import { registerTwoFactor } from "./twofactor.js";
 
 const email = z.string().trim().email().max(254);
 const name = z.string().trim().max(100).optional();
@@ -37,6 +39,7 @@ function signedIn(c: Parameters<typeof signIn>[0], user: User) {
 
 /** E-mail + password accounts: first-run setup, login, password change and invite acceptance. */
 export function registerLocalAuth(r: ApiRouter) {
+  registerTwoFactor(r);
   r.add(
     {
       method: "post",
@@ -88,6 +91,8 @@ export function registerLocalAuth(r: ApiRouter) {
       }
       accountSucceeded(c, accountKey);
       if (user.disabled) throw new HttpError(403, "account_disabled", "Your account is disabled in this app");
+      if (twoFactorEnabled(user))
+        return c.json({ two_factor_required: true, challenge: createChallenge(d, user.id), expires_in: CHALLENGE_TTL_MS / 1000 });
       d.logger.info("password login", { user_id: user.id, role: user.role });
       return signedIn(c, user);
     },

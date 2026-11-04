@@ -10,6 +10,8 @@ export function userOut(u: User) {
     /** "local": e-mail + password, role managed in the app; "sso": role follows identity-provider groups. */
     auth: u.oidcSub === null ? ("local" as const) : ("sso" as const),
     disabled: u.disabled,
+    /** Local accounts only: TOTP second factor turned on. */
+    two_factor: u.totpEnabledAt !== null && !!u.totpSecret,
     created_at: u.createdAt,
     last_login_at: u.lastLoginAt,
   };
