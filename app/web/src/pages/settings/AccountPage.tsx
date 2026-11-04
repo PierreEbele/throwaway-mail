@@ -6,6 +6,7 @@ import { DirectoriesCard } from "./DirectoriesCard";
 import { NotificationsCard } from "./NotificationsCard";
 import { PanicCard } from "./PanicCard";
 import { PasswordCard } from "./PasswordCard";
+import { TwoFactorCard } from "./TwoFactorCard";
 import { PushTargetsCard } from "./PushTargetsCard";
 
 export function AccountPage() {
@@ -27,6 +28,7 @@ export function AccountPage() {
         </p>
       </div>
       {user?.auth === "local" && <PasswordCard />}
+      {user?.auth === "local" && <TwoFactorCard />}
       <NotificationsCard />
       <PushTargetsCard />
       <DirectoriesCard />

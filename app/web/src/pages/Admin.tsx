@@ -224,6 +224,14 @@ export function UsersPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
     onError: (e) => toast((e as Error).message, "error"),
   });
+  const reset2fa = useMutation({
+    mutationFn: (id: string) => del(`/v1/admin/users/${id}/2fa`),
+    onSuccess: () => {
+      toast("Two-factor authentication turned off", "success");
+      return qc.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
   const { create: resetLink, dialog } = useCreateInvite();
   const subtitle = [
     ssoEnabled && `${ssoProvider} accounts are created at their first sign-in and their role follows ${ssoProvider} groups.`,
@@ -261,6 +269,20 @@ export function UsersPage() {
               <Badge value={u.role} />
             )}
             {u.disabled && <Badge value="disabled" />}
+            {u.two_factor && (
+              <>
+                <Badge value="2FA" />
+                <button
+                  className="btn-ghost"
+                  onClick={() =>
+                    confirmAction(`Turn off two-factor authentication for ${u.email}? They can sign in with their password alone.`) &&
+                    reset2fa.mutate(u.id)
+                  }
+                >
+                  Reset 2FA
+                </button>
+              </>
+            )}
             {localEnabled && u.auth === "local" && (
               <button
                 className="btn-ghost"
