@@ -12,6 +12,7 @@ const EVENT_LABELS: Record<string, string> = {
   "leak.detected": "Possible leaks",
   "address.expiring": "Address about to expire",
   "address.burned": "Address burned automatically",
+  "system.alert": "Instance alerts: failed backup or probe (admins only)",
 };
 
 const KIND_HELP: Record<NotifyKind, string> = {

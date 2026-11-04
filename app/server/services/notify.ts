@@ -6,7 +6,14 @@ import { checkOutboundUrl } from "../lib/outbound.js";
 import { parseList } from "../lib/senders.js";
 import { metrics } from "./metrics.js";
 
-export const NOTIFY_EVENTS = ["message.received", "code.received", "leak.detected", "address.expiring", "address.burned"] as const;
+export const NOTIFY_EVENTS = [
+  "message.received",
+  "code.received",
+  "leak.detected",
+  "address.expiring",
+  "address.burned",
+  "system.alert",
+] as const;
 export type NotifyEventType = (typeof NOTIFY_EVENTS)[number];
 
 export interface NotifyEvent {
@@ -30,16 +37,21 @@ function request(t: NotifyTarget, e: NotifyEvent, now: number): { url: string; i
   });
   switch (t.kind) {
     case "ntfy": {
-      const headers: Record<string, string> = { title: e.title, tags: e.type === "leak.detected" ? "warning" : "email" };
+      const urgent = e.type === "leak.detected" || e.type === "system.alert";
+      const headers: Record<string, string> = { title: e.title, tags: urgent ? "warning" : "email" };
       if (e.url) headers.click = e.url;
-      if (e.type === "leak.detected") headers.priority = "high";
+      if (urgent) headers.priority = "high";
       if (t.token) headers.authorization = `Bearer ${t.token}`;
       return { url: t.url!, init: { method: "POST", headers, body: e.body } };
     }
     case "gotify":
       return json(
         `${t.url!.replace(/\/$/, "")}/message`,
-        { title: e.title, message: e.body + (e.url ? `\n${e.url}` : ""), priority: e.type === "leak.detected" ? 8 : 5 },
+        {
+          title: e.title,
+          message: e.body + (e.url ? `\n${e.url}` : ""),
+          priority: e.type === "leak.detected" || e.type === "system.alert" ? 8 : 5,
+        },
         { "x-gotify-key": t.token ?? "" },
       );
     case "telegram":
@@ -98,4 +110,14 @@ export function notify(deps: Deps, userId: string, e: NotifyEvent): Promise<unkn
     .all()
     .filter((t) => parseList(t.eventsJson).includes(e.type));
   return Promise.all(targets.map((t) => sendTo(deps, t, e)));
+}
+
+/** Instance problems (failed backup, failed end-to-end probe): every active admin's targets subscribed to system.alert. */
+export function notifyAdmins(deps: Deps, e: Omit<NotifyEvent, "type">): Promise<unknown> {
+  const admins = deps.db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.role, "admin"), eq(users.disabled, false)))
+    .all();
+  return Promise.all(admins.map((a) => notify(deps, a.id, { ...e, type: "system.alert" })));
 }

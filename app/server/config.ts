@@ -54,6 +54,23 @@ const EnvSchema = z.object({
   LOCAL_LOGIN: z.enum(["auto", "true", "false"]).default("auto"),
   /** Key for secrets stored in the database (IMAP/SMTP passwords). 32+ characters; required to add IMAP domains. */
   APP_SECRET: z.string().min(32, "APP_SECRET must be at least 32 characters").optional(),
+  // Backups made by the server itself (0 = off; scripts/backup.sh from host cron keeps working either way).
+  BACKUP_INTERVAL_HOURS: z.coerce.number().min(0).default(0),
+  BACKUP_DIR: z.string().optional(),
+  BACKUP_KEEP_DAYS: z.coerce.number().int().min(1).default(14),
+  /** Off-site copies on S3-compatible storage (R2, Backblaze B2, MinIO…), encrypted with BACKUP_PASSPHRASE. */
+  BACKUP_S3_ENDPOINT: z.string().url().optional(),
+  BACKUP_S3_BUCKET: z.string().optional(),
+  BACKUP_S3_REGION: z.string().default("auto"),
+  BACKUP_S3_ACCESS_KEY_ID: z.string().optional(),
+  BACKUP_S3_SECRET_ACCESS_KEY: z.string().optional(),
+  BACKUP_S3_PREFIX: z.string().default("throwaway-mail/"),
+  /** Number of off-site backups kept (older ones are deleted after each upload). */
+  BACKUP_S3_KEEP: z.coerce.number().int().min(1).default(30),
+  BACKUP_PASSPHRASE: z.string().min(12, "BACKUP_PASSPHRASE must be at least 12 characters").optional(),
+  /** End-to-end probe: SMTP relay used to send the test mail (smtp://user:pass@host:587 or smtps://…:465). */
+  PROBE_SMTP_URL: z.string().url().optional(),
+  PROBE_FROM: z.string().optional(),
 });
 
 export type Config = ReturnType<typeof loadConfig>;
@@ -79,6 +96,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       "No way to log in: LOCAL_LOGIN=false requires single sign-on (OIDC_ISSUER and OIDC_CLIENT_SECRET). Set them, or set LOCAL_LOGIN=auto|true",
     );
   }
+  const s3 = [parsed.BACKUP_S3_ENDPOINT, parsed.BACKUP_S3_BUCKET, parsed.BACKUP_S3_ACCESS_KEY_ID, parsed.BACKUP_S3_SECRET_ACCESS_KEY];
+  const offsiteBackup = s3.every(Boolean);
+  if (s3.some(Boolean) && !offsiteBackup) {
+    throw new Error(
+      "Off-site backups need all of BACKUP_S3_ENDPOINT, BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY_ID and BACKUP_S3_SECRET_ACCESS_KEY",
+    );
+  }
+  if (offsiteBackup && !parsed.BACKUP_PASSPHRASE)
+    throw new Error("Off-site backups need BACKUP_PASSPHRASE (they are encrypted before upload)");
   const cookieSecure =
     parsed.COOKIE_SECURE !== undefined
       ? parsed.COOKIE_SECURE === "1" || parsed.COOKIE_SECURE === "true"
@@ -92,6 +118,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     /** /ingest only accepts mail signed with a real secret in production. */
     ingestEnabled: !isProd || !!parsed.CF_MOCK || parsed.INGEST_SECRET !== "dev-ingest-secret-change-me",
     databasePath: parsed.DATABASE_PATH ?? path.join(parsed.DATA_DIR, "throwaway.db"),
+    backupDir: parsed.BACKUP_DIR ?? path.join(parsed.DATA_DIR, "backups"),
+    offsiteBackup,
     oidcAllowedGroups: parsed.OIDC_ALLOWED_GROUPS.split(",")
       .map((g) => g.trim())
       .filter(Boolean),

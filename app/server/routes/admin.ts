@@ -12,6 +12,8 @@ import { audit } from "../services/audit.js";
 import { userOut } from "../services/serialize.js";
 import { getMailbox } from "../services/mailbox/settings.js";
 import { runDiagnostics } from "../services/diagnostics.js";
+import { backupStatus } from "../services/backup/index.js";
+import { probeStatus } from "../services/probe.js";
 
 function dbBytes(deps: Deps) {
   let total = 0;
@@ -76,6 +78,8 @@ export function healthSnapshot(deps: Deps) {
     cloudflare: deps.cf.mode,
     retention_days: deps.config.RETENTION_DAYS,
     metrics_enabled: !!deps.config.METRICS_TOKEN,
+    backup: { ...backupStatus(deps), scheduled_every_hours: deps.config.BACKUP_INTERVAL_HOURS },
+    probe: probeStatus(deps),
   };
 }
 
@@ -91,6 +95,30 @@ export function healthGauges(deps: Deps) {
       value: Math.round((d.last_ingest_at ?? 0) / 1000),
       labels: { domain: d.name },
     })),
+    ...(h.backup.last_run_at !== null
+      ? [
+          {
+            name: "throwaway_backup_last_success_timestamp_seconds",
+            help: "Last successful backup (0 = none yet)",
+            value: Math.round((h.backup.last_success_at ?? 0) / 1000),
+          },
+          { name: "throwaway_backup_last_run_ok", help: "1 when the last backup succeeded", value: h.backup.last_ok ? 1 : 0 },
+        ]
+      : []),
+    ...(h.probe.enabled
+      ? [
+          {
+            name: "throwaway_probe_last_success_timestamp_seconds",
+            help: "Last successful end-to-end probe (0 = none yet)",
+            value: Math.round((h.probe.last_success_at ?? 0) / 1000),
+          },
+          {
+            name: "throwaway_probe_ok",
+            help: "1 when the last finished end-to-end probe succeeded",
+            value: h.probe.last_ok === false ? 0 : 1,
+          },
+        ]
+      : []),
   ];
 }
 

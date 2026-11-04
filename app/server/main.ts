@@ -8,6 +8,8 @@ import { pruneIconCache } from "./services/icons.js";
 import { runExpiryReminders } from "./services/reminders.js";
 import { metrics } from "./services/metrics.js";
 import { backfillAuthResults } from "./services/maintenance.js";
+import { scheduledBackup } from "./services/backup/index.js";
+import { probeTick } from "./services/probe.js";
 
 // Local (non-Docker) runs may keep settings in .env.
 try {
@@ -71,7 +73,30 @@ const retentionTimer = setInterval(retention, 60 * 60 * 1000);
 retentionTimer.unref();
 const reminderTimer = setInterval(reminders, 10 * 60 * 1000);
 reminderTimer.unref();
-retentionTimer.unref();
+
+let backupTimer: NodeJS.Timeout | null = null;
+if (config.BACKUP_INTERVAL_HOURS > 0) {
+  let running = false;
+  const backup = () => {
+    if (running) return;
+    running = true;
+    scheduledBackup(deps)
+      .catch((e) => logger.error("backup job crashed", { err: e as Error }))
+      .finally(() => (running = false));
+  };
+  backupTimer = setInterval(backup, config.BACKUP_INTERVAL_HOURS * 3600_000);
+  backupTimer.unref();
+  logger.info("scheduled backups", { every_hours: config.BACKUP_INTERVAL_HOURS, offsite: config.offsiteBackup });
+}
+let probing = false;
+const probeTimer = setInterval(() => {
+  if (probing) return;
+  probing = true;
+  probeTick(deps)
+    .catch((e) => logger.error("probe job crashed", { err: e as Error }))
+    .finally(() => (probing = false));
+}, 60_000);
+probeTimer.unref();
 
 const server = serve({ fetch: app.fetch, port: config.PORT, hostname: config.HOST }, (info) => {
   logger.info("listening", { port: info.port, host: config.HOST, app_url: config.APP_URL });
@@ -84,6 +109,8 @@ function shutdown(signal: string) {
   logger.info("shutting down", { signal });
   clearInterval(retentionTimer);
   clearInterval(reminderTimer);
+  clearInterval(probeTimer);
+  if (backupTimer) clearInterval(backupTimer);
   deps.mailboxes.stop();
   const force = setTimeout(() => {
     logger.warn("forced exit after timeout");

@@ -28,6 +28,8 @@ export const metrics = {
   imapPolls: new Counter("throwaway_imap_polls_total", "IMAP mailbox polls, by domain and result"),
   imapMessages: new Counter("throwaway_imap_messages_total", "Messages found in IMAP mailboxes, by domain and outcome"),
   imapForwards: new Counter("throwaway_imap_forwards_total", "Mails forwarded over SMTP, by result"),
+  backups: new Counter("throwaway_backups_total", "Backup runs made by the server, by result"),
+  probes: new Counter("throwaway_probe_total", "End-to-end probe runs, by result"),
   jobs: new Map<string, { at: number; ok: boolean; detail: string }>(),
   job(name: string, ok: boolean, detail = "") {
     this.jobs.set(name, { at: Date.now(), ok, detail });
@@ -38,7 +40,16 @@ const esc = (v: string) => v.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace
 
 export function renderPrometheus(gauges: Array<{ name: string; help: string; value: number; labels?: Labels }>): string {
   const out: string[] = [];
-  for (const c of [metrics.ingest, metrics.http, metrics.notify, metrics.imapPolls, metrics.imapMessages, metrics.imapForwards]) {
+  for (const c of [
+    metrics.ingest,
+    metrics.http,
+    metrics.notify,
+    metrics.imapPolls,
+    metrics.imapMessages,
+    metrics.imapForwards,
+    metrics.backups,
+    metrics.probes,
+  ]) {
     out.push(`# HELP ${c.name} ${c.help}`, `# TYPE ${c.name} counter`);
     for (const [labels, v] of c.entries()) {
       const l = Object.entries(labels)

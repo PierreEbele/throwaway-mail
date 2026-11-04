@@ -36,6 +36,7 @@ import { registerNewsletters } from "./routes/newsletters.js";
 import { registerBackup } from "./routes/backup.js";
 import { registerNotify } from "./routes/notify.js";
 import { registerFeeds } from "./routes/feeds.js";
+import { registerReliability } from "./routes/reliability.js";
 import { metrics, renderPrometheus } from "./services/metrics.js";
 import { healthGauges } from "./routes/admin.js";
 
@@ -142,6 +143,7 @@ export function createApp(deps: Deps) {
   registerSmartFolders(api);
   registerDirectories(api);
   registerStale(api);
+  registerReliability(api);
   registerAdmin(api);
   if (deps.config.localLoginEnabled) registerInvites(api);
   // Site logo: an image, so outside the JSON router

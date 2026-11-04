@@ -393,6 +393,13 @@ export const auditLog = sqliteTable(
   (t) => [index("audit_created_idx").on(t.createdAt)],
 );
 
+/** Small key/value store for instance-wide state: off-site backup status, end-to-end probe settings and results. */
+export const systemState = sqliteTable("system_state", {
+  key: text("key").primaryKey(),
+  valueJson: text("value_json").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type Domain = typeof domains.$inferSelect;
 export type Address = typeof addresses.$inferSelect;
