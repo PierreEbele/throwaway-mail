@@ -43,6 +43,7 @@ function loadBackground(t: ReturnType<typeof makeTestApp>, store: Record<string,
     URL,
     URLSearchParams,
     crypto,
+    btoa,
     structuredClone,
     browser,
     console,
@@ -52,7 +53,8 @@ function loadBackground(t: ReturnType<typeof makeTestApp>, store: Record<string,
     },
   };
   vm.createContext(sandbox);
-  for (const f of ["generator.js", "throwaway.js", "background.js"]) {
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "../../extension/manifest.json"), "utf8"));
+  for (const f of manifest.background.scripts.filter((f: string) => f !== "compat.js")) {
     vm.runInContext(
       fs.readFileSync(path.join(__dirname, "../../extension", f), "utf8").replace(/^const (\w+) =/m, "globalThis.$1 ="),
       sandbox,
@@ -136,5 +138,31 @@ describe("extension background", () => {
     await new Promise((r) => setTimeout(r, 100));
     await ingest(t, a.email, simpleEml({ subject: "Your code", text: "Your one-time code is 731904" }));
     expect(await waiting).toMatchObject({ code: "731904" });
+  });
+
+  it("with the local (no service) provider, fills a catch-all address and never waits for a code", async () => {
+    const { admin, store, send } = await setup();
+    store.aliasProvider = "none";
+    store.providerSettings = { none: { mode: "catchall", domain: "catch.example.net", pattern: "{site}.{random}" } };
+    const r = await send({ type: "fill-new" });
+    expect(r.email).toMatch(/^example\.[a-z0-9]{6}@catch\.example\.net$/);
+    expect(r).toMatchObject({ provider: "No service", codes: false });
+    expect(store.profile.throwaway).toMatchObject({ provider: "none", host: "shop.example.org" });
+    expect(store.tmPending).toBeUndefined();
+    expect(await send({ type: "state" })).toMatchObject({ autoCode: false, autoFillCode: false, pending: null });
+    expect(await send({ type: "poll-code" })).toEqual({ done: true });
+    expect(await send({ type: "site-code", wait: 0 })).toEqual({ done: true });
+    expect((await admin.get("/v1/addresses")).json.addresses).toHaveLength(0); // the server was never asked
+
+    // Same site again: the same address is kept.
+    expect((await send({ type: "fill-new" })).email).toBe(r.email);
+  });
+
+  it("an unconfigured provider keeps the generated @example.com address", async () => {
+    const { store, send } = await setup();
+    store.aliasProvider = "simplelogin";
+    const r = await send({ type: "fill-new" });
+    expect(r.email).not.toMatch(/@mail\.example\.test$/);
+    expect(r.provider).toBeNull();
   });
 });
