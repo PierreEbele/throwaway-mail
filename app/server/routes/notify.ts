@@ -7,6 +7,7 @@ import { newId, randomString } from "../lib/crypto.js";
 import { badRequest, notFound } from "../lib/errors.js";
 import { parseList } from "../lib/senders.js";
 import { NOTIFY_EVENTS, sendTo } from "../services/notify.js";
+import { vapidKeys } from "../services/webpush.js";
 import { OutboundUrlError, checkOutboundUrl } from "../lib/outbound.js";
 import { attempt, deliveryOut, redeliver } from "../services/webhooks.js";
 
@@ -17,6 +18,7 @@ const out = (t: NotifyTarget) => ({
   name: t.name,
   url: t.url,
   chat_id: t.chatId,
+  // Web Push: the endpoint identifies the browser, the keys stay on the server.
   has_token: !!t.token,
   secret: t.kind === "webhook" ? t.secret : null,
   events: parseList(t.eventsJson),
@@ -51,6 +53,7 @@ async function checkUrl(d: Deps, user: User, url: string | undefined) {
 }
 
 const Events = z.array(z.enum(NOTIFY_EVENTS)).min(1);
+const DEFAULT_EVENTS: (typeof NOTIFY_EVENTS)[number][] = ["code.received", "leak.detected", "address.expiring", "address.burned"];
 
 export function registerNotify(r: ApiRouter) {
   r.add(
@@ -83,7 +86,7 @@ export function registerNotify(r: ApiRouter) {
         url: z.string().trim().max(500).optional(),
         token: z.string().trim().max(300).optional(),
         chat_id: z.string().trim().max(64).optional(),
-        events: Events.default(["code.received", "leak.detected", "address.expiring", "address.burned"]),
+        events: Events.default(DEFAULT_EVENTS),
       }),
     },
     async (c, { body }) => {
@@ -112,6 +115,72 @@ export function registerNotify(r: ApiRouter) {
 
   r.add(
     {
+      method: "get",
+      path: "/v1/push/vapid-key",
+      summary: "Public VAPID key for Web Push subscriptions",
+      tags: ["notifications"],
+      auth: "user",
+    },
+    (c) => c.json({ public_key: vapidKeys(c.get("deps")).publicKey }),
+  );
+
+  r.add(
+    {
+      method: "post",
+      path: "/v1/push/subscriptions",
+      summary: "Register this browser for Web Push notifications",
+      description:
+        "Body: the browser's PushSubscription (endpoint and keys). Creates a `webpush` notification target, or updates the one with the same endpoint.",
+      tags: ["notifications"],
+      auth: "user",
+      body: z.object({
+        endpoint: z.string().trim().url().max(1000),
+        keys: z.object({ p256dh: z.string().min(16).max(200), auth: z.string().min(8).max(100) }),
+        name: z.string().trim().min(1).max(80).default("This browser"),
+        events: Events.default(DEFAULT_EVENTS),
+      }),
+    },
+    async (c, { body }) => {
+      const d = c.get("deps");
+      const user = c.get("user")!;
+      if (!body.endpoint.startsWith("https://")) throw badRequest("endpoint must be an https:// URL");
+      try {
+        // Push services are public hosts; never let a subscription point the server at its own network.
+        await checkOutboundUrl(body.endpoint, { resolve: d.resolve, allowPrivate: false });
+      } catch (e) {
+        if (e instanceof OutboundUrlError) throw badRequest(`endpoint: ${e.message}`);
+        throw e;
+      }
+      const token = JSON.stringify(body.keys);
+      const existing = d.db
+        .select()
+        .from(notifyTargets)
+        .where(and(eq(notifyTargets.userId, user.id), eq(notifyTargets.kind, "webpush"), eq(notifyTargets.url, body.endpoint)))
+        .get();
+      if (existing) {
+        d.db.update(notifyTargets).set({ token, enabled: true, lastError: null }).where(eq(notifyTargets.id, existing.id)).run();
+        return c.json({ target: out(owned(d, user, existing.id)) });
+      }
+      const id = newId("ntf");
+      d.db
+        .insert(notifyTargets)
+        .values({
+          id,
+          userId: user.id,
+          kind: "webpush",
+          name: body.name,
+          url: body.endpoint,
+          token,
+          eventsJson: JSON.stringify(body.events),
+          createdAt: d.now(),
+        })
+        .run();
+      return c.json({ target: out(owned(d, user, id)) }, 201);
+    },
+  );
+
+  r.add(
+    {
       method: "patch",
       path: "/v1/notify-targets/:id",
       summary: "Update a notification target",
@@ -130,11 +199,12 @@ export function registerNotify(r: ApiRouter) {
       const d = c.get("deps");
       const user = c.get("user")!;
       const t = owned(d, user, c.req.param("id")!);
-      if (body.url !== undefined && t.kind !== "telegram") await checkUrl(d, user, body.url);
+      const urlEditable = t.kind !== "telegram" && t.kind !== "webpush";
+      if (body.url !== undefined && urlEditable) await checkUrl(d, user, body.url);
       const set: Partial<NotifyTarget> = {};
       if (body.name !== undefined) set.name = body.name;
-      if (body.url !== undefined && t.kind !== "telegram") set.url = body.url;
-      if (body.token) set.token = body.token;
+      if (body.url !== undefined && urlEditable) set.url = body.url;
+      if (body.token && t.kind !== "webpush") set.token = body.token;
       if (body.chat_id !== undefined) set.chatId = body.chat_id || null;
       if (body.events) set.eventsJson = JSON.stringify(body.events);
       if (body.enabled !== undefined) set.enabled = body.enabled;

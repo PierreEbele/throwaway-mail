@@ -15,6 +15,7 @@ Everything you can do from the web UI. Each feature is also available through th
 - [This week (digest)](#this-week)
 - [Account tools](#account-tools)
 - [Keyboard shortcuts](#keyboard-shortcuts)
+- [Install as an app](#install-as-an-app)
 
 ## Addresses
 
@@ -194,6 +195,10 @@ _Block everywhere_.
 - **Desktop notifications** (Account): while the app is open in a tab, a system notification shows new mail; mail
   with a code shows the code, and clicking copies it.
 - **Push notifications & webhooks** (Account) work with the app closed:
+  - **This device** (Web Push): _Enable on this device_ asks the browser for permission and registers it; a code
+    then shows up as "Code 123456" on the lock screen, and tapping it opens the address. Works in Chrome, Edge and
+    Firefox (desktop and Android) and Safari; on iPhone/iPad, add the app to the Home Screen first (iOS 16.4+) and
+    enable it from the installed app. A browser that unsubscribes is paused automatically.
   - **ntfy**: full topic URL, optional access token.
   - **Gotify**: server URL and application token.
   - **Telegram**: bot token and chat id.
@@ -265,3 +270,11 @@ destinations), filterable by action group, action and user.
 | `Esc`     | Clear the selection                                |
 | `e`       | Archive the open message                           |
 | `Delete`  | Delete the open message                            |
+
+## Install as an app
+
+Throwaway Mail is a progressive web app: install it from the browser (Chrome/Edge: install icon in the address bar or
+_Install app_; Android: _Add to Home screen_ / _Install_; iPhone/iPad: Safari → Share → _Add to Home Screen_). It
+then opens in its own window with its icon. The service worker only caches the application itself (HTML, scripts,
+icons) so it starts fast; addresses, mail and codes always come from the server and are never stored by it. On a
+phone the address list and an address page are two screens: tap an address to open it, _← Back_ to return.

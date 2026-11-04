@@ -7,6 +7,7 @@ import { checkOutboundUrl } from "../lib/outbound.js";
 import { parseList } from "../lib/senders.js";
 import { metrics } from "./metrics.js";
 import { enqueueWebhooks } from "./webhooks.js";
+import { webPushRequest } from "./webpush.js";
 
 export const NOTIFY_EVENTS = [
   "message.received",
@@ -39,7 +40,7 @@ export function webhookSignature(secret: string, ts: string, body: string) {
   return createHmac("sha256", secret).update(`${ts}.${body}`).digest("hex");
 }
 
-function request(t: NotifyTarget, e: NotifyEvent): { url: string; init: RequestInit } {
+function request(deps: Deps, t: NotifyTarget, e: NotifyEvent): { url: string; init: RequestInit } {
   const json = (url: string, body: unknown, headers: Record<string, string> = {}) => ({
     url,
     init: { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) },
@@ -69,6 +70,13 @@ function request(t: NotifyTarget, e: NotifyEvent): { url: string; init: RequestI
         text: `${e.title}\n${e.body}${e.url ? `\n${e.url}` : ""}`,
         disable_web_page_preview: true,
       });
+    case "webpush":
+      return webPushRequest(
+        deps,
+        t,
+        { title: e.title, body: e.body, url: e.url, tag: e.type === "code.received" ? "code" : undefined },
+        e.type === "code.received" || e.type === "leak.detected" || e.type === "system.alert",
+      );
     case "webhook":
       throw new Error("webhooks go through the outbox (services/webhooks.ts)");
   }
@@ -80,13 +88,18 @@ export async function sendTo(deps: Deps, t: NotifyTarget, e: NotifyEvent): Promi
     const [res] = (await enqueueWebhooks(deps, [t], e)) as Array<{ ok: boolean; error?: string } | null>;
     return res ?? { ok: false, error: t.pausedAt ? "paused after repeated failures" : "not sent" };
   }
-  const { url, init } = request(t, e);
   try {
+    const { url, init } = request(deps, t, e);
     // Re-checked at every send: the target's DNS may have changed since it was saved.
     const owner = deps.db.select({ role: users.role }).from(users).where(eq(users.id, t.userId)).get();
     await checkOutboundUrl(url, { resolve: deps.resolve, allowPrivate: owner?.role === "admin" });
     const res = await deps.fetch(url, { ...init, signal: AbortSignal.timeout(8000), redirect: "error" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      // The browser unsubscribed (or the subscription expired): stop sending to it.
+      if (t.kind === "webpush" && (res.status === 404 || res.status === 410))
+        deps.db.update(notifyTargets).set({ enabled: false }).where(eq(notifyTargets.id, t.id)).run();
+      throw new Error(`HTTP ${res.status}`);
+    }
     deps.db.update(notifyTargets).set({ lastOkAt: deps.now(), lastError: null }).where(eq(notifyTargets.id, t.id)).run();
     metrics.notify.inc({ kind: t.kind, result: "ok" });
     return { ok: true };

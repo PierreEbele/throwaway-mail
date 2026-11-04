@@ -142,7 +142,7 @@ export interface Destination {
   pgp: { fingerprint: string; hide_subject: boolean } | null;
 }
 
-export type NotifyKind = "ntfy" | "gotify" | "telegram" | "webhook";
+export type NotifyKind = "ntfy" | "gotify" | "telegram" | "webhook" | "webpush";
 export type NotifyEvent =
   | "message.received"
   | "code.received"

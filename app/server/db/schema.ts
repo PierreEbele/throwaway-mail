@@ -401,11 +401,11 @@ export const notifyTargets = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["ntfy", "gotify", "telegram", "webhook"] }).notNull(),
+    kind: text("kind", { enum: ["ntfy", "gotify", "telegram", "webhook", "webpush"] }).notNull(),
     name: text("name").notNull(),
-    /** ntfy topic URL, Gotify server URL or webhook URL (unused for Telegram). */
+    /** ntfy topic URL, Gotify server URL, webhook URL or Web Push endpoint (unused for Telegram). */
     url: text("url"),
-    /** ntfy access token, Gotify app token or Telegram bot token. */
+    /** ntfy access token, Gotify app token, Telegram bot token or Web Push subscription keys (JSON {p256dh, auth}). */
     token: text("token"),
     /** Telegram chat id. */
     chatId: text("chat_id"),

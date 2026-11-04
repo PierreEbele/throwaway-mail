@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { addDomain, ingest, loginAs, makeTestApp, setupAdmin, simpleEml } from "../helpers.js";
 import { webhookSignature } from "../../app/server/services/notify.js";
@@ -101,6 +103,70 @@ describe("notifications", () => {
     const tg = (await user.post("/v1/notify-targets", { kind: "telegram", name: "tg", token: "1:a", chat_id: "1" })).json.target;
     expect((await user.post(`/v1/notify-targets/${tg.id}/test`)).json).toEqual({ ok: false, error: "HTTP 500" });
     expect((await user.get("/v1/notify-targets")).json.targets[0].last_error).toBe("HTTP 500");
+  });
+});
+
+describe("Web Push", () => {
+  // Decrypts RFC 8291 payloads the way a browser does (the library web-push itself relies on).
+  const ece = createRequire(import.meta.url)("http_ece") as {
+    decrypt(buf: Buffer, p: { version: string; privateKey: crypto.ECDH; authSecret: Buffer }): Buffer;
+  };
+  const browserKeys = () => {
+    const ecdh = crypto.createECDH("prime256v1");
+    ecdh.generateKeys();
+    const authSecret = crypto.randomBytes(16);
+    return { ecdh, authSecret, keys: { p256dh: ecdh.getPublicKey().toString("base64url"), auth: authSecret.toString("base64url") } };
+  };
+
+  it("registers a browser subscription and sends encrypted, VAPID-signed pushes", async () => {
+    const { t, user, calls, flush } = await setup();
+    const key = (await user.get("/v1/push/vapid-key")).json.public_key as string;
+    expect(Buffer.from(key, "base64url")).toHaveLength(65);
+    // The key pair is generated once and kept.
+    expect((await user.get("/v1/push/vapid-key")).json.public_key).toBe(key);
+
+    const b = browserKeys();
+    const sub = { endpoint: "https://fcm.googleapis.com/fcm/send/abc", keys: b.keys, name: "Android", events: ["code.received"] };
+    expect((await user.post("/v1/push/subscriptions", { ...sub, endpoint: "http://fcm.googleapis.com/x" })).status).toBe(400);
+    const target = (await user.post("/v1/push/subscriptions", sub)).json.target;
+    expect(target).toMatchObject({ kind: "webpush", name: "Android", has_token: true, url: sub.endpoint });
+    // Same endpoint again: updated, not duplicated.
+    expect((await user.post("/v1/push/subscriptions", sub)).status).toBe(200);
+    expect((await user.get("/v1/notify-targets")).json.targets).toHaveLength(1);
+
+    const a = (await user.post("/v1/addresses", { site_name: "GitHub" })).json.address;
+    await ingest(t, a.email, simpleEml({ subject: "Your code", text: "Your verification code is 482913" }));
+    await flush();
+    const push = calls.find((c) => c.url === sub.endpoint)!;
+    const h = push.init.headers as Record<string, string>;
+    expect(h["Content-Encoding"]).toBe("aes128gcm");
+    expect(h.Authorization).toMatch(new RegExp(`^vapid t=.+, k=${key}$`));
+    expect(h.Urgency).toBe("high");
+    const plain = ece.decrypt(Buffer.from(push.init.body as Uint8Array), {
+      version: "aes128gcm",
+      privateKey: b.ecdh,
+      authSecret: b.authSecret,
+    });
+    expect(JSON.parse(plain.toString())).toMatchObject({ title: "Code 482913", tag: "code" });
+  });
+
+  it("disables a subscription the push service reports as gone", async () => {
+    const { t, user } = await setup();
+    t.deps.fetch = (async () => new Response("gone", { status: 410 })) as typeof fetch;
+    const target = (
+      await user.post("/v1/push/subscriptions", {
+        endpoint: "https://updates.push.services.mozilla.com/wpush/v2/x",
+        keys: browserKeys().keys,
+      })
+    ).json.target;
+    expect((await user.post(`/v1/notify-targets/${target.id}/test`)).json).toEqual({ ok: false, error: "HTTP 410" });
+    expect((await user.get("/v1/notify-targets")).json.targets[0].enabled).toBe(false);
+  });
+
+  it("uses the VAPID key pair from the environment when set", async () => {
+    const t = makeTestApp({ VAPID_PUBLIC_KEY: "BPub", VAPID_PRIVATE_KEY: "priv" });
+    const admin = await setupAdmin(t);
+    expect((await admin.get("/v1/push/vapid-key")).json.public_key).toBe("BPub");
   });
 });
 

@@ -57,6 +57,8 @@ const APP_CSP = {
   fontSrc: ["'self'", "data:"],
   connectSrc: ["'self'"],
   frameSrc: ["'self'"],
+  workerSrc: ["'self'"],
+  manifestSrc: ["'self'"],
   frameAncestors: ["'none'"],
   formAction: ["'self'"],
   baseUri: ["'none'"],
@@ -207,6 +209,11 @@ export function createApp(deps: Deps) {
     app.use("/assets/*", async (c, next) => {
       await next();
       if (c.res.status === 200) c.header("cache-control", "public, max-age=31536000, immutable");
+    });
+    // The service worker and manifest must be revalidated so a new deployment is picked up.
+    app.use("/sw.js", async (c, next) => {
+      await next();
+      c.header("cache-control", "no-cache");
     });
     app.use("/*", serveStatic({ root: path.relative(process.cwd(), webDir) || "." }));
     app.get("*", (c) => {

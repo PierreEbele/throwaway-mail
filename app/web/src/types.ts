@@ -230,7 +230,7 @@ export interface LeakGroup {
   senders: string[];
   addresses: Address[];
 }
-export type NotifyKind = "ntfy" | "gotify" | "telegram" | "webhook";
+export type NotifyKind = "ntfy" | "gotify" | "telegram" | "webhook" | "webpush";
 export interface NotifyTarget {
   id: string;
   kind: NotifyKind;

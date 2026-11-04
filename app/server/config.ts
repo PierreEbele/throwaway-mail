@@ -55,6 +55,14 @@ const EnvSchema = z.object({
    * "true" offers both; "false" disables them.
    */
   LOCAL_LOGIN: z.enum(["auto", "true", "false"]).default("auto"),
+  /** Web Push (VAPID) key pair, base64url. Generated and stored in the database when unset. */
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  /** VAPID contact (mailto: or https: URL) sent to push services; default: the origin of APP_URL. */
+  VAPID_SUBJECT: z
+    .string()
+    .regex(/^(mailto:|https:\/\/)/, "VAPID_SUBJECT must start with mailto: or https://")
+    .optional(),
   /** Key for secrets stored in the database (IMAP/SMTP passwords). 32+ characters; required to add IMAP domains. */
   APP_SECRET: z.string().min(32, "APP_SECRET must be at least 32 characters").optional(),
   // Backups made by the server itself (0 = off; scripts/backup.sh from host cron keeps working either way).

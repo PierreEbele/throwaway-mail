@@ -26,7 +26,54 @@ const KIND_HELP: Record<NotifyKind, string> = {
   gotify: "Server URL and an application token.",
   telegram: "Bot token from @BotFather and your chat id.",
   webhook: "Any URL (n8n, Home Assistant, Zapier...). JSON body signed with HMAC-SHA256 (x-tm-signature).",
+  webpush: "Use “Enable on this device” above.",
 };
+
+const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+
+function urlBase64ToBytes(b64: string) {
+  const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(raw, (ch) => ch.charCodeAt(0));
+}
+
+/** Subscribes this browser to Web Push and registers it as a "webpush" notification target. */
+async function subscribeThisDevice(events: string[]) {
+  if (!pushSupported())
+    throw new Error("This browser does not support push notifications (on iPhone/iPad: add the app to the Home Screen first).");
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") throw new Error("Notifications are blocked for this site in the browser settings.");
+  const reg = (await navigator.serviceWorker.getRegistration()) ?? (await navigator.serviceWorker.register("/sw.js"));
+  await navigator.serviceWorker.ready;
+  const { public_key } = await get<{ public_key: string }>("/v1/push/vapid-key");
+  let sub = await reg.pushManager.getSubscription();
+  // A subscription made with another server key (keys rotated) must be replaced.
+  if (sub && sub.options.applicationServerKey) {
+    const current = new Uint8Array(sub.options.applicationServerKey);
+    const wanted = urlBase64ToBytes(public_key);
+    if (current.length !== wanted.length || current.some((b, i) => b !== wanted[i])) {
+      await sub.unsubscribe();
+      sub = null;
+    }
+  }
+  sub ??= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToBytes(public_key) });
+  const json = sub.toJSON();
+  const ua = navigator.userAgent;
+  const name = /iPhone|iPad/.test(ua)
+    ? "iPhone / iPad"
+    : /Android/.test(ua)
+      ? "Android"
+      : /Firefox/.test(ua)
+        ? "Firefox"
+        : /Edg\//.test(ua)
+          ? "Edge"
+          : /Chrome/.test(ua)
+            ? "Chrome"
+            : /Safari/.test(ua)
+              ? "Safari"
+              : "This browser";
+  return post("/v1/push/subscriptions", { endpoint: json.endpoint, keys: json.keys, name, events });
+}
 
 export function PushTargetsCard() {
   const qc = useQueryClient();
@@ -61,6 +108,13 @@ export function PushTargetsCard() {
       toast("Target added", "success");
     },
   });
+  const enablePush = useMutation({
+    mutationFn: () => subscribeThisDevice(["code.received", "leak.detected", "address.expiring", "address.burned"]),
+    onSuccess: () => {
+      refresh();
+      toast("Notifications enabled on this device", "success");
+    },
+  });
   const test = (t: NotifyTarget) =>
     post<{ ok: boolean; error?: string }>(`/v1/notify-targets/${t.id}/test`).then((r) => {
       refresh();
@@ -70,8 +124,18 @@ export function PushTargetsCard() {
     <div className="card mt-4 max-w-xl space-y-3 p-5 text-sm">
       <h2 className="font-semibold">Push notifications &amp; webhooks</h2>
       <p className="text-zinc-500">
-        Works even when the app is closed: get codes and leak alerts on your phone (ntfy, Gotify, Telegram) or feed automations.
+        Works even when the app is closed: get codes and leak alerts on your phone (this browser, ntfy, Gotify, Telegram) or feed
+        automations.
       </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button className="btn-secondary" onClick={() => enablePush.mutate()} disabled={enablePush.isPending}>
+          Enable on this device
+        </button>
+        <span className="text-xs text-zinc-500">
+          Web Push: “Code 123456” right on this phone or computer. On iPhone/iPad, add the app to the Home Screen first.
+        </span>
+      </div>
+      <ErrorText error={enablePush.error} />
       {(list.data ?? []).map((t) => (
         <div key={t.id} className="rounded border border-zinc-200 p-2 dark:border-zinc-800">
           <div className="flex flex-wrap items-center gap-2">
@@ -112,6 +176,7 @@ export function PushTargetsCard() {
             ) : null}
           </p>
           {t.kind === "webhook" && <Deliveries target={t} />}
+          {t.kind === "webpush" && t.url && <p className="mt-1 truncate text-xs text-zinc-500">Push service: {new URL(t.url).host}</p>}
           {t.secret && (
             <p className="mt-1 flex items-center gap-1 text-xs text-zinc-500">
               Signing secret: <code className="font-mono">{t.secret}</code> <CopyButton text={t.secret} />

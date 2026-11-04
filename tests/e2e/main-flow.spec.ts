@@ -85,3 +85,35 @@ test("SSO sign-in, domain, address lifecycle and live code", async ({ page, requ
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(row).toBeHidden();
 });
+
+test("installable app and phone layout: list, then address, then back", async ({ page, request }) => {
+  // PWA: manifest, icons and service worker are served; the shell links them.
+  const manifest = await (await request.get("/manifest.webmanifest")).json();
+  expect(manifest).toMatchObject({ display: "standalone", start_url: "/" });
+  for (const icon of manifest.icons) expect((await request.get(icon.src)).ok()).toBe(true);
+  const sw = await request.get("/sw.js");
+  expect(sw.headers()["cache-control"]).toBe("no-cache");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/login/);
+  await page.getByRole("link", { name: "Sign in with Authelia" }).click();
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.webmanifest");
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => !!r))).toBe(true);
+
+  await page.getByRole("button", { name: "+ New" }).click();
+  await page.getByLabel("Site name").fill("Phone");
+  await page.getByLabel(/Local part/).fill("e2e-phone");
+  await page.getByRole("button", { name: "Create address" }).click();
+  // The address page replaces the list on a narrow screen.
+  await expect(page.getByRole("heading", { name: "Phone" })).toBeVisible();
+  const row = page.getByRole("link", { name: /Phone, e2e-phone@/ });
+  await expect(row).toBeHidden();
+  await page.getByRole("link", { name: "← Back" }).click();
+  await expect(row).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Phone" })).toBeHidden();
+  await row.click();
+  await expect(page.getByRole("heading", { name: "Phone" })).toBeVisible();
+  // Nothing wider than the screen.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
