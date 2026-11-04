@@ -40,6 +40,14 @@ describe("live Cloudflare client", () => {
     expect(calls.every((c) => c.auth === "Bearer tok")).toBe(true);
   });
 
+  it("verifies account-owned tokens on the account endpoint", async () => {
+    const { f } = fakeApi((_m, p) => {
+      if (p === "/user/tokens/verify") return { status: 401, errors: [{ code: 1000, message: "Invalid API Token" }] };
+      if (p === "/accounts/acct/tokens/verify") return { result: { status: "active" } };
+    });
+    expect(await new LiveCloudflareClient("t", "acct", f).verifyToken()).toEqual({ status: "active", expiresOn: null });
+  });
+
   it("reads the current catch-all and can put a previous one back", async () => {
     const { f, calls } = fakeApi((m, p) => {
       if (p === "/zones/z1/email/routing/rules/catch_all" && m === "GET")

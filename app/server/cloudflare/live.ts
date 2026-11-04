@@ -48,7 +48,15 @@ export class LiveCloudflareClient implements CloudflareClient {
   }
 
   async verifyToken(): Promise<TokenInfo> {
-    const r = await this.call<{ status: string; expires_on?: string | null }>("GET", "/user/tokens/verify");
+    type Verify = { status: string; expires_on?: string | null };
+    let r: Verify;
+    try {
+      r = await this.call<Verify>("GET", "/user/tokens/verify");
+    } catch (e) {
+      // Account-owned tokens are only known to the account endpoint; user tokens answer "Invalid API Token" there.
+      if (!(e instanceof CloudflareError && e.cfCode === 1000 && this.accountId)) throw e;
+      r = await this.call<Verify>("GET", `/accounts/${this.accountId}/tokens/verify`);
+    }
     return { status: r.status, expiresOn: r.expires_on ?? null };
   }
 
