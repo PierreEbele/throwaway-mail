@@ -33,12 +33,14 @@ app polls a catch-all mailbox of any provider over IMAP and forwards over SMTP. 
 
 **Privacy**
 
+- Sites that reject alias domains: one click records it and moves the address to another of your domains; new
+  addresses for that site skip the domain; optional random or rotating domain choice; "no mail yet" warning
 - Leak detection when an address receives mail from another sender than its site, with history and one-click
   replacement of the address
 - Site lock and per-address sender blocking
 - Forwarding to one or several verified mailboxes, optionally PGP-encrypted
 - Reply from the alias: answers go out from the disposable address, your real one stays hidden (needs outbound SMTP)
-- Panic button, encrypted export
+- Panic button, encrypted export, import from SimpleLogin and addy.io
 
 **Integrations**
 
@@ -78,9 +80,11 @@ pnpm simulate --to <address> tests/fixtures/github-device-verification.eml
 
 ## Documentation
 
+- [Quickstart](docs/quickstart.md): five minutes with Docker and Cloudflare or an IMAP mailbox
+- [Comparison](docs/comparison.md) with SimpleLogin, addy.io, Firefox Relay and DuckDuckGo Email Protection
 - [Installation](docs/installation.md): server, Cloudflare, Email Worker, single sign-on
 - [Tour](docs/tour.md): every screen, with screenshots
-- [User guide](docs/user-guide.md)
+- [User guide](docs/user-guide.md) · [Import from SimpleLogin / addy.io](docs/import.md) · [Public demo](docs/demo.md)
 - [Configuration](docs/configuration.md) · [Operations](docs/operations.md)
 - [API](docs/api.md) · [Node.js SDK](sdk/README.md)
 - [Browser extension](docs/extension.md) · [Bitwarden](docs/bitwarden.md)
