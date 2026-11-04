@@ -7,6 +7,7 @@ import { checkOutboundUrl } from "../lib/outbound.js";
 import { ownedAddress } from "../services/addresses.js";
 import { pickUnsubscribe, type UnsubscribeCandidate } from "../parser/unsubscribe.js";
 import { candidatesOf } from "../services/unsubscribe.js";
+import { visitUnsubscribe } from "../services/unsubscribe-visit.js";
 
 /** Newsletter handling (List-Unsubscribe). */
 export function registerNewsletters(r: ApiRouter) {
@@ -16,7 +17,8 @@ export function registerNewsletters(r: ApiRouter) {
       path: "/v1/messages/:id/unsubscribe",
       summary: "Unsubscribe from the newsletter a message came from",
       description:
-        "With RFC 8058 one-click support the server POSTs the unsubscribe request itself (done: true). Otherwise the unsubscribe URL (or mailto) is returned for the user to open.",
+        "With RFC 8058 one-click support the server POSTs the unsubscribe request itself (done: true). Otherwise it opens the https unsubscribe page itself and submits its confirmation form, " +
+        "and returns done: true only when the page confirms. When it cannot, the unsubscribe URL (or mailto) is returned for the user to open.",
       tags: ["messages"],
       auth: "user",
       body: z.object({ block: z.boolean().default(false).describe("Also reject future newsletters on this address") }),
@@ -58,6 +60,9 @@ export function registerNewsletters(r: ApiRouter) {
         } catch (e) {
           error = (e as Error).message;
         }
+      } else if (url && /^https:/i.test(url)) {
+        // No one-click: open the page server-side, and submit its confirmation form if it has one.
+        ({ done, error } = await visitUnsubscribe(d, url));
       }
       if (done) d.db.update(messages).set({ unsubscribedAt: d.now() }).where(eq(messages.id, m.id)).run();
       d.bus.publish(user.id, { type: "address.updated", address_id: m.addressId });
