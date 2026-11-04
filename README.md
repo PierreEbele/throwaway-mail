@@ -4,6 +4,8 @@ Self-hosted disposable e-mail addresses on Cloudflare Email Routing or any catch
 verification codes in the web UI, the API or your browser, choose per site whether mail reaches your real mailbox, and
 see when a site leaks or sells your address.
 
+![Inbox with a verification code](docs/images/address.png)
+
 ```
 Sender → Cloudflare MX → Email Routing catch-all → Email Worker ──HMAC──▶ App (API + web UI, SQLite)
                                                         ▲                       │
@@ -35,6 +37,7 @@ app polls a catch-all mailbox of any provider over IMAP and forwards over SMTP. 
   replacement of the address
 - Site lock and per-address sender blocking
 - Forwarding to one or several verified mailboxes, optionally PGP-encrypted
+- Reply from the alias: answers go out from the disposable address, your real one stays hidden (needs outbound SMTP)
 - Panic button, encrypted export
 
 **Integrations**
@@ -47,9 +50,14 @@ app polls a catch-all mailbox of any provider over IMAP and forwards over SMTP. 
 **Operations**
 
 - Multi-user: local accounts with invite links, and/or single sign-on (OpenID Connect, e.g. Authelia) with roles from identity-provider groups
+- Optional two-factor authentication (TOTP, recovery codes), login lockout and an audit log
 - The app configures Cloudflare itself (zones, catch-all rule, destinations)
 - Or no Cloudflare at all: domains backed by an IMAP catch-all mailbox, forwarding over SMTP
-- Docker Compose, online SQLite backups, health page, Prometheus metrics
+- Published Docker image (amd64, arm64), online SQLite backups with encrypted off-site copies (S3, R2, B2)
+- Setup check page and `pnpm run doctor`, end-to-end delivery probe, health page, Prometheus metrics
+- The Worker keeps forwarding when the app is down and replays the mail later
+
+![Setup check](docs/images/setup-check.png)
 
 ## Try it locally
 
