@@ -99,12 +99,17 @@ async function fillNewIdentity(tabId, pageUrl) {
   }
   const { revision = 0 } = await browser.storage.local.get("revision");
   await browser.storage.local.set({ profile, revision: keepPrevious ? revision : revision + 1 });
-  await browser.scripting.executeScript({ target: { tabId }, files: ["filler.js"] });
+  await browser.scripting.executeScript({ target: { tabId }, files: ["generator.js", "filler.js"] });
   const [res] = await browser.scripting.executeScript({
     target: { tabId },
     func: (data, options) => globalThis.ThrowawayFill.fill(data, options),
     args: [profile, { overwrite: true, fields }],
   });
+  // The site refused the password and a variant it accepts was typed instead: the identity keeps that one.
+  if (res?.result?.password) {
+    profile = { ...profile, password: res.result.password };
+    await browser.storage.local.set({ profile });
+  }
   const via = provider ? { provider: provider.provider.name, codes: !!provider.provider.codes } : { provider: null, codes: false };
   if (s.bitwardenMode) return { report: res?.result || null, name: profile.fullName, bitwarden: true, ...via };
   if (profile.throwaway?.host === host && profile.throwaway.id && s.autoCode && provider?.provider.codes)

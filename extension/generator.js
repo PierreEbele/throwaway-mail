@@ -1,46 +1,146 @@
 (function (root) {
   "use strict";
-  // Origin of given names: Japanese, Korean, Hindi, Arabic, Turkish, Nordic.
-  const firstNames = [
-    "Haruto",
-    "Yui",
-    "Sora",
-    "Akari",
-    "Minjun",
-    "Seoyeon",
-    "Jiwoo",
-    "Arjun",
-    "Kavya",
-    "Aarav",
-    "Zeynep",
-    "Emre",
-    "Eren",
-    "Sigrid",
-    "Sven",
-    "Hakan",
-    "Niran",
-    "Ravi",
-    "Aditi",
-    "Yuna",
-  ];
-  const lastNames = [
-    "Tanaka",
-    "Nakamura",
-    "Kobayashi",
-    "Kim",
-    "Park",
-    "Choi",
-    "Sharma",
-    "Patel",
-    "Iyer",
-    "Demir",
-    "Yilmaz",
-    "Aydin",
-    "Lindberg",
-    "Sundqvist",
-    "Bergstrom",
-    "Srisai",
-  ];
+  // Given names and surnames that fit the identity's country (common, not tied to anyone in particular).
+  const names = {
+    FR: {
+      first: [
+        "Camille",
+        "Léa",
+        "Manon",
+        "Chloé",
+        "Inès",
+        "Jade",
+        "Louise",
+        "Zoé",
+        "Lucas",
+        "Hugo",
+        "Théo",
+        "Nathan",
+        "Louis",
+        "Gabriel",
+        "Arthur",
+        "Jules",
+        "Yanis",
+        "Sofiane",
+        "Amina",
+        "Clément",
+      ],
+      last: [
+        "Martin",
+        "Bernard",
+        "Dubois",
+        "Thomas",
+        "Robert",
+        "Richard",
+        "Petit",
+        "Durand",
+        "Leroy",
+        "Moreau",
+        "Simon",
+        "Laurent",
+        "Lefebvre",
+        "Michel",
+        "Garcia",
+        "Fournier",
+        "Girard",
+        "Bonnet",
+        "Mercier",
+        "Benali",
+      ],
+    },
+    GB: {
+      first: [
+        "Olivia",
+        "Amelia",
+        "Isla",
+        "Ava",
+        "Freya",
+        "Lily",
+        "Grace",
+        "Poppy",
+        "Oliver",
+        "George",
+        "Harry",
+        "Noah",
+        "Jack",
+        "Leo",
+        "Arthur",
+        "Oscar",
+        "Alfie",
+        "Freddie",
+        "Priya",
+        "Aisha",
+      ],
+      last: [
+        "Smith",
+        "Jones",
+        "Taylor",
+        "Brown",
+        "Williams",
+        "Wilson",
+        "Johnson",
+        "Davies",
+        "Patel",
+        "Wright",
+        "Robinson",
+        "Thompson",
+        "Evans",
+        "Walker",
+        "White",
+        "Roberts",
+        "Green",
+        "Hall",
+        "Wood",
+        "Khan",
+      ],
+    },
+    US: {
+      first: [
+        "Emma",
+        "Olivia",
+        "Ava",
+        "Sophia",
+        "Mia",
+        "Harper",
+        "Evelyn",
+        "Abigail",
+        "Liam",
+        "Noah",
+        "James",
+        "Elijah",
+        "Benjamin",
+        "Lucas",
+        "Mason",
+        "Ethan",
+        "Mateo",
+        "Daniel",
+        "Maya",
+        "Jayden",
+      ],
+      last: [
+        "Smith",
+        "Johnson",
+        "Williams",
+        "Brown",
+        "Jones",
+        "Garcia",
+        "Miller",
+        "Davis",
+        "Rodriguez",
+        "Martinez",
+        "Hernandez",
+        "Lopez",
+        "Wilson",
+        "Anderson",
+        "Thomas",
+        "Taylor",
+        "Moore",
+        "Jackson",
+        "Lee",
+        "Nguyen",
+      ],
+    },
+  };
   const fields = Object.freeze({
     firstName: "First name",
     lastName: "Last name",
@@ -129,6 +229,31 @@
       [chars[i], chars[j]] = [chars[j], chars[i]];
     }
     return chars.join("");
+  }
+  // Variants of `password` for a field that refuses it (maxlength, minlength, pattern), most similar first:
+  // the same characters cut to length (keeping one of each kind), then letters and digits only.
+  // Derived from the password only, so the same identity always gets the same variant.
+  const PASSWORD_GROUPS = [/[A-Z]/, /[a-z]/, /[0-9]/, /[^A-Za-z0-9]/];
+  function passwordVariants(password, { minLength = -1, maxLength = -1 } = {}) {
+    const alnum = password.replace(/[^A-Za-z0-9]/g, (_, i) => String((i % 8) + 2));
+    const out = [];
+    for (const base of [password, alnum]) {
+      let v = base;
+      if (minLength > v.length) while (v.length < minLength) v += base;
+      if (maxLength > 0 && v.length > maxLength) {
+        v = v.slice(0, maxLength);
+        // Put back a character of each kind the cut removed, over the last character whose kind is repeated.
+        for (const group of PASSWORD_GROUPS) {
+          if (group.test(v) || !group.test(base)) continue;
+          const count = (g) => [...v].filter((ch) => g.test(ch)).length;
+          const i = [...v].findLastIndex((ch) => PASSWORD_GROUPS.every((g) => !g.test(ch) || count(g) > 1));
+          if (i < 0) break;
+          v = v.slice(0, i) + [...base].find((ch) => group.test(ch)) + v.slice(i + 1);
+        }
+      } else if (minLength > base.length) v = v.slice(0, minLength);
+      if (!out.includes(v)) out.push(v);
+    }
+    return out;
   }
   const banks = Object.freeze({
     bnp: "BNP Paribas",
@@ -269,8 +394,6 @@
   }
   function generate(countryMode = "random", previous = null, lockedFields = []) {
     const locks = new Set(lockedFields.filter((key) => Object.hasOwn(fields, key)));
-    const firstName = pick(firstNames),
-      lastName = pick(lastNames);
     const token = Array.from(root.crypto.getRandomValues(new Uint8Array(5)), (n) => n.toString(16).padStart(2, "0")).join("");
     const keepCountry = previous && isCountryLocked([...locks]) && Object.hasOwn(countries, previous.countryCode);
     const countryCode = keepCountry
@@ -279,6 +402,8 @@
         ? countryMode
         : pick(Object.keys(countries));
     const locale = countries[countryCode];
+    const firstName = pick(names[countryCode].first),
+      lastName = pick(names[countryCode].last);
     const fr = countryCode === "FR",
       uk = countryCode === "GB";
     // France: audiovisual block reserved by ARCEP, decision 2025-2215, §2.5.12.
@@ -306,7 +431,10 @@
           ? ["Exempleville", "Test-sur-Démo", "Démo-les-Bains", "Val-des-Exemples"]
           : ["Examplebrook", "Testford", "Mockhaven", "Demovale"],
       ),
-      email: `${firstName}.${lastName}.${token}@example.com`.toLowerCase(),
+      email: `${firstName}.${lastName}.${token}@example.com`
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase(),
       phone,
       phoneNational: national,
       birthDate: generateBirthDate(),
@@ -326,6 +454,7 @@
   root.ThrowawayGenerator = {
     generate,
     generatePassword,
+    passwordVariants,
     generateBirthDate,
     validBirthDate,
     fields,

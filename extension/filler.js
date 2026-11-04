@@ -1,7 +1,7 @@
 (function (root) {
   "use strict";
   // The popup reinjects this file on each fill; keep the last transaction alive.
-  if (root.ThrowawayFill?.version === "1.9") return;
+  if (root.ThrowawayFill?.version === "2.0") return;
   let lastFill = null;
   const fieldKeys = ["firstName", "lastName", "address", "city", "postalCode", "country", "email", "phone", "birthDate", "password"];
   function allowed(key, selected) {
@@ -684,6 +684,15 @@
     }
     if (birthIssue) report.birthIssue = birthIssue;
     const passwordFields = selected.filter((field) => field.key === "password");
+    const passwordFits = (value) =>
+      typeof value === "string" &&
+      !!value &&
+      passwordFields.every(({ el }) => {
+        if ((el.maxLength > -1 && value.length > el.maxLength) || (el.minLength > 0 && value.length < el.minLength)) return false;
+        const probe = el.cloneNode(true);
+        probe.value = value;
+        return probe.checkValidity();
+      });
     let passwordIssue = null;
     if (selectedFields.has("password") && passwordFields.length) {
       if (!ranked[0].allowPassword) passwordIssue = "registration";
@@ -691,22 +700,20 @@
         ranked[0].passwordPeers.some((el) => el.value !== data.password && (el.disabled || el.readOnly || (!options.overwrite && el.value)))
       )
         passwordIssue = "preserved";
-      else if (
-        passwordFields.some(({ el }) => {
-          const value = data.password;
-          if (
-            typeof value !== "string" ||
-            !value ||
-            (el.maxLength > -1 && value.length > el.maxLength) ||
-            (el.minLength > 0 && value.length < el.minLength)
-          )
-            return true;
-          const probe = el.cloneNode(true);
-          probe.value = value;
-          return !probe.checkValidity();
-        })
-      )
-        passwordIssue = "constraints";
+      else if (!passwordFits(data.password)) {
+        // The site's rules (length, pattern) refuse the identity's password: use the closest variant they accept,
+        // and report it so the identity keeps the password actually typed (generator.js is injected before this file).
+        const max = Math.min(...passwordFields.map(({ el }) => (el.maxLength > 0 ? el.maxLength : Infinity)));
+        const limits = { maxLength: Number.isFinite(max) ? max : -1, minLength: Math.max(...passwordFields.map(({ el }) => el.minLength)) };
+        const variant =
+          typeof data.password === "string" && data.password
+            ? root.ThrowawayGenerator?.passwordVariants?.(data.password, limits).find(passwordFits)
+            : null;
+        if (variant) {
+          data = { ...data, password: variant };
+          report.password = variant;
+        } else passwordIssue = "constraints";
+      }
     }
     if (passwordIssue) report.passwordIssue = passwordIssue;
     for (const { el, key } of selected) {
@@ -805,5 +812,5 @@
     }
     return report;
   }
-  root.ThrowawayFill = { version: "1.6", fill, fillCard, undo, classify };
+  root.ThrowawayFill = { version: "2.0", fill, fillCard, undo, classify };
 })(globalThis);

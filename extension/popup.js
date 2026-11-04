@@ -280,7 +280,7 @@ $("fill").addEventListener("click", async () => {
     const { bitwardenMode } = await browser.storage.local.get("bitwardenMode");
     if (!bitwardenMode && !(await ensureAlias())) return;
     const tabId = await activeTabId();
-    await browser.scripting.executeScript({ target: { tabId }, files: ["filler.js"] });
+    await browser.scripting.executeScript({ target: { tabId }, files: ["generator.js", "filler.js"] });
     const results = await browser.scripting.executeScript({
       target: { tabId },
       func: (data, options) => globalThis.ThrowawayFill.fill(data, options),
@@ -294,6 +294,12 @@ $("fill").addEventListener("click", async () => {
     });
     const report = results[0]?.result;
     if (!report) throw new Error("NO_RESULT");
+    // The site refused the password and a variant it accepts was typed instead: the identity keeps that one.
+    if (report.password) {
+      profile = { ...profile, password: report.password };
+      render();
+      await browser.storage.local.set({ profile });
+    }
     // Bitwarden mode: the page waits for the e-mail filled by Bitwarden, then the code.
     if (bitwardenMode) await browser.tabs.sendMessage(tabId, { type: "watch-email" }).catch(() => {});
     if (report.filled && profile.throwaway) void handOffCode(tabId);
@@ -304,7 +310,9 @@ $("fill").addEventListener("click", async () => {
           ? " Password does not meet the site’s rules: neither field was changed."
           : report.passwordIssue === "registration"
             ? " Password skipped: not recognised as a sign-up."
-            : "") +
+            : report.password
+              ? " Password shortened or simplified to meet the site’s rules (saved in the identity)."
+              : "") +
       (report.birthIssue === "preserved"
         ? " Existing birth date kept as a whole."
         : report.birthIssue === "constraints"
