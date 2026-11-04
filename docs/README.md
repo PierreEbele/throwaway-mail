@@ -3,6 +3,7 @@
 | Document                          | For                                                                            |
 | --------------------------------- | ------------------------------------------------------------------------------ |
 | [Installation](installation.md)   | Server, Cloudflare, Email Worker, single sign-on, first domain and destination |
+| [Tour](tour.md)                   | Every screen of the web UI, with screenshots                                   |
 | [User guide](user-guide.md)       | Every feature of the web UI, keyboard shortcuts                                |
 | [Configuration](configuration.md) | Environment variables of the app and the Worker                                |
 | [Operations](operations.md)       | Updating, backups, health page, Prometheus metrics, background jobs            |

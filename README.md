@@ -4,7 +4,7 @@ Self-hosted disposable e-mail addresses on Cloudflare Email Routing or any catch
 verification codes in the web UI, the API or your browser, choose per site whether mail reaches your real mailbox, and
 see when a site leaks or sells your address.
 
-![Inbox with a verification code](docs/images/address.png)
+![Inbox with a verification code](docs/images/inbox.png)
 
 ```
 Sender → Cloudflare MX → Email Routing catch-all → Email Worker ──HMAC──▶ App (API + web UI, SQLite)
@@ -78,6 +78,7 @@ pnpm simulate --to <address> tests/fixtures/github-device-verification.eml
 ## Documentation
 
 - [Installation](docs/installation.md): server, Cloudflare, Email Worker, single sign-on
+- [Tour](docs/tour.md): every screen, with screenshots
 - [User guide](docs/user-guide.md)
 - [Configuration](docs/configuration.md) · [Operations](docs/operations.md)
 - [API](docs/api.md) · [Node.js SDK](sdk/README.md)
