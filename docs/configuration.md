@@ -82,7 +82,7 @@ Set in `worker/wrangler.local.toml` (git-ignored copy of `wrangler.toml`):
 | `FALLBACK_FORWARD`  | Verified mailbox(es) used when the app is unreachable: one address or `domain=addr,*=default`                                          |
 | `INGEST_TIMEOUT_MS` | Time to wait for the app before falling back (default 5000)                                                                            |
 | `INGEST_SECRET`     | Secret (`wrangler secret put`), same value as in the app                                                                               |
-| `SEND_EMAIL`        | `send_email` binding, needed only for PGP-encrypted forwarding                                                                         |
+| `SEND_EMAIL`        | `send_email` binding: PGP-encrypted, reverse-alias and rewritten (rules, header allowlist) forwards                                    |
 | `FALLBACK_MODE`     | `forward` (default): while the app is unreachable forward to cached destinations or `FALLBACK_FORWARD`; `reject`: temporary error only |
 | `ROUTES`            | Optional KV binding: last known forward destinations per address, used by the fallback                                                 |
 | `ROUTE_TTL_DAYS`    | Lifetime of a cached route (default 30)                                                                                                |

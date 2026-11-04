@@ -6,9 +6,10 @@ Sender → MX (Cloudflare) → Email Routing catch-all → Email Worker
                                                       ▼
                                  Reverse proxy (TLS) → App (Hono API + React UI) → SQLite
                                                       │
-                     { action: forward | store_only | reject, forward_to(_all), send }
+                     { action: forward | store_only | reject, forward_to(_all), send, fallback_to }
                                                       ▼
-            Worker: message.forward() to each target / SEND_EMAIL.send() for PGP copies / setReject()
+            Worker: message.forward() to each target / SEND_EMAIL.send() for PGP and rewritten copies / setReject()
+                    a failed target is replaced by the first fallback_to that accepts it; failures → POST /ingest/report
 ```
 
 There is no SMTP server and no port 25: Cloudflare receives and forwards, the app stores, parses and decides. If the
@@ -42,7 +43,10 @@ app/server/            Hono API (Node 22, SQLite via Drizzle)
   routes/              One file per area: addresses, messages, categories, bulk, lifecycle, senders, insights,
                        newsletters, backup, feeds, notify, smart-folders, directories, stale, domains, admin…
   services/            Business logic used by routes and jobs
-    ingest/            index (pipeline), recipients, forwarding, effects (notifications, self-destruction), auth
+    ingest/            index (pipeline), recipients, forwarding (targets, fallbacks, PGP), transform (strip attachments,
+                       header allowlist), effects (notifications, self-destruction), auth
+    rules/             Rule schema (zod), ReDoS-guarded regex, evaluation and address-level effects
+    deliveries         Delivery attempts, fallback logic shared by SMTP senders, failed-deliveries log, retry
     mailbox/           IMAP poller, runner, SMTP forwarding, recipient detection, app-side destination verification
     addresses, categories, notify, pgp, reminders, retention, metrics, icons, domains, destinations
   lib/                 Pure helpers: senders (leak checks), phishing, trackers, listheaders, outbound, sanitize, time
@@ -70,6 +74,13 @@ scripts/               simulate-mail, parse-eml, backup, fake-idp, pack-extensio
 3. Reject paused, archived or expired addresses, blocked senders, blocked newsletters and site-locked leaks.
 4. Deduplicate (Message-ID, or body hash within 15 minutes).
 5. Parse codes and links, sanitise HTML and remove trackers, read SPF/DKIM/DMARC, flag phishing and leaks.
-6. Store the message, its extracted items and any leak event in one transaction.
-7. Publish the live event, send notifications, apply self-destruction.
-8. Answer the Worker: plain forwards and PGP-encrypted copies.
+6. Run the user's rules (`services/rules/`) in order: block (reject `rule_blocked`), quarantine, strip attachments,
+   forward to a specific destination, mark read, and address effects (category, blocked sender, pause) after storing.
+7. Store the message (with the matched rules, the full header section up to 256 KB, and a raw copy when it is
+   quarantined or forwarded: kept 3 days for retries, until release for quarantine), its extracted items and any leak
+   event in one transaction.
+8. Publish the live event, send notifications, apply self-destruction.
+9. Answer the Worker: plain forwards, `send` copies (PGP-encrypted, or changed: reverse alias, attachments removed,
+   headers filtered) and the fallback chain. The Worker reports failed forwards to `POST /ingest/report` (signed like
+   `/ingest`, envelope fields `report`/`report`); the app records them in `delivery_failures` with a plain-English
+   reason. IMAP domains use the same fallback logic over SMTP.

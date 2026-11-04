@@ -77,6 +77,55 @@ Per address, **Forward new mail to my mailbox** sends a copy to a verified [dest
   DMARC. The _Replies_ card lists the contacts; _Block_ refuses replies to one, _Forget_ invalidates its reply address.
   Needs outbound SMTP: the domain's mailbox SMTP server (IMAP domains) or `SMTP_RELAY_URL` (Cloudflare domains, which
   also send the rewritten copies with the Worker's `SEND_EMAIL` binding). Without it the toggle is disabled and says why.
+- **Fallback mailboxes**: when a mailbox refuses a forward (full, deleted, not verified…), the mail goes to the first
+  fallback that accepts it. Set the order under **Destinations → Fallback mailboxes**; an address can have its own list
+  (_If forwarding fails, try_ on its page), which replaces the account's. Destinations with a PGP key never receive a
+  clear copy, and an encrypted copy is never redirected to another mailbox.
+- **Original headers in forwarded mail** (**Destinations**): by default a forward keeps every original header. Tick
+  _Remove original headers_ to keep only those needed to read and thread the mail (From, To, Cc, Subject, Date,
+  Message-ID, In-Reply-To, References, Reply-To and the MIME headers) plus the ones you list. Such a copy is sent as a
+  new message from the alias with the sender in Reply-To (Worker `SEND_EMAIL` binding, or SMTP for IMAP domains).
+  The message view always shows the full original headers (_Headers_ tab).
+
+## Rules
+
+**Rules** (sidebar, _Filtering_) act on every mail that arrives, after the address's own protections (blocked
+senders, newsletter rejection, site lock). They run from top to bottom; a rule applies to all your addresses, to the
+addresses of one category, or to one address.
+
+A rule is: **When** _all_ (or _any_) of its conditions are true, **then** do its actions.
+
+| Conditions                                                             | Actions                                                     |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Sender address is / contains / ends with                               | **Block it**: the mail is refused (not stored)              |
+| Sender's domain (sub-domains included)                                 | **Quarantine it**: stored, not forwarded, see below         |
+| Subject contains                                                       | **Remove attachments before forwarding** (stored copy kept) |
+| Alias matches a pattern (regular expression, advanced)                 | **Forward to a specific mailbox** instead of the usual one  |
+| Address is in a category                                               | **Move the address to a category**                          |
+| Has attachments; is larger than N KB                                   | **Mark as read**                                            |
+| Has a header; a header equals a value                                  | **Block this sender's domain** for the address from now on  |
+| Failed sender checks: SPF, DKIM, DMARC or any (Authentication-Results) | **Pause the address**                                       |
+| Is a newsletter or bulk mail; contains a verification code             | **Stop**: the rules below are ignored for this mail         |
+
+Every condition can be reversed (_no (the opposite)_). The actions of every matching rule add up until a _Stop_.
+_Test against the last 20 messages_ shows which recent mail the conditions would match, without changing anything.
+The message view lists the rules that applied; the Rules page counts the matches.
+
+Patterns are limited to 200 characters, and patterns that could make matching very slow (repeated groups like
+`(a+)+`, back-references, look-arounds) are refused.
+
+**Quarantine** lists held mail. _Release & forward_ forwards it now (the app sends it over SMTP: the domain's mailbox
+server for IMAP domains, or `SMTP_RELAY_URL`); _Release only_ keeps it in the inbox without forwarding; _Delete_
+removes it. The original message of quarantined mail is kept until it is released or deleted.
+
+## Failed deliveries
+
+**Failed deliveries** (sidebar) lists forwards that did not reach a mailbox, with the reason in plain English (not
+verified, mailbox full, refused as spam, no such mailbox, SMTP server unreachable…), the fallback that received the
+mail instead if any, and the technical detail. Filter by status, kind (_failed_: temporary or unknown, _refused_:
+permanent) and mailbox. _Retry_ sends the mail again to that mailbox over SMTP: possible for 3 days (the original is
+kept that long) when the app has an outgoing SMTP server for the domain. _Dismiss_ marks it handled. The mail itself
+is always kept in the app.
 
 ## Leaks and protection
 
