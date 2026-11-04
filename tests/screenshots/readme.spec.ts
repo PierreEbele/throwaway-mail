@@ -85,6 +85,24 @@ test("documentation screenshots", async ({ page, request }) => {
   await shot(page, "destinations");
   await open(page, "/keys", /API keys/);
   await shot(page, "api-keys");
+  const { csrf_token } = await (await page.request.get("/v1/auth/me")).json();
+  const categories = (await (await page.request.get("/v1/categories")).json()).categories as Array<{ id: string; name: string }>;
+  const shopping = categories.find((c) => c.name === "Shopping")!.id;
+  for (const rule of [
+    { name: "Quarantine mail that fails DMARC", conditions: [{ type: "auth_failed", value: "dmarc" }], actions: [{ type: "quarantine" }] },
+    { name: "No attachments from shops", conditions: [{ type: "category", value: shopping }], actions: [{ type: "strip_attachments" }] },
+    { name: "Block marketing", conditions: [{ type: "is_newsletter" }, { type: "has_code", negate: true }], actions: [{ type: "block" }] },
+  ]) {
+    const res = await page.request.post("/v1/rules", { headers: { "x-csrf-token": csrf_token }, data: { match: "all", ...rule } });
+    expect(res.ok()).toBeTruthy();
+  }
+  await open(page, "/rules", /Rules/);
+  await shot(page, "rules");
+  await open(page, "/deliveries", /deliver/i);
+  await shot(page, "deliveries");
+  await open(page, "/account", /Account/);
+  await shot(page, "account");
+
   await open(page, "/admin/domains", /Domains/);
   await shot(page, "domains");
   await open(page, "/admin/users", /Users/);
