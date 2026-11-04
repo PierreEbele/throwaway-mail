@@ -25,6 +25,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p app/web/tsconfig.json",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "screenshots": "playwright test -c playwright.screenshots.config.ts",
     "simulate": "tsx scripts/simulate-mail.ts",
     "fake-oidc": "tsx scripts/fake-idp.ts",
     "lint": "tsc --noEmit --noUnusedLocals --noUnusedParameters -p tsconfig.json && tsc --noEmit --noUnusedLocals --noUnusedParameters -p app/web/tsconfig.json && prettier --check .",

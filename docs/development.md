@@ -37,6 +37,7 @@ Tests:
 ```bash
 pnpm test                  # unit + integration (Vitest): parser fixtures, ingest, API, isolation, worker, Cloudflare client
 pnpm build && pnpm exec playwright install chromium && pnpm test:e2e   # UI smoke test
+pnpm screenshots   # regenerate the README screenshots in docs/images
 pnpm typecheck
 ```
 
