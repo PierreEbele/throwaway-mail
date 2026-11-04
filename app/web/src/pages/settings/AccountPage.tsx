@@ -8,6 +8,7 @@ import { PanicCard } from "./PanicCard";
 import { PasswordCard } from "./PasswordCard";
 import { TwoFactorCard } from "./TwoFactorCard";
 import { PushTargetsCard } from "./PushTargetsCard";
+import { SmtpPasswordsCard } from "./SmtpPasswordsCard";
 
 export function AccountPage() {
   const { user, ssoProvider } = useAuth();
@@ -31,6 +32,7 @@ export function AccountPage() {
       {user?.auth === "local" && <TwoFactorCard />}
       <NotificationsCard />
       <PushTargetsCard />
+      <SmtpPasswordsCard />
       <DirectoriesCard />
       <PanicCard />
       <BackupCard />

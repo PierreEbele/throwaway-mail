@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, patch } from "../../api";
 import type { Address } from "../../types";
 import { CopyButton, Toggle } from "../../components/ui";
 import { timeAgo } from "../../util";
+import { ComposeDialog } from "./ComposeDialog";
 
 interface Contact {
   id: string;
@@ -28,11 +30,23 @@ export function RepliesCard({ a, onChange }: { a: Address; onChange: (b: Record<
   });
   const forget = useMutation({ mutationFn: (c: Contact) => del(`/v1/addresses/${a.id}/contacts/${c.id}`), onSuccess: refresh });
   const unavailable = a.replies_unavailable;
+  const [composing, setComposing] = useState(false);
   return (
     <section className="card space-y-3 p-5" aria-labelledby="replies">
-      <h2 id="replies" className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">
-        Replies
-      </h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 id="replies" className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">
+          Replies
+        </h2>
+        <button
+          className="btn-secondary px-3 py-1 text-xs"
+          disabled={!!unavailable || a.status !== "active"}
+          title={unavailable ?? (a.status !== "active" ? "Only active addresses can send" : undefined)}
+          onClick={() => setComposing(true)}
+        >
+          New mail
+        </button>
+      </div>
+      <ComposeDialog a={a} open={composing} onClose={() => setComposing(false)} />
       <div className="flex items-center justify-between gap-3">
         <label htmlFor="replies-toggle" className="text-sm">
           Reply from this address

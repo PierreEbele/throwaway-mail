@@ -235,7 +235,37 @@ export interface NotifyTarget {
   enabled: boolean;
   last_ok_at: number | null;
   last_error: string | null;
+  consecutive_failures: number;
+  paused_at: number | null;
   created_at: number;
+}
+export interface WebhookDelivery {
+  id: string;
+  event_id: string;
+  event_type: string;
+  status: "pending" | "delivered" | "failed";
+  attempts: number;
+  next_attempt_at: number | null;
+  last_status: number | null;
+  last_error: string | null;
+  created_at: number;
+  delivered_at: number | null;
+  payload: unknown;
+}
+export interface SmtpPassword {
+  id: string;
+  name: string;
+  hint: string;
+  created_at: number;
+  last_used_at: number | null;
+  revoked_at: number | null;
+}
+export interface SendingInfo {
+  submission:
+    { enabled: false } | { enabled: true; host: string; port: number; security: "starttls" | "implicit" | "none"; username: string };
+  rate_limit_per_hour: number;
+  max_recipients: number;
+  passwords: SmtpPassword[];
 }
 export interface SavedSearch {
   id: string;
