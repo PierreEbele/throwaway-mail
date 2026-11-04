@@ -5,7 +5,8 @@ import { ingestMessage, type IngestResult } from "../ingest/index.js";
 import { metrics } from "../metrics.js";
 import { findRecipient, findSender } from "./recipient.js";
 import { getMailbox, imapSettings, smtpSettings, type DomainMailbox } from "./settings.js";
-import { SmtpError, type ImapSession, type SmtpSettings } from "./types.js";
+import type { ImapSession, SmtpSettings } from "./types.js";
+import { decisionJobs, deliverWithFallback, recordAttempts, type DeliveryAttempt } from "../deliveries.js";
 
 /** Messages handled per poll; the rest waits for the next one. */
 export const POLL_BATCH = 50;
@@ -102,8 +103,10 @@ async function pollFolder(deps: Deps, domain: Domain, m: DomainMailbox, session:
 
 /**
  * Carries out a forward decision over SMTP. The original message is sent unchanged (no header is added, so DKIM
- * signatures stay intact); the envelope sender is smtp_from, or the alias. A permanent SMTP error (5xx) is logged
- * and skipped; a temporary one aborts the poll so the message is retried (ingest replays the decision).
+ * signatures stay intact); the envelope sender is smtp_from, or the alias. When a destination fails, the fallback
+ * destinations are tried in order. A failure nobody took over is retried when it is temporary (the poll is aborted
+ * and ingest replays the decision); a permanent one (5xx) is logged and skipped. Failures that are not retried are
+ * recorded in the failed-deliveries log.
  */
 async function deliver(
   deps: Deps,
@@ -116,22 +119,26 @@ async function deliver(
 ) {
   if (decision.action !== "forward") return;
   const from = m.smtpFrom ?? alias;
-  const jobs = [
-    ...(decision.forward_to_all ?? (decision.forward_to ? [decision.forward_to] : [])).map((to) => ({ to, raw })),
-    ...(decision.send ?? []).map((s) => ({ to: s.to, raw: Buffer.from(s.raw_base64, "base64") })),
-  ];
+  const jobs = decisionJobs(decision, raw);
+  const record = (attempts: DeliveryAttempt[]) => {
+    if (decision.message_id && !decision.duplicate) recordAttempts(deps, decision.message_id, attempts, "smtp");
+  };
   if (!smtp) {
     log.warn("forwarding skipped: no SMTP server configured", { targets: jobs.length });
+    record(jobs.map((j) => ({ to: j.to, ok: false, error: "No SMTP server is configured for this domain's mailbox." })));
     return;
   }
-  for (const job of jobs) {
+  const attempts = await deliverWithFallback(jobs, decision.fallback_to ?? [], async (to, body) => {
     try {
-      await deps.mail.smtp.send(smtp, { from, to: [job.to] }, job.raw);
+      await deps.mail.smtp.send(smtp, { from, to: [to] }, body);
       metrics.imapForwards.inc({ result: "ok" });
     } catch (e) {
       metrics.imapForwards.inc({ result: "error" });
-      if (e instanceof SmtpError && e.permanent) log.warn("forward refused by the SMTP server", { to: job.to, err: e.message });
-      else throw new Error(`SMTP: ${(e as Error).message}`);
+      throw e;
     }
-  }
+  });
+  const retry = attempts.find((a) => !a.ok && !a.fallback_for && !a.permanent && !attempts.some((x) => x.ok && x.fallback_for === a.to));
+  if (retry) throw new Error(`SMTP: ${retry.error}`);
+  for (const a of attempts.filter((x) => !x.ok)) log.warn("forward refused by the SMTP server", { to: a.to, err: a.error });
+  record(attempts);
 }

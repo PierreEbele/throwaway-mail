@@ -2,7 +2,9 @@ import { createHash } from "node:crypto";
 import PostalMime from "postal-mime";
 import { and, eq, gt } from "drizzle-orm";
 import type { Deps } from "../../context.js";
-import { addresses, domains, extractedItems, messages } from "../../db/schema.js";
+import { addresses, domains, extractedItems, messageRaw, messages, type Address, type Message } from "../../db/schema.js";
+import { applyAddressEffects, emptyEffect, evaluate, recordMatches, rulesFor } from "../rules/engine.js";
+import type { RuleEffect } from "../rules/types.js";
 import { newId } from "../../lib/crypto.js";
 import { normalizeRecipient } from "../../lib/email.js";
 import { sanitizeEmail } from "../../lib/sanitize.js";
@@ -14,13 +16,51 @@ import { pauseExpired } from "../reminders.js";
 import { handleReply, REVERSE_LOCAL_RE } from "../replies.js";
 import { authResult } from "./auth.js";
 import { afterStore, recordLeak, rejectLockedLeak } from "./effects.js";
-import { forwardDecision, forwardTargets } from "./forwarding.js";
+import {
+  destinationEmails,
+  fallbackChain,
+  forwardDecision,
+  forwardTargets,
+  userHeaderAllowlist,
+  type ForwardOptions,
+} from "./forwarding.js";
 import { resolveRecipient } from "./recipients.js";
 import type { IngestInput, IngestResult } from "./types.js";
 
 export type { IngestAction, IngestInput, IngestResult } from "./types.js";
 export { authResult } from "./auth.js";
 export { forwardTarget, forwardTargets } from "./forwarding.js";
+
+/** Raw MIME of forwarded mail is kept this long, so a failed delivery can be retried. */
+export const RAW_KEEP_MS = 3 * 86400_000;
+/** Limits of the parsed header list (the full header section is kept separately, up to RAW_HEADERS_MAX). */
+export const MAX_HEADERS = 500;
+export const MAX_HEADER_VALUE = 8000;
+export const RAW_HEADERS_MAX = 256 * 1024;
+
+/** The header section of a raw message, as text. */
+export function rawHeaderSection(raw: Uint8Array): string {
+  const buf = Buffer.from(raw.buffer, raw.byteOffset, Math.min(raw.byteLength, RAW_HEADERS_MAX + 4));
+  const text = buf.toString("utf8");
+  const m = /\r?\n\r?\n/.exec(text);
+  return (m ? text.slice(0, m.index) : text).slice(0, RAW_HEADERS_MAX);
+}
+
+/** How a duplicate delivery of a stored mail is forwarded again (the same way as the first time). */
+function duplicateOptions(deps: Deps, address: Address, dup: Message): ForwardOptions {
+  const targets = (dup.forwardTo ?? "").split(",").map((x) => x.trim());
+  return {
+    stripAttachments: dup.stripAttachments,
+    headerAllowlist: userHeaderAllowlist(deps, address.userId),
+    fallbacks: fallbackChain(deps, address, targets),
+  };
+}
+
+function ruleReject(deps: Deps, address: Address, effect: RuleEffect, sender: string | null): IngestResult {
+  recordMatches(deps, effect);
+  applyAddressEffects(deps, address, effect, sender);
+  return { action: "reject", reason: "rule_blocked" };
+}
 
 /**
  * Decides what happens to one incoming mail (store, forward, reject) and stores it.
@@ -75,7 +115,11 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     if (dup) {
       log.info("duplicate delivery (body hash)", { message_id: dup.id });
       return dup.forwarded && dup.forwardTo
-        ? { ...(await forwardDecision(deps, address, dup.forwardTo, input.raw, email, rcpt.full)), message_id: dup.id, duplicate: true }
+        ? {
+            ...(await forwardDecision(deps, address, dup.forwardTo, input.raw, email, rcpt.full, duplicateOptions(deps, address, dup))),
+            message_id: dup.id,
+            duplicate: true,
+          }
         : { action: "store_only", message_id: dup.id, duplicate: true };
     }
   }
@@ -89,7 +133,11 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     if (dup) {
       log.info("duplicate delivery", { message_id: dup.id });
       return dup.forwarded && dup.forwardTo
-        ? { ...(await forwardDecision(deps, address, dup.forwardTo, input.raw, email, rcpt.full)), message_id: dup.id, duplicate: true }
+        ? {
+            ...(await forwardDecision(deps, address, dup.forwardTo, input.raw, email, rcpt.full, duplicateOptions(deps, address, dup))),
+            message_id: dup.id,
+            duplicate: true,
+          }
         : { action: "store_only", message_id: dup.id, duplicate: true };
     }
   }
@@ -106,11 +154,45 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     dkim: authResult(email.headers, "dkim"),
     dmarc: authResult(email.headers, "dmarc"),
   };
-  const targets = preservedForward ? [preservedForward] : forwardTargets(deps, address);
+  const headers = email.headers.map((h) => ({ key: h.key, value: h.value.slice(0, MAX_HEADER_VALUE) })).slice(0, MAX_HEADERS);
+  const senderAddr = email.from?.address?.toLowerCase() ?? sender?.full ?? null;
+
+  // Mail rules (preserved catch-all mail belongs to nobody yet: no rules).
+  const effect = preservedForward
+    ? emptyEffect()
+    : evaluate(rulesFor(deps, address), {
+        sender: senderAddr,
+        subject: email.subject ?? null,
+        recipient: rcpt.full,
+        categoryId: address.categoryId,
+        attachments: email.attachments.filter((a) => a.disposition !== "inline").length,
+        size: input.raw.byteLength,
+        headers,
+        auth,
+        isBulk: list.bulk,
+        hasCode: !!parsed.code,
+      });
+  if (effect.block) {
+    log.info("reject: blocked by a rule", { address_id: address.id, rules: effect.matched.map((m) => m.id) });
+    return ruleReject(deps, address, effect, senderAddr);
+  }
+
+  const ruleTargets = effect.forwardTo.length ? destinationEmails(deps, address.userId, [...new Set(effect.forwardTo)]) : null;
+  const targets = effect.quarantine
+    ? []
+    : preservedForward
+      ? [preservedForward]
+      : ruleTargets?.length
+        ? ruleTargets
+        : forwardTargets(deps, address);
   const forwardTo = targets.length ? targets.join(", ") : null;
+  const forwardOpts: ForwardOptions = {
+    stripAttachments: effect.stripAttachments,
+    headerAllowlist: preservedForward ? null : userHeaderAllowlist(deps, address.userId),
+    fallbacks: preservedForward ? [] : fallbackChain(deps, address, targets),
+  };
   const now = deps.now();
   const id = newId("msg");
-  const headers = email.headers.map((h) => ({ key: h.key, value: h.value.slice(0, 2000) })).slice(0, 200);
 
   const leak = !address.isUnassigned && looksLikeLeak(address.siteUrl, email.from?.address ?? null, parseList(address.trustedSendersJson));
   if (leak && address.siteLock) {
@@ -156,8 +238,18 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
               })),
             )
           : null,
+        rawHeaders: rawHeaderSection(input.raw),
+        matchedRulesJson: effect.matched.length ? JSON.stringify(effect.matched) : null,
+        quarantinedAt: effect.quarantine ? now : null,
+        stripAttachments: effect.stripAttachments,
+        readAt: effect.markRead ? now : null,
       })
       .run();
+    // Quarantined mail may be released later; forwarded mail may need a retry: keep the raw message for that.
+    if (effect.quarantine || forwardTo)
+      tx.insert(messageRaw)
+        .values({ messageId: id, raw: Buffer.from(input.raw), keepUntil: effect.quarantine ? null : now + RAW_KEEP_MS })
+        .run();
     const items = [
       ...(parsed.code ? [parsed.code] : []).concat(parsed.alternatives).map((c, i) => ({
         id: newId("itm"),
@@ -214,8 +306,10 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     leak,
     at: now,
   });
+  recordMatches(deps, effect);
+  applyAddressEffects(deps, address, effect, senderAddr);
 
   return forwardTo
-    ? { ...(await forwardDecision(deps, address, forwardTo, input.raw, email, rcpt.full)), message_id: id }
+    ? { ...(await forwardDecision(deps, address, forwardTo, input.raw, email, rcpt.full, forwardOpts)), message_id: id }
     : { action: "store_only", message_id: id };
 }

@@ -38,6 +38,10 @@ import { registerBackup } from "./routes/backup.js";
 import { registerNotify } from "./routes/notify.js";
 import { registerFeeds } from "./routes/feeds.js";
 import { registerReliability } from "./routes/reliability.js";
+import { registerRules } from "./routes/rules.js";
+import { registerForwarding } from "./routes/forwarding.js";
+import { registerQuarantine } from "./routes/quarantine.js";
+import { registerDeliveries } from "./routes/deliveries.js";
 import { metrics, renderPrometheus } from "./services/metrics.js";
 import { healthGauges } from "./routes/admin.js";
 
@@ -133,6 +137,7 @@ export function createApp(deps: Deps) {
   registerBackup(api);
   registerNotify(api);
   registerFeeds(api);
+  registerForwarding(api);
   registerAddresses(api);
   registerReplies(api);
   registerMessages(api);
@@ -146,6 +151,9 @@ export function createApp(deps: Deps) {
   registerDirectories(api);
   registerStale(api);
   registerReliability(api);
+  registerRules(api);
+  registerQuarantine(api);
+  registerDeliveries(api);
   registerAdmin(api);
   if (deps.config.localLoginEnabled) registerInvites(api);
   // Site logo: an image, so outside the JSON router

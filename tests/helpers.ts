@@ -78,6 +78,7 @@ export class Client {
   get = (u: string) => this.req("GET", u);
   post = (u: string, b: unknown = {}) => this.req("POST", u, b);
   patch = (u: string, b: unknown) => this.req("PATCH", u, b);
+  put = (u: string, b: unknown) => this.req("PUT", u, b);
   del = (u: string) => this.req("DELETE", u);
 }
 

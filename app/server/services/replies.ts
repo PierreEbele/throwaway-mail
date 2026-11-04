@@ -89,13 +89,13 @@ export function contactFor(deps: Deps, address: Address, email: string, name: st
 
 // --- MIME header surgery -------------------------------------------------------------------------------------------
 
-interface Field {
+export interface Field {
   name: string;
   /** Raw field text including folding, without the final CRLF. */
   text: string;
 }
 
-function split(raw: Uint8Array): { fields: Field[]; body: Buffer } {
+export function split(raw: Uint8Array): { fields: Field[]; body: Buffer } {
   const buf = Buffer.from(raw);
   const text = buf.toString("latin1");
   const m = /\r?\n\r?\n/.exec(text);
@@ -112,7 +112,7 @@ function split(raw: Uint8Array): { fields: Field[]; body: Buffer } {
   return { fields, body };
 }
 
-function join(fields: Field[], body: Buffer): Buffer {
+export function join(fields: Field[], body: Buffer): Buffer {
   return Buffer.concat([Buffer.from(fields.map((f) => f.text).join("\r\n") + "\r\n\r\n", "latin1"), body]);
 }
 
@@ -123,10 +123,10 @@ export function displayName(name: string): string {
   return `=?UTF-8?B?${Buffer.from(clean, "utf8").toString("base64")}?=`;
 }
 
-const field = (name: string, value: string): Field => ({ name: name.toLowerCase(), text: `${name}: ${value}` });
+export const field = (name: string, value: string): Field => ({ name: name.toLowerCase(), text: `${name}: ${value}` });
 
 /** Headers that would let the recipient (or the user's mail client) bypass the alias. */
-const FORWARD_DROP = new Set(["from", "reply-to", "sender", "return-path", "dkim-signature", "x-original-from", "mail-followup-to"]);
+export const FORWARD_DROP = new Set(["from", "reply-to", "sender", "return-path", "dkim-signature", "x-original-from", "mail-followup-to"]);
 
 /** The forwarded copy: From the alias, Reply-To the reverse address, the original sender kept in X-Original-From. */
 export function rewriteForward(

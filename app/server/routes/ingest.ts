@@ -4,6 +4,8 @@ import type { AppEnv } from "../context.js";
 import { HttpError } from "../lib/errors.js";
 import { hmacHex, safeEqual } from "../lib/crypto.js";
 import { ingestMessage } from "../services/ingest/index.js";
+import { recordAttempts } from "../services/deliveries.js";
+import { z } from "zod";
 
 export const INGEST_HEADERS = {
   timestamp: "x-tm-timestamp",
@@ -69,4 +71,47 @@ export function registerIngest(app: Hono<AppEnv>) {
     metrics.ingest.inc({ action: result.duplicate ? "duplicate" : result.action, reason: result.reason ?? "" });
     return c.json(result);
   });
+
+  app.post("/ingest/report", async (c) => {
+    const deps = c.get("deps");
+    if (!deps.config.ingestEnabled) throw new HttpError(503, "ingest_disabled", "INGEST_SECRET is not set");
+    const ts = c.req.header(INGEST_HEADERS.timestamp) ?? "";
+    const sig = (c.req.header(INGEST_HEADERS.signature) ?? "").toLowerCase();
+    if (!/^\d+$/.test(ts) || !/^[0-9a-f]{64}$/.test(sig))
+      throw new HttpError(401, "bad_signature", "Missing or malformed signature headers");
+    if (Math.abs(Math.floor(deps.now() / 1000) - Number(ts)) > 300)
+      throw new HttpError(401, "stale_timestamp", "Timestamp outside the allowed 5 minute window");
+    const body = await readLimited(c.req.raw, 256 * 1024);
+    if (!safeEqual(sig, reportSignature(deps.config.INGEST_SECRET, ts, body)))
+      throw new HttpError(401, "bad_signature", "Signature mismatch");
+    let parsed: z.infer<typeof reportSchema>;
+    try {
+      parsed = reportSchema.parse(JSON.parse(Buffer.from(body).toString("utf8")));
+    } catch {
+      throw new HttpError(400, "bad_request", "Invalid report");
+    }
+    const failed = recordAttempts(deps, parsed.message_id, parsed.deliveries, "cloudflare");
+    if (failed) deps.logger.warn("forward failures reported by the Worker", { message_id: parsed.message_id, failed });
+    return c.json({ ok: true, recorded: failed });
+  });
+}
+
+/** Body of POST /ingest/report: what happened to the forwards of one message (sent by the Worker). */
+const reportSchema = z.object({
+  message_id: z.string().min(1).max(64),
+  deliveries: z
+    .array(
+      z.object({
+        to: z.string().trim().toLowerCase().max(254),
+        ok: z.boolean(),
+        error: z.string().max(2000).optional(),
+        fallback_for: z.string().trim().toLowerCase().max(254).optional(),
+      }),
+    )
+    .max(50),
+});
+
+/** The Worker signs reports like mail, with "report" as both envelope fields: `${timestamp}\nreport\nreport\n` + JSON body. */
+export function reportSignature(secret: string, timestamp: string, body: Uint8Array): string {
+  return ingestSignature(secret, timestamp, "report", "report", body);
 }

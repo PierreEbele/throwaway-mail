@@ -1,3 +1,4 @@
+import { addressFallbackIds } from "./ingest/forwarding.js";
 import { parseList } from "../lib/senders.js";
 import type { Address, Destination, Domain, ExtractedItem, Message, User } from "../db/schema.js";
 
@@ -48,6 +49,8 @@ export function destinationOut(d: Destination) {
     /** "app": verified through a link e-mailed by the app (no Cloudflare); "cloudflare": by Cloudflare Email Routing. */
     verification: d.verifyTokenHash ? ("app" as const) : ("cloudflare" as const),
     verify_sent_at: d.verifySentAt,
+    /** Position in the fallback chain (null: not a fallback). */
+    fallback_position: d.fallbackPosition,
   };
 }
 
@@ -79,6 +82,7 @@ export function addressOut(a: Address, domainName: string, counts?: { unread: nu
     max_messages: a.maxMessages,
     burn_after_code: a.burnAfterCode,
     replies_enabled: a.repliesEnabled,
+    fallback_destination_ids: addressFallbackIds(a),
     burned: a.burnReason ? { reason: a.burnReason, at: a.burnedAt } : null,
     leak: a.leakSender ? { sender: a.leakSender, at: a.leakAt } : null,
     unread_count: counts?.unread ?? 0,
@@ -125,6 +129,8 @@ export function messageSummaryOut(m: Message, items: ExtractedItem[]) {
         : null,
     code: ex.code?.value ?? null,
     has_links: ex.links.length > 0,
+    quarantined_at: m.quarantinedAt,
+    matched_rules: m.matchedRulesJson ? (JSON.parse(m.matchedRulesJson) as Array<{ id: string; name: string }>) : [],
   };
 }
 
@@ -139,6 +145,8 @@ export function messageOut(m: Message, items: ExtractedItem[]) {
     text: m.text,
     html: m.html,
     headers: m.headersJson ? JSON.parse(m.headersJson) : [],
+    /** The original header section as received (null for mail stored before it was kept). */
+    raw_headers: m.rawHeaders,
     extracted: itemsOut(items),
   };
 }

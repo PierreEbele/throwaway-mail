@@ -71,6 +71,8 @@ export class FakeSmtp {
   sent: Array<{ settings: SmtpSettings; from: string; to: string[]; raw: string }> = [];
   verified = 0;
   failWith: SmtpError | null = null;
+  /** Fails only for these recipients. */
+  failFor = new Map<string, SmtpError>();
 
   async verify() {
     this.verified++;
@@ -78,6 +80,8 @@ export class FakeSmtp {
 
   async send(settings: SmtpSettings, env: { from: string; to: string[] }, raw: Uint8Array) {
     if (this.failWith) throw this.failWith;
+    const fail = env.to.map((t) => this.failFor.get(t)).find(Boolean);
+    if (fail) throw fail;
     this.sent.push({ settings, from: env.from, to: env.to, raw: Buffer.from(raw).toString("utf8") });
   }
 }

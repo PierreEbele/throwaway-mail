@@ -218,6 +218,31 @@ describe("IMAP domains: polling", () => {
     smtp.failWith = new SmtpError("550 no such user", true);
     expect(await poll(t)).toEqual({ processed: 1, skipped: 0 });
     expect(mailboxRow(t).lastUid).toBe(second);
+    expect((await admin.get("/v1/delivery-failures")).json.failures[0]).toMatchObject({
+      transport: "smtp",
+      kind: "rejected",
+      destination: "me@personal.example",
+    });
+  });
+
+  it("falls back to the next destination when SMTP refuses the primary", async () => {
+    const { t, admin, imap, smtp } = await setup();
+    await addImapDomain(admin);
+    const a = await forwardingAddress(t, admin, smtp);
+    const backup = (await admin.post("/v1/destinations", { email: "backup@personal.example", verify_by: "app" })).json.destination;
+    const token = /verify\/([\w-]+)/.exec(smtp.sent.at(-1)!.raw)![1];
+    await t.app.request(`/v1/destinations/verify/${token}`);
+    smtp.sent.length = 0;
+    await admin.put("/v1/forwarding/fallbacks", { destination_ids: [backup.id] });
+    // A temporary failure taken over by a fallback is not retried.
+    smtp.failFor.set("me@personal.example", new SmtpError("452 mailbox full", false));
+    imap.deliver(mail(a.email));
+    expect(await poll(t)).toEqual({ processed: 1, skipped: 0 });
+    expect(smtp.sent.map((s) => s.to[0])).toEqual(["backup@personal.example"]);
+    const [f] = (await admin.get("/v1/delivery-failures")).json.failures;
+    expect(f).toMatchObject({ destination: "me@personal.example", delivered_to: "backup@personal.example", kind: "failed" });
+    expect(f.reason).toBe("The destination mailbox is full.");
+    expect(t.deps.db.select().from(messages).get()!.forwardTo).toBe("backup@personal.example");
   });
 
   it("saves last_uid after each message: a crash mid-poll never processes a mail twice", async () => {
