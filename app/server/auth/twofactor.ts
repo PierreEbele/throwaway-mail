@@ -62,8 +62,9 @@ export function useRecoveryCode(d: Deps, user: User, code: string): boolean {
 
 /** A TOTP code or a recovery code. */
 export function checkSecondFactor(d: Deps, user: User, code: string): "totp" | "recovery" | null {
-  if (!twoFactorEnabled(user)) return null;
-  if (/^\s*\d{3}\s?\d{3}\s*$/.test(code)) return checkTotp(d, user, code) ? "totp" : null;
+  // Recovery codes also back up "passkey after password" (users.passkeySecondFactor).
+  if (!twoFactorEnabled(user) && !user.passkeySecondFactor) return null;
+  if (/^\s*\d{3}\s?\d{3}\s*$/.test(code)) return twoFactorEnabled(user) && checkTotp(d, user, code) ? "totp" : null;
   return useRecoveryCode(d, user, code) ? "recovery" : null;
 }
 
@@ -94,10 +95,15 @@ export function enableTwoFactor(d: Deps, userId: string): string[] {
   return regenerateRecoveryCodes(d, userId);
 }
 
-export function disableTwoFactor(d: Deps, userId: string) {
+/** Turns TOTP off. `all` (admin reset) also turns "passkey after password" off; otherwise its recovery codes are kept. */
+export function disableTwoFactor(d: Deps, userId: string, all = false) {
+  const keepCodes = !all && !!d.db.select({ on: users.passkeySecondFactor }).from(users).where(eq(users.id, userId)).get()?.on;
   d.db.transaction((tx) => {
-    tx.update(users).set({ totpSecret: null, totpEnabledAt: null, totpLastStep: null }).where(eq(users.id, userId)).run();
-    tx.delete(recoveryCodes).where(eq(recoveryCodes.userId, userId)).run();
+    tx.update(users)
+      .set({ totpSecret: null, totpEnabledAt: null, totpLastStep: null, ...(all ? { passkeySecondFactor: false } : {}) })
+      .where(eq(users.id, userId))
+      .run();
+    if (!keepCodes) tx.delete(recoveryCodes).where(eq(recoveryCodes.userId, userId)).run();
     tx.delete(loginChallenges).where(eq(loginChallenges.userId, userId)).run();
   });
 }

@@ -72,29 +72,30 @@ const { code } = await tm.addresses.waitForCode(addr.id, { since: Date.now(), ti
 
 ## Endpoint overview
 
-| Area          | Endpoints                                                                                                                                                           |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Addresses     | `GET/POST /v1/addresses`, `GET/PATCH/DELETE /v1/addresses/:id`, `POST /v1/addresses/bulk`                                                                           |
-| Filters       | `q`, `site`, `domain`, `status`, `category` (id or `none`), `pinned`, `unread`, `has_code`, `since_hours`, `leak`, `hide_hidden`                                    |
-| Messages      | `GET /v1/addresses/:id/messages`, `GET/PATCH/DELETE /v1/messages/:id`, `POST /v1/addresses/:id/messages/bulk`, `GET /v1/addresses/:id/code`                         |
-| Newsletters   | `POST /v1/messages/:id/unsubscribe`                                                                                                                                 |
-| Protection    | `POST /v1/addresses/:id/senders`, `/replace`, `/extend`, `/feed`; `POST /v1/panic`                                                                                  |
-| Rejections    | `POST /v1/addresses/:id/rejected` `{replace}`, `GET /v1/site-rejections`, `DELETE /v1/site-rejections/:id`, `GET /v1/sites/domain`, `GET /v1/admin/site-rejections` |
-| Preferences   | `PATCH /v1/auth/me/preferences` `{domain_choice, no_mail_warn_minutes}`; `POST /v1/addresses` accepts `preferred_domain` and returns `avoided_domains`              |
-| Insights      | `GET /v1/addresses/:id/stats`, `GET /v1/digest`, `GET /v1/leaks`, `POST /v1/leaks/block`, `GET/POST /v1/stale-addresses`                                            |
-| Organisation  | `/v1/categories` (+ `/reorder`), `/v1/saved-searches`, `/v1/directories`                                                                                            |
-| Forwarding    | `/v1/destinations` (+ `/refresh`, `/resend`, PGP key via `PATCH`)                                                                                                   |
-| Replies       | `PATCH /v1/addresses/:id` `{replies_enabled}`, `GET /v1/addresses/:id/contacts`, `PATCH/DELETE /v1/addresses/:id/contacts/:cid`                                     |
-| Rules         | `GET/POST /v1/rules`, `PATCH/DELETE /v1/rules/:id`, `POST /v1/rules/reorder` `{ids}`, `POST /v1/rules/test`                                                         |
-| Quarantine    | `GET /v1/quarantine`, `POST /v1/quarantine/:id/release` `{forward}`, `DELETE /v1/quarantine/:id`                                                                    |
-| Deliveries    | `GET /v1/delivery-failures` (`status`, `kind`, `address_id`, `destination`, `before`, `limit`), `POST /:id/retry`, `POST /:id/dismiss`                              |
-| Fallbacks     | `PUT /v1/forwarding/fallbacks` `{destination_ids}`, `PUT /v1/addresses/:id/fallbacks` `{destination_ids}`                                                           |
-| Headers       | `GET/PUT /v1/forwarding/headers` `{allowlist: string[] \| null}`; `GET /v1/messages/:id` returns `raw_headers`                                                      |
-| Sending       | `POST /v1/addresses/:id/send`, `GET /v1/sending`, `POST /v1/sending/passwords`, `DELETE /v1/sending/passwords/:id`                                                  |
-| Notifications | `/v1/notify-targets` (+ `/test`, `/resume`, `GET /:id/deliveries`, `POST /:id/deliveries/:did/resend`)                                                              |
-| Account       | `/v1/keys`, `GET /v1/export`, `POST /v1/import`                                                                                                                     |
-| Admin         | `/v1/domains`, `/v1/admin/users` (+ `DELETE /:id/2fa`), `/v1/admin/audit`, `/v1/admin/health`, `/v1/admin/diagnostics`                                              |
-| Two-factor    | `GET /v1/auth/2fa`, `POST /v1/auth/2fa/setup`, `/enable`, `/disable`, `/recovery-codes`; `POST /v1/auth/login/2fa`                                                  |
+| Area          | Endpoints                                                                                                                                                                                                                                                                                                              |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Addresses     | `GET/POST /v1/addresses`, `GET/PATCH/DELETE /v1/addresses/:id`, `POST /v1/addresses/bulk`                                                                                                                                                                                                                              |
+| Filters       | `q`, `site`, `domain`, `status`, `category` (id or `none`), `pinned`, `unread`, `has_code`, `since_hours`, `leak`, `hide_hidden`                                                                                                                                                                                       |
+| Messages      | `GET /v1/addresses/:id/messages`, `GET/PATCH/DELETE /v1/messages/:id`, `POST /v1/addresses/:id/messages/bulk`, `GET /v1/addresses/:id/code`                                                                                                                                                                            |
+| Newsletters   | `POST /v1/messages/:id/unsubscribe`                                                                                                                                                                                                                                                                                    |
+| Protection    | `POST /v1/addresses/:id/senders`, `/replace`, `/extend`, `/feed`; `POST /v1/panic`                                                                                                                                                                                                                                     |
+| Rejections    | `POST /v1/addresses/:id/rejected` `{replace}`, `GET /v1/site-rejections`, `DELETE /v1/site-rejections/:id`, `GET /v1/sites/domain`, `GET /v1/admin/site-rejections`                                                                                                                                                    |
+| Preferences   | `PATCH /v1/auth/me/preferences` `{domain_choice, no_mail_warn_minutes}`; `POST /v1/addresses` accepts `preferred_domain` and returns `avoided_domains`                                                                                                                                                                 |
+| Insights      | `GET /v1/addresses/:id/stats`, `GET /v1/digest`, `GET /v1/leaks`, `POST /v1/leaks/block`, `GET/POST /v1/stale-addresses`                                                                                                                                                                                               |
+| Organisation  | `/v1/categories` (+ `/reorder`), `/v1/saved-searches`, `/v1/directories`                                                                                                                                                                                                                                               |
+| Forwarding    | `/v1/destinations` (+ `/refresh`, `/resend`, PGP key via `PATCH`)                                                                                                                                                                                                                                                      |
+| Replies       | `PATCH /v1/addresses/:id` `{replies_enabled}`, `GET /v1/addresses/:id/contacts`, `PATCH/DELETE /v1/addresses/:id/contacts/:cid`                                                                                                                                                                                        |
+| Rules         | `GET/POST /v1/rules`, `PATCH/DELETE /v1/rules/:id`, `POST /v1/rules/reorder` `{ids}`, `POST /v1/rules/test`                                                                                                                                                                                                            |
+| Quarantine    | `GET /v1/quarantine`, `POST /v1/quarantine/:id/release` `{forward}`, `DELETE /v1/quarantine/:id`                                                                                                                                                                                                                       |
+| Deliveries    | `GET /v1/delivery-failures` (`status`, `kind`, `address_id`, `destination`, `before`, `limit`), `POST /:id/retry`, `POST /:id/dismiss`                                                                                                                                                                                 |
+| Fallbacks     | `PUT /v1/forwarding/fallbacks` `{destination_ids}`, `PUT /v1/addresses/:id/fallbacks` `{destination_ids}`                                                                                                                                                                                                              |
+| Headers       | `GET/PUT /v1/forwarding/headers` `{allowlist: string[] \| null}`; `GET /v1/messages/:id` returns `raw_headers`                                                                                                                                                                                                         |
+| Sending       | `POST /v1/addresses/:id/send`, `GET /v1/sending`, `POST /v1/sending/passwords`, `DELETE /v1/sending/passwords/:id`                                                                                                                                                                                                     |
+| Notifications | `/v1/notify-targets` (+ `/test`, `/resume`, `GET /:id/deliveries`, `POST /:id/deliveries/:did/resend`)                                                                                                                                                                                                                 |
+| Account       | `/v1/keys`, `GET /v1/export`, `POST /v1/import`                                                                                                                                                                                                                                                                        |
+| Admin         | `/v1/domains`, `/v1/admin/users` (+ `DELETE /:id/2fa`), `/v1/admin/audit`, `/v1/admin/health`, `/v1/admin/diagnostics`                                                                                                                                                                                                 |
+| Two-factor    | `GET /v1/auth/2fa`, `POST /v1/auth/2fa/setup`, `/enable`, `/disable`, `/recovery-codes`; `POST /v1/auth/login/2fa`                                                                                                                                                                                                     |
+| Passkeys      | `GET /v1/auth/passkeys`, `POST /v1/auth/passkeys/options` + `POST /v1/auth/passkeys`, `PATCH`/`DELETE /v1/auth/passkeys/:id`, `POST /v1/auth/passkeys/second-factor`; sign-in `POST /v1/auth/passkey/options` + `/v1/auth/passkey/login`; second step `POST /v1/auth/login/passkey/options` + `/v1/auth/login/passkey` |
 
 ### Rules
 
@@ -118,9 +119,20 @@ section). A mail blocked by a rule is rejected with reason `rule_blocked`.
 
 ### Sign-in with two-factor authentication
 
-`POST /v1/auth/login` answers `{"two_factor_required": true, "challenge": "…", "expires_in": 300}` (no session yet)
-for accounts with TOTP turned on. Send `POST /v1/auth/login/2fa` with `{"challenge", "code"}` (6-digit TOTP code or a
-recovery code) within 5 minutes; a challenge allows 5 attempts. Login-like endpoints answer `429` with `Retry-After`
+`POST /v1/auth/login` answers `{"two_factor_required": true, "challenge": "…", "expires_in": 300, "methods": [...]}`
+(no session yet) for accounts with TOTP or "passkey after password" turned on; `methods` lists `totp`, `passkey` and
+`recovery`. Send `POST /v1/auth/login/2fa` with `{"challenge", "code"}` (6-digit TOTP code or a recovery code), or get
+WebAuthn options from `POST /v1/auth/login/passkey/options` `{"challenge"}` and send the browser's assertion to
+`POST /v1/auth/login/passkey` `{"challenge", "response"}`, within 5 minutes; a challenge allows 5 attempts.
+
+### Passkeys
+
+WebAuthn bodies and answers are the JSON of `@simplewebauthn/browser` (`startRegistration` / `startAuthentication`).
+Adding a passkey takes two calls: `POST /v1/auth/passkeys/options` with `{"password"}` (or `{"code"}`) returns
+`{options}`, then `POST /v1/auth/passkeys` with `{"response", "name"}`. Usernameless sign-in: `POST /v1/auth/passkey/options`
+then `POST /v1/auth/passkey/login` `{"response"}` (user verification required; no second step). The relying party ID
+is the host name of the origin the request came from when it is `APP_URL` or one of `APP_EXTRA_URLS`; a passkey only
+works on the host name it was created on. Challenges are single use and expire after 5 minutes. Login-like endpoints answer `429` with `Retry-After`
 when the IP or account budget is spent (see `LOGIN_*` in [configuration](configuration.md)).
 
 ### Audit log
@@ -128,7 +140,8 @@ when the IP or account budget is spent (see `LOGIN_*` in [configuration](configu
 `GET /v1/admin/audit?limit=&offset=&action=&user_id=&target=&ip=` returns `{entries, total, offset, limit, actions}`,
 newest first. `action` is exact, or a prefix when it ends with `.` (`auth.`, `user.`, `invite.`, `domain.`,
 `destination.`). Actions include `auth.login`, `auth.login_failed`, `auth.recovery_code_used`, `user.password_changed`,
-`user.2fa_enabled`, `user.2fa_disabled`, `user.2fa_recovery_regenerated`, `user.2fa_reset`, `invite.created`,
+`user.2fa_enabled`, `user.2fa_disabled`, `user.2fa_recovery_regenerated`, `user.2fa_reset`, `user.passkey_added`,
+`user.passkey_removed`, `invite.created`,
 `domain.added`, `domain.deleted`, `destination.created`, `destination.deleted`.
 
 ## Live events

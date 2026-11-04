@@ -13,7 +13,9 @@ import { userOut } from "../services/serialize.js";
 import { signIn } from "./auth.js";
 import { accountFailed, accountSucceeded, checkAccount, limitIp } from "../auth/limits.js";
 import { CHALLENGE_TTL_MS, createChallenge, twoFactorEnabled } from "../auth/twofactor.js";
+import { listPasskeys, secondFactorRequired } from "../auth/passkeys.js";
 import { registerTwoFactor } from "./twofactor.js";
+import { registerPasskeys } from "./passkeys.js";
 
 const email = z.string().trim().email().max(254);
 const name = z.string().trim().max(100).optional();
@@ -40,6 +42,7 @@ function signedIn(c: Parameters<typeof signIn>[0], user: User) {
 /** E-mail + password accounts: first-run setup, login, password change and invite acceptance. */
 export function registerLocalAuth(r: ApiRouter) {
   registerTwoFactor(r);
+  registerPasskeys(r);
   r.add(
     {
       method: "post",
@@ -102,8 +105,18 @@ export function registerLocalAuth(r: ApiRouter) {
         audit(d, user.id, "auth.login_failed", user.email, { method: "password", reason: "account_disabled" }, clientIp(c));
         throw new HttpError(403, "account_disabled", "Your account is disabled in this app");
       }
-      if (twoFactorEnabled(user))
-        return c.json({ two_factor_required: true, challenge: createChallenge(d, user.id), expires_in: CHALLENGE_TTL_MS / 1000 });
+      if (secondFactorRequired(d, user)) {
+        const methods: string[] = [];
+        if (twoFactorEnabled(user)) methods.push("totp");
+        if (listPasskeys(d, user.id).length) methods.push("passkey");
+        methods.push("recovery");
+        return c.json({
+          two_factor_required: true,
+          challenge: createChallenge(d, user.id),
+          expires_in: CHALLENGE_TTL_MS / 1000,
+          methods,
+        });
+      }
       d.logger.info("password login", { user_id: user.id, role: user.role });
       audit(d, user.id, "auth.login", user.id, { method: "password" }, clientIp(c));
       return signedIn(c, user);

@@ -34,6 +34,8 @@ export const users = sqliteTable("users", {
     .default("first"),
   /** Flag addresses that received nothing this many minutes after creation (0: never). */
   noMailWarnMinutes: integer("no_mail_warn_minutes").notNull().default(15),
+  /** Ask for a passkey after the password (second factor without an authenticator app). */
+  passkeySecondFactor: integer("passkey_second_factor", { mode: "boolean" }).notNull().default(false),
 });
 
 /** One-time two-factor recovery codes (sha256 hashes). */
@@ -58,6 +60,40 @@ export const loginChallenges = sqliteTable("login_challenges", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   attempts: integer("attempts").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+});
+
+/** WebAuthn credentials (passkeys) of local accounts. */
+export const passkeys = sqliteTable(
+  "passkeys",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Credential id, base64url. */
+    credentialId: text("credential_id").notNull().unique(),
+    /** COSE public key, base64url. */
+    publicKey: text("public_key").notNull(),
+    counter: integer("counter").notNull().default(0),
+    /** JSON array of transports reported at registration (usb, nfc, ble, internal, hybrid...). */
+    transportsJson: text("transports_json"),
+    deviceType: text("device_type"),
+    backedUp: integer("backed_up", { mode: "boolean" }).notNull().default(false),
+    name: text("name").notNull(),
+    createdAt: integer("created_at").notNull(),
+    lastUsedAt: integer("last_used_at"),
+  },
+  (t) => [index("passkeys_user_idx").on(t.userId)],
+);
+
+/** Pending WebAuthn ceremonies: one random challenge each, single use, short-lived. id is the challenge. */
+export const webauthnChallenges = sqliteTable("webauthn_challenges", {
+  id: text("id").primaryKey(),
+  /** Set for registration and second-factor ceremonies; null for usernameless sign-in. */
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+  purpose: text("purpose", { enum: ["register", "login", "second_factor"] }).notNull(),
   createdAt: integer("created_at").notNull(),
   expiresAt: integer("expires_at").notNull(),
 });
@@ -639,6 +675,7 @@ export type Category = typeof categories.$inferSelect;
 export type Destination = typeof destinations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type ReverseContact = typeof reverseContacts.$inferSelect;
+export type Passkey = typeof passkeys.$inferSelect;
 export type NotifyTarget = typeof notifyTargets.$inferSelect;
 export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
 export type SiteRejection = typeof siteRejections.$inferSelect;

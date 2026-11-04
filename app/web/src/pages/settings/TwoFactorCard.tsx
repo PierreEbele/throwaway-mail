@@ -13,7 +13,7 @@ interface Status {
   recovery_codes_left: number;
 }
 
-function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void }) {
+export function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void }) {
   return (
     <div className="space-y-3">
       <p>

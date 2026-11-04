@@ -1,22 +1,72 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
+import { browserSupportsWebAuthn, startAuthentication, type PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/browser";
 import { ApiError, post } from "../../api";
 import { useAuth } from "../../auth";
 import { AuthCard, Field, useAfterSignIn } from "./AuthCard";
 
-type LoginResult = { two_factor_required?: boolean; challenge?: string };
+type LoginResult = { two_factor_required?: boolean; challenge?: string; methods?: string[] };
+type Options = { options: PublicKeyCredentialRequestOptionsJSON };
 
-/** Second step for accounts with two-factor authentication: a code from the app or a recovery code. */
-function CodeForm({ challenge, returnTo, onRestart }: { challenge: string; returnTo: string; onRestart: () => void }) {
-  const [code, setCode] = useState("");
-  const [recovery, setRecovery] = useState(false);
+/** A cancelled or timed-out browser prompt is not worth an error message. */
+const cancelled = (e: unknown) => e instanceof Error && (e.name === "NotAllowedError" || e.name === "AbortError");
+
+/** Usernameless sign-in with a passkey (no e-mail, no password, no second step). */
+function PasskeyButton({ returnTo }: { returnTo: string }) {
   const afterSignIn = useAfterSignIn();
+  const m = useMutation({
+    mutationFn: async () => {
+      const { options } = await post<Options>("/v1/auth/passkey/options");
+      const response = await startAuthentication({ optionsJSON: options });
+      return post("/v1/auth/passkey/login", { response });
+    },
+    onSuccess: () => afterSignIn(returnTo),
+  });
+  if (!browserSupportsWebAuthn()) return null;
+  return (
+    <div className="mt-3 space-y-2">
+      {m.error && !cancelled(m.error) && (
+        <p className="text-sm text-red-700 dark:text-red-300" role="alert">
+          {m.error.message}
+        </p>
+      )}
+      <button type="button" className="btn-secondary w-full py-2 text-base" onClick={() => m.mutate()} disabled={m.isPending}>
+        {m.isPending ? "Waiting for your passkey…" : "Sign in with a passkey"}
+      </button>
+    </div>
+  );
+}
+
+/** Second step for accounts with two-factor authentication: a code from the app, a passkey or a recovery code. */
+function CodeForm({
+  challenge,
+  methods,
+  returnTo,
+  onRestart,
+}: {
+  challenge: string;
+  methods: string[];
+  returnTo: string;
+  onRestart: () => void;
+}) {
+  const [code, setCode] = useState("");
+  const [recovery, setRecovery] = useState(!methods.includes("totp"));
+  const afterSignIn = useAfterSignIn();
+  const passkey = useMutation({
+    mutationFn: async () => {
+      const { options } = await post<Options>("/v1/auth/login/passkey/options", { challenge });
+      const response = await startAuthentication({ optionsJSON: options });
+      return post("/v1/auth/login/passkey", { challenge, response });
+    },
+    onSuccess: () => afterSignIn(returnTo),
+  });
+  const canPasskey = methods.includes("passkey") && browserSupportsWebAuthn();
   const verify = useMutation({
     mutationFn: () => post("/v1/auth/login/2fa", { challenge, code }),
     onSuccess: () => afterSignIn(returnTo),
   });
-  const expired = verify.error instanceof ApiError && verify.error.code === "challenge_expired";
+  const expired = [verify.error, passkey.error].some((e) => e instanceof ApiError && e.code === "challenge_expired");
   return (
     <form
       className="space-y-3"
@@ -25,6 +75,19 @@ function CodeForm({ challenge, returnTo, onRestart }: { challenge: string; retur
         verify.mutate();
       }}
     >
+      {canPasskey && (
+        <>
+          <button type="button" className="btn-primary w-full py-2 text-base" onClick={() => passkey.mutate()} disabled={passkey.isPending}>
+            {passkey.isPending ? "Waiting for your passkey…" : "Use a passkey"}
+          </button>
+          {passkey.error && !cancelled(passkey.error) && (
+            <p className="text-sm text-red-700 dark:text-red-300" role="alert">
+              {passkey.error.message}
+            </p>
+          )}
+          <p className="text-center text-xs text-zinc-500">or</p>
+        </>
+      )}
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
         {recovery ? "Enter one of your recovery codes. Each code works only once." : "Enter the 6-digit code from your authenticator app."}
       </p>
@@ -55,16 +118,20 @@ function CodeForm({ challenge, returnTo, onRestart }: { challenge: string; retur
         </button>
       )}
       <div className="flex justify-between text-xs">
-        <button
-          type="button"
-          className="text-zinc-500 underline"
-          onClick={() => {
-            setRecovery(!recovery);
-            setCode("");
-          }}
-        >
-          {recovery ? "Use the authenticator app" : "Use a recovery code"}
-        </button>
+        {methods.includes("totp") ? (
+          <button
+            type="button"
+            className="text-zinc-500 underline"
+            onClick={() => {
+              setRecovery(!recovery);
+              setCode("");
+            }}
+          >
+            {recovery ? "Use the authenticator app" : "Use a recovery code"}
+          </button>
+        ) : (
+          <span />
+        )}
         <button type="button" className="text-zinc-500 underline" onClick={onRestart}>
           Back
         </button>
@@ -76,21 +143,22 @@ function CodeForm({ challenge, returnTo, onRestart }: { challenge: string; retur
 function PasswordForm({ returnTo, autoFocus }: { returnTo: string; autoFocus: boolean }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [challenge, setChallenge] = useState<string | null>(null);
+  const [challenge, setChallenge] = useState<{ token: string; methods: string[] } | null>(null);
   const afterSignIn = useAfterSignIn();
   const login = useMutation({
     mutationFn: () => post<LoginResult>("/v1/auth/login", { email, password }),
     onSuccess: (r) => {
       if (r.two_factor_required && r.challenge) {
         setPassword("");
-        setChallenge(r.challenge);
+        setChallenge({ token: r.challenge, methods: r.methods ?? ["totp", "recovery"] });
       } else void afterSignIn(returnTo);
     },
   });
   if (challenge)
     return (
       <CodeForm
-        challenge={challenge}
+        challenge={challenge.token}
+        methods={challenge.methods}
         returnTo={returnTo}
         onRestart={() => {
           setChallenge(null);
@@ -172,6 +240,7 @@ export function LoginPage() {
         </div>
       )}
       {localEnabled && <PasswordForm returnTo={returnTo} autoFocus={!ssoEnabled} />}
+      {localEnabled && <PasskeyButton returnTo={returnTo} />}
       <p className="mt-4 text-xs text-zinc-500">
         {ssoEnabled && `${ssoProvider} accounts: admins are the members of its admin group. `}
         {localEnabled && "No local account yet? Ask an admin for an invite link."}

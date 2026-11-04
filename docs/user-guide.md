@@ -248,6 +248,13 @@ expiring soon, new addresses, addresses silent for 30 days, and the leak history
   ten one-time recovery codes shown once; _New recovery codes_ replaces them. Signing in then asks for a 6-digit code
   (or a recovery code) after the password. _Turn off_ needs your password or a code. If you lose both the app and the
   codes, an admin can _Reset 2FA_ on the Users page. SSO accounts use their identity provider's two-factor settings.
+- **Passkeys** (local accounts, optional): _Account → Passkeys → Add a passkey_, confirm your password, then let the
+  browser, phone or security key create it. _Sign in with a passkey_ on the sign-in page then signs you in without
+  typing your e-mail or password (the device asks for your fingerprint, face or PIN). Tick _Ask for a passkey after my
+  password_ to use a passkey as the second factor instead of (or as well as) an authenticator app; recovery codes are
+  created if you have none. A passkey only works on the address it was created on (each URL in `APP_URL` /
+  `APP_EXTRA_URLS` needs its own). Removing a passkey needs your password or a code; removing the last one turns
+  "passkey after password" off. An admin's _Reset 2FA_ also turns it off.
 - Repeated wrong passwords or codes lock the account for a while (see `LOGIN_MAX_FAILURES`), even for the right
   password; wait for the time shown and try again.
 

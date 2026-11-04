@@ -27,13 +27,13 @@ import { signIn } from "./auth.js";
 
 const ISSUER = "Throwaway Mail";
 const code = z.string().trim().min(6).max(20);
-const confirmBody = z
+export const confirmBody = z
   .object({ password: z.string().max(1000).optional(), code: code.optional() })
   .refine((b) => b.password || b.code, "Give your password or a two-factor code");
 
-const fresh = (c: Ctx, id: string) => c.get("deps").db.select().from(users).where(eq(users.id, id)).get()!;
+export const fresh = (c: Ctx, id: string) => c.get("deps").db.select().from(users).where(eq(users.id, id)).get()!;
 
-function localMe(c: Ctx): User {
+export function localMe(c: Ctx): User {
   const me = c.get("user")!;
   if (!isLocalUser(me) || !me.passwordHash)
     throw badRequest("Two-factor authentication of single sign-on accounts is managed by the identity provider");
@@ -41,7 +41,7 @@ function localMe(c: Ctx): User {
 }
 
 /** Confirms a sensitive change with the password or a second-factor code; failures count towards the account lockout. */
-async function confirm(c: Ctx, me: User, body: { password?: string; code?: string }) {
+export async function confirm(c: Ctx, me: User, body: { password?: string; code?: string }) {
   const key = `2fa:${me.id}`;
   checkAccount(c, key);
   const ok = body.code ? !!checkSecondFactor(c.get("deps"), me, body.code) : await verifyPassword(body.password!, me.passwordHash!);
@@ -204,8 +204,8 @@ export function registerTwoFactor(r: ApiRouter) {
       const id = c.req.param("id")!;
       const target = d.db.select().from(users).where(eq(users.id, id)).get();
       if (!target) throw notFound("User");
-      if (!target.totpSecret) throw badRequest("This user has no two-factor authentication");
-      disableTwoFactor(d, id);
+      if (!target.totpSecret && !target.passkeySecondFactor) throw badRequest("This user has no two-factor authentication");
+      disableTwoFactor(d, id, true);
       audit(d, c.get("user")!.id, "user.2fa_reset", id, { email: target.email }, clientIp(c));
       return c.json({ user: userOut(fresh(c, id)) });
     },

@@ -9,6 +9,7 @@ import { PanicCard } from "./PanicCard";
 import { DomainChoiceCard } from "./DomainChoiceCard";
 import { PasswordCard } from "./PasswordCard";
 import { TwoFactorCard } from "./TwoFactorCard";
+import { PasskeysCard } from "./PasskeysCard";
 import { PushTargetsCard } from "./PushTargetsCard";
 import { SmtpPasswordsCard } from "./SmtpPasswordsCard";
 
@@ -32,6 +33,7 @@ export function AccountPage() {
       </div>
       {user?.auth === "local" && <PasswordCard />}
       {user?.auth === "local" && <TwoFactorCard />}
+      {user?.auth === "local" && <PasskeysCard />}
       <DomainChoiceCard />
       <NotificationsCard />
       <PushTargetsCard />
