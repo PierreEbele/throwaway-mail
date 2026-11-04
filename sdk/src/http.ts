@@ -18,7 +18,7 @@ export interface HttpConfig {
 }
 
 interface Call extends RequestOptions {
-  method: "GET" | "POST" | "PATCH" | "DELETE";
+  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   path: string;
   query?: Query;
   body?: unknown;
@@ -84,6 +84,9 @@ export class HttpClient {
   }
   patch<T>(path: string, body: unknown, opts?: RequestOptions) {
     return this.json<T>({ method: "PATCH", path, body, ...opts });
+  }
+  put<T>(path: string, body: unknown, opts?: RequestOptions) {
+    return this.json<T>({ method: "PUT", path, body, ...opts });
   }
   delete<T>(path: string, opts?: RequestOptions) {
     return this.json<T>({ method: "DELETE", path, ...opts });

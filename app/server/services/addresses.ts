@@ -14,7 +14,7 @@ import {
 } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
 import { LOCAL_PART_RE } from "../lib/email.js";
-import { readableLocalPart } from "../lib/words.js";
+import { addressSettings, generateLocalPart } from "./alias-format.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { addressOut } from "./serialize.js";
 import { checkCategory, matchCategory } from "./categories.js";
@@ -130,9 +130,13 @@ export function createAddress(d: Deps, user: User, body: NewAddress): { a: Addre
   checkDestination(d, user, body.destination_id);
   checkCategory(d, user, body.category_id);
   const now = d.now();
-  const expiresAt = body.expires_at ?? (body.expires_in_days ? now + body.expires_in_days * 86400_000 : null);
+  // The user's defaults apply when the creator says nothing (an explicit null means "never" / "no limit").
+  const prefs = addressSettings(user);
+  const expiryDays = body.expires_in_days ?? (body.expires_at === undefined ? prefs.default_expires_in_days : null);
+  const expiresAt = body.expires_at ?? (expiryDays ? now + expiryDays * 86400_000 : null);
+  const maxMessages = body.max_messages === undefined ? prefs.default_max_messages : body.max_messages;
   for (let attempt = 0; attempt < 12; attempt++) {
-    const localPart = body.local_part ?? readableLocalPart();
+    const localPart = body.local_part ?? generateLocalPart(prefs, body.site_name, attempt);
     const row = {
       id: newId("adr"),
       userId: user.id,
@@ -145,7 +149,7 @@ export function createAddress(d: Deps, user: User, body: NewAddress): { a: Addre
       destinationId: body.destination_id ?? null,
       categoryId: body.category_id === undefined ? matchCategory(d, user.id, body.site_name, body.site_url ?? null) : body.category_id,
       expiresAt,
-      maxMessages: body.max_messages ?? null,
+      maxMessages: maxMessages ?? null,
       createdAt: now,
       updatedAt: now,
     };

@@ -36,6 +36,8 @@ export const users = sqliteTable("users", {
   noMailWarnMinutes: integer("no_mail_warn_minutes").notNull().default(15),
   /** Ask for a passkey after the password (second factor without an authenticator app). */
   passkeySecondFactor: integer("passkey_second_factor", { mode: "boolean" }).notNull().default(false),
+  /** New-address settings (JSON, see services/alias-format.ts): local-part format, default expiry and mail quota. */
+  addressSettingsJson: text("address_settings_json"),
 });
 
 /** One-time two-factor recovery codes (sha256 hashes). */

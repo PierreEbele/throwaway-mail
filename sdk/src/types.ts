@@ -297,3 +297,17 @@ export interface CategoryChangedEvent {
   type: "category.changed";
 }
 export type ApiEvent = MessageReceivedEvent | AddressChangedEvent | CategoryChangedEvent;
+
+/** Format of random local parts: `words` (amber-otter-4821), `random`, `word.word` or a `template` ({word}-{rand6}). */
+export type AliasFormat = "words" | "random" | "word.word" | "template";
+export interface AddressSettings {
+  format: AliasFormat;
+  /** Length of `random` local parts (6-32). */
+  length: number;
+  /** `template` format: {word}, {randN}, {digitsN}, {site}. */
+  template: string | null;
+  /** Applied to new addresses created without an expiry; null = never. */
+  default_expires_in_days: number | null;
+  /** Applied to new addresses created without max_messages; null = unlimited. */
+  default_max_messages: number | null;
+}

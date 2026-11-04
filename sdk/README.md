@@ -101,15 +101,15 @@ try {
 
 ## Other resources
 
-| Namespace       | Methods                                                                                                                  |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `categories`    | `list`, `create`, `update`, `delete`, `reorder`                                                                          |
-| `smartFolders`  | `list`, `create`, `delete`                                                                                               |
-| `directories`   | `list`, `create`, `delete`                                                                                               |
-| `destinations`  | `list`, `create`, `update` (PGP key), `refresh`, `resendVerification`, `delete`                                          |
-| `notifications` | `list`, `create`, `update`, `delete`, `test`                                                                             |
-| `addresses`     | also `get`, `replace`, `senders`, `setFeed`, `stats`                                                                     |
-| `account`       | `digest`, `leaks`, `blockLeak`, `staleAddresses`, `cleanupStale`, `panic`, `export`, `import`, `keys.list/create/revoke` |
+| Namespace       | Methods                                                                                                                                                                                                                                |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `categories`    | `list`, `create`, `update`, `delete`, `reorder`                                                                                                                                                                                        |
+| `smartFolders`  | `list`, `create`, `delete`                                                                                                                                                                                                             |
+| `directories`   | `list`, `create`, `delete`                                                                                                                                                                                                             |
+| `destinations`  | `list`, `create`, `update` (PGP key), `refresh`, `resendVerification`, `delete`                                                                                                                                                        |
+| `notifications` | `list`, `create`, `update`, `delete`, `test`                                                                                                                                                                                           |
+| `addresses`     | also `get`, `replace`, `senders`, `setFeed`, `stats`                                                                                                                                                                                   |
+| `account`       | `addressSettings`, `setAddressSettings` (format, default expiry and max mails applied by `addresses.create`), `digest`, `leaks`, `blockLeak`, `staleAddresses`, `cleanupStale`, `panic`, `export`, `import`, `keys.list/create/revoke` |
 
 ## Build
 

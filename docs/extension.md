@@ -15,6 +15,7 @@ On top of the form filler it adds:
 - **Toolbar badge.** For the active tab's site, the badge shows the address's unread count, or a red `!` if a leak was detected. Refreshed on tab switch/load and every 2 min.
 - **Permissions.** Host access is `http://*/*` + `https://*/*` (not `<all_urls>`): the sign-up prompt and code paste run as content scripts on every web page and the background fills tabs with `scripting` without a click, so per-site access is still required; `file://`/`ftp://` are no longer requested.
 - **New identity for every new site** by default; filling again on the same site keeps the same identity.
+- **Address format and defaults** follow your account (_Account → New addresses_ in the app: local-part format, default expiry, default max mails). The extension options _New addresses expire after_ / _stop after_ override them only when set (_Account default_ otherwise).
 - The three behaviours can be turned off in the extension settings.
 - Without configuration it only uses `@example.com` addresses and nothing leaves the browser (badge `LOCAL`).
 

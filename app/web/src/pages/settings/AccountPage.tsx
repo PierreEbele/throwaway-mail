@@ -12,6 +12,7 @@ import { TwoFactorCard } from "./TwoFactorCard";
 import { PasskeysCard } from "./PasskeysCard";
 import { PushTargetsCard } from "./PushTargetsCard";
 import { SmtpPasswordsCard } from "./SmtpPasswordsCard";
+import { AddressSettingsCard } from "./AddressSettingsCard";
 
 export function AccountPage() {
   const { user, ssoProvider } = useAuth();
@@ -35,6 +36,7 @@ export function AccountPage() {
       {user?.auth === "local" && <TwoFactorCard />}
       {user?.auth === "local" && <PasskeysCard />}
       <DomainChoiceCard />
+      <AddressSettingsCard />
       <NotificationsCard />
       <PushTargetsCard />
       <SmtpPasswordsCard />

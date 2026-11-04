@@ -38,6 +38,7 @@ import { registerNewsletters } from "./routes/newsletters.js";
 import { registerBackup } from "./routes/backup.js";
 import { registerNotify } from "./routes/notify.js";
 import { registerSending } from "./routes/sending.js";
+import { registerSettings } from "./routes/settings.js";
 import { registerFeeds } from "./routes/feeds.js";
 import { registerReliability } from "./routes/reliability.js";
 import { registerRules } from "./routes/rules.js";
@@ -149,6 +150,7 @@ export function createApp(deps: Deps) {
   registerNewsletters(api);
   registerBackup(api);
   registerNotify(api);
+  registerSettings(api);
   registerFeeds(api);
   registerForwarding(api);
   registerAddresses(api);

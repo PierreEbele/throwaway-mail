@@ -1,11 +1,24 @@
 import { compact, type HttpClient, type RequestOptions } from "../http.js";
-import type { Address, Digest, ExportCategory, ExportAddress, ExportData, ImportResult, Leak } from "../types.js";
+import type { Address, AddressSettings, Digest, ExportCategory, ExportAddress, ExportData, ImportResult, Leak } from "../types.js";
 import { Keys } from "./misc.js";
 
 export class Account {
   readonly keys: Keys;
   constructor(private http: HttpClient) {
     this.keys = new Keys(http);
+  }
+
+  /**
+   * New-address settings: local-part format and the expiry / max mails applied when `addresses.create()` does not
+   * pass them.
+   */
+  async addressSettings(opts?: RequestOptions): Promise<AddressSettings> {
+    return (await this.http.get<{ settings: AddressSettings }>("/v1/settings/addresses", undefined, opts)).settings;
+  }
+
+  /** Replaces the new-address settings (omitted fields take their default). */
+  async setAddressSettings(s: Partial<AddressSettings>, opts?: RequestOptions): Promise<AddressSettings> {
+    return (await this.http.put<{ settings: AddressSettings }>("/v1/settings/addresses", s, opts)).settings;
   }
 
   /** Summary of the last `days` days (1–90, default 7). */

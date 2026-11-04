@@ -366,3 +366,15 @@ export interface DeliveryFailure {
   created_at: number;
   can_retry: boolean;
 }
+export type AliasFormat = "words" | "random" | "word.word" | "template";
+export interface AddressSettings {
+  format: AliasFormat;
+  length: number;
+  template: string | null;
+  default_expires_in_days: number | null;
+  default_max_messages: number | null;
+}
+export interface AddressSettingsResponse {
+  settings: AddressSettings;
+  examples: string[];
+}

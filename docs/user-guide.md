@@ -20,7 +20,18 @@ Everything you can do from the web UI. Each feature is also available through th
 ## Addresses
 
 One address per website. **+ New** (or `n`) asks for the site name and, optionally, its URL, a category, a domain,
-forwarding, an expiry and a maximum number of mails. The local part is a readable random string such as `amber-otter-4821`.
+forwarding, an expiry and a maximum number of mails. The local part is a readable random string such as `amber-otter-4821`
+unless you choose another format (below).
+
+**Account → New addresses** sets, for your account:
+
+- the **format** of random local parts: readable words and digits (`amber-otter-4821`, the default), random characters
+  of a chosen length (6–32), two words (`amber.otter`; digits are added if both are taken), or a **template** such as
+  `{word}-{rand6}` with `{word}`, `{randN}` (N random letters/digits), `{digitsN}` and `{site}` (the site name). A
+  template must be random enough not to collide (about a word and 4 digits); examples are shown as you type. A taken
+  address is never reused: another one is drawn.
+- a **default expiry** and **default max mails**, applied to every new address created without one: the _+ New_
+  dialog (prefilled, you can clear them for one address), the API and SDK, the browser extension and Bitwarden.
 
 Right-click an address in the list for quick actions: open, copy, mark read, pin, edit, move to a category, pause,
 archive, delete.
@@ -30,7 +41,8 @@ archive, delete.
   _+7 days_, _+30 days_ and _Never expire_, and a notification is sent 24 hours before. Once expired, the address
   is paused automatically (shown as _expired_; its mail is rejected); extending it brings it back.
 - **Max mails**: after N mails the address pauses itself (shown as _quota reached_). Both can be set at creation, from
-  the API / SDK, or as defaults for addresses created by the extension (its options page).
+  the API / SDK, as account defaults (_Account → New addresses_), or as defaults for addresses created by the
+  extension (its options page, which overrides the account defaults).
 - **Silent addresses**: addresses that never received mail after 30 days are suggested for clean-up in the Inbox.
 
 ## Organising

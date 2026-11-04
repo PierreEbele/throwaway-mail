@@ -21,7 +21,7 @@ export TM=https://mail-app.example.com
 export KEY=tm_xxxxxxxx_...
 ```
 
-Create an address for a site (random readable local part, first active domain):
+Create an address for a site (random local part in your format, first active domain; your default expiry and max mails apply unless given):
 
 ```bash
 curl -s -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
@@ -96,6 +96,7 @@ const { code } = await tm.addresses.waitForCode(addr.id, { since: Date.now(), ti
 | Admin         | `/v1/domains`, `/v1/admin/users` (+ `DELETE /:id/2fa`), `/v1/admin/audit`, `/v1/admin/health`, `/v1/admin/diagnostics`                                                                                                                                                                                                 |
 | Two-factor    | `GET /v1/auth/2fa`, `POST /v1/auth/2fa/setup`, `/enable`, `/disable`, `/recovery-codes`; `POST /v1/auth/login/2fa`                                                                                                                                                                                                     |
 | Passkeys      | `GET /v1/auth/passkeys`, `POST /v1/auth/passkeys/options` + `POST /v1/auth/passkeys`, `PATCH`/`DELETE /v1/auth/passkeys/:id`, `POST /v1/auth/passkeys/second-factor`; sign-in `POST /v1/auth/passkey/options` + `/v1/auth/passkey/login`; second step `POST /v1/auth/login/passkey/options` + `/v1/auth/login/passkey` |
+| Settings      | `GET`/`PUT /v1/settings/addresses` (local-part format, default expiry and max mails), `POST /v1/settings/addresses/preview`                                                                                                                                                                                            |
 
 ### Rules
 

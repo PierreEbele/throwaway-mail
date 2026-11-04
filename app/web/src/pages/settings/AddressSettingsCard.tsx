@@ -1,0 +1,157 @@
+import { useEffect, useState, type FormEvent } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { post, put } from "../../api";
+import type { AddressSettings, AddressSettingsResponse, AliasFormat } from "../../types";
+import { ErrorText, Spinner, useToast } from "../../components/ui";
+import { useAddressSettings } from "../Addresses";
+
+const FORMATS: Record<AliasFormat, string> = {
+  words: "Readable words and digits (amber-otter-4821)",
+  random: "Random characters",
+  "word.word": "Two words (amber.otter)",
+  template: "Custom template",
+};
+
+/** Format of random local parts and defaults applied to new addresses (UI, API, SDK, extension, Bitwarden). */
+export function AddressSettingsCard() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const q = useAddressSettings();
+  const [s, setS] = useState<AddressSettings | null>(null);
+  const [examples, setExamples] = useState<string[]>([]);
+  useEffect(() => {
+    if (q.data && !s) {
+      setS(q.data.settings);
+      setExamples(q.data.examples);
+    }
+  }, [q.data, s]);
+  const preview = useMutation({
+    mutationFn: (next: AddressSettings) => post<{ examples: string[] }>("/v1/settings/addresses/preview", next),
+    onSuccess: (r) => setExamples(r.examples),
+  });
+  const save = useMutation({
+    mutationFn: () => put<AddressSettingsResponse>("/v1/settings/addresses", s),
+    onSuccess: (r) => {
+      qc.setQueryData(["address-settings"], r);
+      setExamples(r.examples);
+      toast("Settings saved", "success");
+    },
+  });
+  // Live examples while editing (debounced).
+  useEffect(() => {
+    if (!s) return;
+    if (s.format === "template" && !s.template) return;
+    const t = setTimeout(() => preview.mutate(s), 400);
+    return () => clearTimeout(t);
+  }, [s?.format, s?.length, s?.template]);
+  if (!s) return <div className="card mt-4 max-w-xl p-5">{q.error ? <ErrorText error={q.error} /> : <Spinner />}</div>;
+  const set = (patch: Partial<AddressSettings>) => setS({ ...s, ...patch });
+  const num = (v: string) => (v.trim() ? Math.max(1, Math.floor(Number(v))) : null);
+  return (
+    <form
+      className="card mt-4 max-w-xl space-y-3 p-5 text-sm"
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+    >
+      <h2 className="font-semibold">New addresses</h2>
+      <p className="text-zinc-500">
+        How random addresses look, and the defaults used whenever an address is created without saying (this app, the API and SDK, the
+        browser extension, Bitwarden).
+      </p>
+      <div>
+        <label htmlFor="as-format" className="label">
+          Random address format
+        </label>
+        <select id="as-format" className="input" value={s.format} onChange={(e) => set({ format: e.target.value as AliasFormat })}>
+          {Object.entries(FORMATS).map(([k, label]) => (
+            <option key={k} value={k}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {s.format === "random" && (
+        <div>
+          <label htmlFor="as-length" className="label">
+            Length
+          </label>
+          <input
+            id="as-length"
+            className="input w-28"
+            type="number"
+            min={6}
+            max={32}
+            value={s.length}
+            onChange={(e) => set({ length: Math.min(32, Math.max(6, Number(e.target.value) || 12)) })}
+          />
+        </div>
+      )}
+      {s.format === "template" && (
+        <div>
+          <label htmlFor="as-template" className="label">
+            Template
+          </label>
+          <input
+            id="as-template"
+            className="input font-mono"
+            placeholder="{word}-{rand6}"
+            value={s.template ?? ""}
+            onChange={(e) => set({ template: e.target.value.toLowerCase() })}
+          />
+          <p className="mt-1 text-xs text-zinc-500">
+            <code>{"{word}"}</code> a word, <code>{"{rand6}"}</code> 6 random letters/digits, <code>{"{digits4}"}</code> 4 digits,{" "}
+            <code>{"{site}"}</code> the site name. Must be random enough to avoid collisions (e.g. a word and 4 digits).
+          </p>
+        </div>
+      )}
+      <p className="text-xs text-zinc-500">
+        Examples:{" "}
+        {preview.error ? (
+          <span className="text-red-600">{preview.error.message}</span>
+        ) : (
+          examples.map((x) => (
+            <code key={x} className="mr-2 font-mono">
+              {x}
+            </code>
+          ))
+        )}
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor="as-expiry" className="label">
+            Default expiry <span className="font-normal text-zinc-400">(days, blank = never)</span>
+          </label>
+          <input
+            id="as-expiry"
+            className="input"
+            type="number"
+            min={1}
+            max={3650}
+            value={s.default_expires_in_days ?? ""}
+            onChange={(e) => set({ default_expires_in_days: num(e.target.value) })}
+          />
+        </div>
+        <div>
+          <label htmlFor="as-max" className="label">
+            Default max mails <span className="font-normal text-zinc-400">(blank = unlimited)</span>
+          </label>
+          <input
+            id="as-max"
+            className="input"
+            type="number"
+            min={1}
+            max={100000}
+            value={s.default_max_messages ?? ""}
+            onChange={(e) => set({ default_max_messages: num(e.target.value) })}
+          />
+        </div>
+      </div>
+      <ErrorText error={save.error} />
+      <button className="btn-primary" disabled={save.isPending}>
+        Save
+      </button>
+    </form>
+  );
+}

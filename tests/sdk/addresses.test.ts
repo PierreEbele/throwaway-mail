@@ -95,3 +95,16 @@ describe("SDK: addresses", () => {
     expect(await tm.addresses.messages(a.id, { archived: "all" })).toHaveLength(2);
   });
 });
+
+describe("SDK: new-address settings", () => {
+  it("reads and changes the format and defaults, which apply to create() without values", async () => {
+    const { tm } = await sdkFixture();
+    expect((await tm.account.addressSettings()).format).toBe("words");
+    const s = await tm.account.setAddressSettings({ format: "random", length: 10, default_max_messages: 3 });
+    expect(s).toMatchObject({ format: "random", length: 10, default_max_messages: 3, default_expires_in_days: null });
+    const a = await tm.addresses.create({ siteName: "Shop" });
+    expect(a.local_part).toMatch(/^[a-z][a-z0-9]{9}$/);
+    expect(a.max_messages).toBe(3);
+    expect((await tm.addresses.create({ siteName: "Forum", maxMessages: null })).max_messages).toBeNull();
+  });
+});

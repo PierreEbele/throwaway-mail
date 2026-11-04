@@ -2,13 +2,21 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { get, post } from "../api";
-import type { Destination, Domain } from "../types";
+import type { AddressSettingsResponse, Destination, Domain } from "../types";
 import { ErrorText, Modal, Toggle, useToast } from "../components/ui";
 import { useCategories } from "./mailbox/shared";
 import { invalidate } from "../queries";
 
 export function useDomains() {
   return useQuery({ queryKey: ["domains"], queryFn: () => get<{ domains: Domain[] }>("/v1/domains").then((r) => r.domains) });
+}
+export function useAddressSettings(enabled = true) {
+  return useQuery({
+    queryKey: ["address-settings"],
+    queryFn: () => get<AddressSettingsResponse>("/v1/settings/addresses"),
+    enabled,
+    staleTime: 0,
+  });
 }
 export function useDestinations() {
   return useQuery({
@@ -31,6 +39,7 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
   const [maxMessages, setMaxMessages] = useState("");
   const categories = useCategories(open);
   const [categoryId, setCategoryId] = useState("");
+  const prefs = useAddressSettings(open);
   const qc = useQueryClient();
   const nav = useNavigate();
   const toast = useToast();
@@ -46,6 +55,12 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
   }, [open, defaultCategory]);
   // "Automatic": the server applies the domain choice and skips domains this site is known to reject.
   const [siteQuery, setSiteQuery] = useState({ name: "", url: "" });
+  // Defaults from Account -> New addresses, shown so they can be changed or cleared for this address.
+  useEffect(() => {
+    if (!open || !prefs.data) return;
+    setExpiresDays(prefs.data.settings.default_expires_in_days ? String(prefs.data.settings.default_expires_in_days) : "");
+    setMaxMessages(prefs.data.settings.default_max_messages ? String(prefs.data.settings.default_max_messages) : "");
+  }, [open, prefs.data]);
   useEffect(() => {
     const t = setTimeout(() => setSiteQuery({ name: siteName.trim(), url: siteUrl.trim() }), 300);
     return () => clearTimeout(t);
@@ -70,8 +85,9 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
         forward,
         destination_id: forward && destinationId ? destinationId : undefined,
         category_id: categoryId || undefined,
-        expires_in_days: expiresDays ? Number(expiresDays) : undefined,
-        max_messages: maxMessages ? Number(maxMessages) : undefined,
+        // Blank means none here: the form already showed the account defaults.
+        ...(expiresDays ? { expires_in_days: Number(expiresDays) } : { expires_at: null }),
+        max_messages: maxMessages ? Number(maxMessages) : null,
       }),
     onSuccess: (r) => {
       invalidate(qc, ["addresses"], ["categories"]);
@@ -120,7 +136,7 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
               <input
                 id="na-local"
                 className="input font-mono"
-                placeholder="amber-otter-1234"
+                placeholder={prefs.data?.examples[0] ?? "amber-otter-1234"}
                 value={localPart}
                 onChange={(e) => setLocalPart(e.target.value.toLowerCase())}
               />
@@ -172,6 +188,9 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
                 <option value="30">After 30 days</option>
                 <option value="90">After 90 days</option>
                 <option value="365">After 1 year</option>
+                {expiresDays && !["1", "7", "30", "90", "365"].includes(expiresDays) && (
+                  <option value={expiresDays}>After {expiresDays} days</option>
+                )}
               </select>
             </div>
             <div>
