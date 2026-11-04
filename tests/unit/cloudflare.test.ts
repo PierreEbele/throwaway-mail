@@ -48,6 +48,11 @@ describe("live Cloudflare client", () => {
     expect(await new LiveCloudflareClient("t", "acct", f).verifyToken()).toEqual({ status: "active", expiresOn: null });
   });
 
+  it("cannot tell whether the Worker exists from an empty script list", async () => {
+    const { f } = fakeApi((_m, p) => (p === "/accounts/acct/workers/scripts" ? { result: [] } : undefined));
+    expect(await new LiveCloudflareClient("t", "acct", f).workerExists("throwaway-mail-ingest")).toBeNull();
+  });
+
   it("reads the current catch-all and can put a previous one back", async () => {
     const { f, calls } = fakeApi((m, p) => {
       if (p === "/zones/z1/email/routing/rules/catch_all" && m === "GET")

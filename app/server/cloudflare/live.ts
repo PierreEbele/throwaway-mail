@@ -68,6 +68,8 @@ export class LiveCloudflareClient implements CloudflareClient {
   async workerExists(name: string): Promise<boolean | null> {
     try {
       const scripts = await this.call<Array<{ id: string }>>("GET", `/accounts/${this.accountId}/workers/scripts`);
+      // Without Workers Scripts:Read, account-owned tokens get an empty list instead of a 403.
+      if (scripts.length === 0) return null;
       return scripts.some((s) => s.id === name);
     } catch (e) {
       if (e instanceof CloudflareError && (e.status === 403 || e.cfCode === 10000)) return null;
