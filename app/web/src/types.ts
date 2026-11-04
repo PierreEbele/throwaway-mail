@@ -175,6 +175,7 @@ export interface ApiKey {
 export interface AuditEntry {
   id: string;
   user_id: string | null;
+  user_email: string | null;
   action: string;
   target: string | null;
   meta: unknown;
