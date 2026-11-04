@@ -6,6 +6,11 @@ Typed client for the Throwaway Mail API. No dependencies; Node.js 18+ (uses the 
 npm install @throwaway-mail/sdk
 ```
 
+## Example
+
+[`examples/signup.test.ts`](examples/signup.test.ts) is a complete end-to-end test: create an address, sign up,
+wait for the code, clean up.
+
 ## Setup
 
 ```ts
