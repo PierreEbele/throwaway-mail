@@ -64,7 +64,8 @@ scripts/               simulate-mail, parse-eml, backup, fake-idp, pack-extensio
 ## Ingest pipeline
 
 1. Verify the HMAC signature and timestamp; reject oversize bodies.
-2. Resolve the recipient: known address, directory (`name.site@`), preserved catch-all, or the domain's
+2. `r+<token>@domain` is a reverse-alias reply (`services/replies.ts`): checked (verified destination, SPF/DKIM/DMARC),
+   stripped of the user's headers and sent from the alias over SMTP; never stored. Otherwise resolve the recipient: known address, directory (`name.site@`), preserved catch-all, or the domain's
    unknown-address policy.
 3. Reject paused, archived or expired addresses, blocked senders, blocked newsletters and site-locked leaks.
 4. Deduplicate (Message-ID, or body hash within 15 minutes).

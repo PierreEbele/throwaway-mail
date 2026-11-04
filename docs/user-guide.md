@@ -18,14 +18,17 @@ Everything you can do from the web UI. Each feature is also available through th
 ## Addresses
 
 One address per website. **+ New** (or `n`) asks for the site name and, optionally, its URL, a category, a domain,
-forwarding and an expiry. The local part is a readable random string such as `amber-otter-4821`.
+forwarding, an expiry and a maximum number of mails. The local part is a readable random string such as `amber-otter-4821`.
 
 Right-click an address in the list for quick actions: open, copy, mark read, pin, edit, move to a category, pause,
 archive, delete.
 
 - **Pause** rejects new mail; **Archive** also hides the address from the lists; **Delete** removes it with its mail.
 - **Expiry**: an address can expire after a number of days. A banner appears three days before, with
-  _+7 days_, _+30 days_ and _Never expire_, and a notification is sent 24 hours before.
+  _+7 days_, _+30 days_ and _Never expire_, and a notification is sent 24 hours before. Once expired, the address
+  is paused automatically (shown as _expired_; its mail is rejected); extending it brings it back.
+- **Max mails**: after N mails the address pauses itself (shown as _quota reached_). Both can be set at creation, from
+  the API / SDK, or as defaults for addresses created by the extension (its options page).
 - **Silent addresses**: addresses that never received mail after 30 days are suggested for clean-up in the Inbox.
 
 ## Organising
@@ -67,6 +70,13 @@ Per address, **Forward new mail to my mailbox** sends a copy to a verified [dest
   (the whole original message, headers included, is encrypted; the subject can be hidden too). Requires the Worker's
   `SEND_EMAIL` binding. If encryption is impossible, nothing is forwarded in clear.
 - **Reject newsletters & promotions**: bulk mail without a verification code is rejected.
+- **Replies** (reverse alias): with _Reply from this address_ on, each forwarded mail comes _from_ the alias with a
+  private reply address `r+<token>@<domain>` per sender in Reply-To. Replying from your mailbox sends the answer from
+  the alias to the original sender: your address, name, mail client and IP headers are removed (your address in the
+  body is replaced by the alias). Replies are accepted only from your verified destinations and must pass SPF, DKIM or
+  DMARC. The _Replies_ card lists the contacts; _Block_ refuses replies to one, _Forget_ invalidates its reply address.
+  Needs outbound SMTP: the domain's mailbox SMTP server (IMAP domains) or `SMTP_RELAY_URL` (Cloudflare domains, which
+  also send the rewritten copies with the Worker's `SEND_EMAIL` binding). Without it the toggle is disabled and says why.
 
 ## Leaks and protection
 
@@ -103,6 +113,11 @@ _Block everywhere_.
 Reserve a **directory** name (Account → _On-the-fly addresses_), e.g. `alex`. Then give out
 `alex.anything@your-domain` anywhere, even on paper: the address is created for site `anything` when its first mail
 arrives, sorted by your category keywords. Up to five directories per user; names are first come, first served.
+
+**Catch-all auto-create** (admins, per domain): set _unknown: auto_create_ and mail to any unknown local part creates
+that address on the fly instead of being rejected (Cloudflare and IMAP domains alike). The domain card then lets you
+pick the owner of the created addresses (default: the domain owner) and a default category (default: matched from the
+sender like any new address).
 
 ## Feeds
 

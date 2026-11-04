@@ -81,6 +81,7 @@ const { code } = await tm.addresses.waitForCode(addr.id, { since: Date.now(), ti
 | Insights      | `GET /v1/addresses/:id/stats`, `GET /v1/digest`, `GET /v1/leaks`, `POST /v1/leaks/block`, `GET/POST /v1/stale-addresses`                    |
 | Organisation  | `/v1/categories` (+ `/reorder`), `/v1/saved-searches`, `/v1/directories`                                                                    |
 | Forwarding    | `/v1/destinations` (+ `/refresh`, `/resend`, PGP key via `PATCH`)                                                                           |
+| Replies       | `PATCH /v1/addresses/:id` `{replies_enabled}`, `GET /v1/addresses/:id/contacts`, `PATCH/DELETE /v1/addresses/:id/contacts/:cid`             |
 | Notifications | `/v1/notify-targets` (+ `/test`)                                                                                                            |
 | Account       | `/v1/keys`, `GET /v1/export`, `POST /v1/import`                                                                                             |
 | Admin         | `/v1/domains`, `/v1/admin/users` (+ `DELETE /:id/2fa`), `/v1/admin/audit`, `/v1/admin/health`, `/v1/admin/diagnostics`                      |
