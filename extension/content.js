@@ -60,7 +60,7 @@
   }
   function render(html) {
     const card = ui().querySelector(".card");
-    card.innerHTML = `<div class="top"><span class="mark">T</span><span class="title">Throwaway Mail</span><button class="x" data-a="close" title="Close">✕</button></div>${html}`;
+    card.innerHTML = `<div class="top"><span class="mark">A</span><span class="title">Aliasfill</span><button class="x" data-a="close" title="Close">✕</button></div>${html}`;
     return card;
   }
   function close() {
@@ -155,7 +155,7 @@
     const r = anchorOf(target).getBoundingClientRect();
     chip.style.cssText = `all:initial;position:absolute;z-index:2147483647;left:${Math.round(r.left + scrollX)}px;top:${Math.round(r.bottom + scrollY + 4)}px`;
     const sh = chip.attachShadow({ mode: "closed" });
-    sh.innerHTML = `<style>button{all:unset;cursor:pointer;font:600 12px ui-sans-serif,system-ui,sans-serif;background:#18181b;color:#fff;padding:5px 10px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.18)}button:hover{background:#3f3f46}span{font-family:ui-monospace,monospace;letter-spacing:1px}</style><button title="Throwaway Mail">Fill code <span>${esc(code)}</span></button>`;
+    sh.innerHTML = `<style>button{all:unset;cursor:pointer;font:600 12px ui-sans-serif,system-ui,sans-serif;background:#18181b;color:#fff;padding:5px 10px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.18)}button:hover{background:#3f3f46}span{font-family:ui-monospace,monospace;letter-spacing:1px}</style><button title="Aliasfill">Fill code <span>${esc(code)}</span></button>`;
     sh.querySelector("button").addEventListener("click", (e) => {
       e.preventDefault();
       pasteCode(code);

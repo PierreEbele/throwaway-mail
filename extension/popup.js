@@ -331,7 +331,7 @@ $("fill").addEventListener("click", async () => {
     else if (report.unchanged) status("The selected fields already hold the profile values.");
     else if (report.rejected) status("Fields found, but their rules rejected the values. No field changed.", true);
     else if (report.blockedAuthentication)
-      status("This looks like a sign-in or account verification form. Throwaway Mail skips those forms and their passwords.", true);
+      status("This looks like a sign-in or account verification form. Aliasfill skips those forms and their passwords.", true);
     else if (report.selectionMismatch)
       status("Some fields were recognised but are unticked in Fields to fill. Tick the ones to fill.", true);
     else status("No field matches your selection. Some embedded forms and custom components cannot be reached.", true);

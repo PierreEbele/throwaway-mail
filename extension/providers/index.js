@@ -108,7 +108,7 @@ globalThis.AliasProviders = (() => {
     const created = await a.provider.createAlias(a.cfg, {
       site: url.hostname,
       url: url.origin,
-      note: `Throwaway Mail extension · ${url.hostname}`,
+      note: `Aliasfill · ${url.hostname}`,
       name,
     });
     if (!created?.email) throw new Error(`${a.provider.name} returned no address.`);

@@ -50,7 +50,7 @@ function load(store: Record<string, any> = {}, route: Route = () => ({ status: 4
   return { P: sandbox.AliasProviders as any, calls, store };
 }
 
-const ctx = { site: "shop.example.org", url: "https://shop.example.org", note: "Throwaway Mail extension · shop.example.org" };
+const ctx = { site: "shop.example.org", url: "https://shop.example.org", note: "Aliasfill · shop.example.org" };
 
 describe("alias providers", () => {
   it("registers every adapter, only Throwaway Mail fetches codes, and all scripts are loaded everywhere", () => {

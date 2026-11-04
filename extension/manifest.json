@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Throwaway Mail",
+  "name": "Aliasfill",
   "version": "2.0.0",
   "description": "Fake identities for sign-up forms, with disposable addresses from your own domain or alias service.",
   "permissions": ["alarms", "activeTab", "menus", "scripting", "storage"],
   "action": {
-    "default_title": "Throwaway Mail",
+    "default_title": "Aliasfill",
     "default_popup": "popup.html",
     "default_icon": {
       "32": "icons/throwaway-mail.svg",
