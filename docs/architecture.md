@@ -73,5 +73,3 @@ scripts/               simulate-mail, parse-eml, backup, fake-idp, pack-extensio
 6. Store the message, its extracted items and any leak event in one transaction.
 7. Publish the live event, send notifications, apply self-destruction.
 8. Answer the Worker: plain forwards and PGP-encrypted copies.
-
-Design decisions and their reasons are in [DECISIONS.md](../DECISIONS.md).

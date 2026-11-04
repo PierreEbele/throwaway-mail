@@ -82,7 +82,7 @@ pnpm simulate --to <address> tests/fixtures/github-device-verification.eml
 - [Configuration](docs/configuration.md) · [Operations](docs/operations.md)
 - [API](docs/api.md) · [Node.js SDK](sdk/README.md)
 - [Browser extension](docs/extension.md) · [Bitwarden](docs/bitwarden.md)
-- [Architecture](docs/architecture.md) · [Development](docs/development.md) · [Design decisions](DECISIONS.md)
+- [Architecture](docs/architecture.md) · [Development](docs/development.md)
 
 ## Requirements
 
