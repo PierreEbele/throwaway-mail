@@ -397,36 +397,52 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 /** App shell. `bare` pages (the mailbox) fill the whole area and manage their own scrolling. */
+/** Public demo (DEMO_MODE): explains what is read-only and when the data is reset. */
+function DemoBanner() {
+  const { demo } = useAuth();
+  if (!demo) return null;
+  const next = demo.reset_at ? demo.reset_at + demo.reset_minutes * 60_000 : null;
+  return (
+    <div role="note" data-testid="demo-banner" className="bg-indigo-600 px-4 py-1.5 text-center text-xs text-white dark:bg-indigo-500">
+      Public demo: mail is simulated, nothing is forwarded, domains, destinations, users and keys are read-only. Everything is reset every{" "}
+      {demo.reset_minutes} minutes{next ? ` (next ${new Date(next).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})` : ""}.
+    </div>
+  );
+}
+
 export function Layout({ children, bare }: { children: ReactNode; bare?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="flex h-dvh flex-col md:flex-row">
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2"
-      >
-        Skip to content
-      </a>
-      <header className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2.5 md:hidden dark:border-zinc-800 dark:bg-zinc-950">
-        <span className="font-semibold tracking-tight">Throwaway Mail</span>
-        <button className="btn-ghost" aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen(!open)}>
-          {open ? "Close" : "Menu"}
-        </button>
-      </header>
-      {open && (
-        <div
-          id="mobile-nav"
-          className="max-h-[70dvh] overflow-hidden border-b border-zinc-200 bg-zinc-50 md:hidden dark:border-zinc-800 dark:bg-zinc-950"
+    <div className="flex h-dvh flex-col">
+      <DemoBanner />
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2"
         >
-          <Sidebar onNavigate={() => setOpen(false)} />
-        </div>
-      )}
-      <aside className="hidden w-60 shrink-0 border-r border-zinc-200 bg-zinc-50 md:block dark:border-zinc-800 dark:bg-zinc-950">
-        <Sidebar />
-      </aside>
-      <main id="main" className={`min-h-0 min-w-0 flex-1 bg-white dark:bg-zinc-900 ${bare ? "overflow-hidden" : "overflow-y-auto"}`}>
-        {bare ? children : <div className="mx-auto w-full max-w-5xl p-4 md:p-8">{children}</div>}
-      </main>
+          Skip to content
+        </a>
+        <header className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2.5 md:hidden dark:border-zinc-800 dark:bg-zinc-950">
+          <span className="font-semibold tracking-tight">Throwaway Mail</span>
+          <button className="btn-ghost" aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen(!open)}>
+            {open ? "Close" : "Menu"}
+          </button>
+        </header>
+        {open && (
+          <div
+            id="mobile-nav"
+            className="max-h-[70dvh] overflow-hidden border-b border-zinc-200 bg-zinc-50 md:hidden dark:border-zinc-800 dark:bg-zinc-950"
+          >
+            <Sidebar onNavigate={() => setOpen(false)} />
+          </div>
+        )}
+        <aside className="hidden w-60 shrink-0 border-r border-zinc-200 bg-zinc-50 md:block dark:border-zinc-800 dark:bg-zinc-950">
+          <Sidebar />
+        </aside>
+        <main id="main" className={`min-h-0 min-w-0 flex-1 bg-white dark:bg-zinc-900 ${bare ? "overflow-hidden" : "overflow-y-auto"}`}>
+          {bare ? children : <div className="mx-auto w-full max-w-5xl p-4 md:p-8">{children}</div>}
+        </main>
+      </div>
     </div>
   );
 }

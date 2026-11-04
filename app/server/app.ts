@@ -45,6 +45,7 @@ import { registerForwarding } from "./routes/forwarding.js";
 import { registerQuarantine } from "./routes/quarantine.js";
 import { registerDeliveries } from "./routes/deliveries.js";
 import { metrics, renderPrometheus } from "./services/metrics.js";
+import { demoBlocks } from "./services/demo.js";
 import { healthGauges } from "./routes/admin.js";
 
 const APP_CSP = {
@@ -128,6 +129,13 @@ export function createApp(deps: Deps) {
   // API: auth → CSRF → rate limit
   const limiter = new RateLimiter(deps.config.RATE_LIMIT_PER_MINUTE);
   app.use("/v1/*", authenticate, csrf, rateLimit(limiter, callerKey));
+  if (deps.config.DEMO_MODE) {
+    app.use("/v1/*", async (c, next) => {
+      if (demoBlocks(c.req.method, c.req.path))
+        throw new HttpError(403, "demo_mode", "This is a public demo: domains, destinations, users, keys and notifications are read-only.");
+      await next();
+    });
+  }
   const api = new ApiRouter(app);
   registerAuth(api, deps.config.localLoginEnabled);
   // Before registerAddresses: /v1/addresses/bulk must not be taken for /v1/addresses/:id.

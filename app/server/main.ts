@@ -12,6 +12,7 @@ import { scheduledBackup } from "./services/backup/index.js";
 import { probeTick } from "./services/probe.js";
 import { startSubmission } from "./services/submission.js";
 import { processWebhookOutbox } from "./services/webhooks.js";
+import { resetDemo } from "./services/demo.js";
 
 // Local (non-Docker) runs may keep settings in .env.
 try {
@@ -111,6 +112,17 @@ const outboxTimer = setInterval(() => {
 }, 15_000);
 outboxTimer.unref();
 
+let demoTimer: NodeJS.Timeout | null = null;
+if (config.DEMO_MODE) {
+  logger.warn("DEMO MODE: domains, destinations, users, keys and notifications are read-only, nothing is forwarded", {
+    reset_minutes: config.DEMO_RESET_MINUTES,
+  });
+  const reset = () => resetDemo(deps).catch((e) => logger.error("demo reset failed", { err: e as Error }));
+  await reset();
+  demoTimer = setInterval(reset, config.DEMO_RESET_MINUTES * 60_000);
+  demoTimer.unref();
+}
+
 const server = serve({ fetch: app.fetch, port: config.PORT, hostname: config.HOST }, (info) => {
   logger.info("listening", { port: info.port, host: config.HOST, app_url: config.APP_URL });
 });
@@ -125,6 +137,7 @@ function shutdown(signal: string) {
   clearInterval(probeTimer);
   clearInterval(outboxTimer);
   if (backupTimer) clearInterval(backupTimer);
+  if (demoTimer) clearInterval(demoTimer);
   deps.mailboxes.stop();
   void stopSubmission?.();
   const force = setTimeout(() => {

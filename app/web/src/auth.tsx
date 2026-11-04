@@ -14,6 +14,8 @@ interface AuthState {
   localEnabled: boolean;
   setupRequired: boolean;
   cloudflareMode: "live" | "mock" | "unconfigured" | null;
+  /** Public demo (DEMO_MODE): one-click sign-in, data reset every reset_minutes. */
+  demo: { reset_minutes: number; reset_at: number | null } | null;
 }
 const Ctx = createContext<AuthState>({
   user: null,
@@ -23,6 +25,7 @@ const Ctx = createContext<AuthState>({
   localEnabled: false,
   setupRequired: false,
   cloudflareMode: null,
+  demo: null,
 });
 export const useAuth = () => useContext(Ctx);
 
@@ -34,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sso: { enabled: boolean; provider: string };
         local: { enabled: boolean; setup_required: boolean };
         cloudflare_mode: AuthState["cloudflareMode"];
+        demo: AuthState["demo"];
       }>("/v1/auth/status"),
     staleTime: 60_000,
   });
@@ -64,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localEnabled: status.data?.local.enabled ?? false,
         setupRequired: status.data?.local.setup_required ?? false,
         cloudflareMode: status.data?.cloudflare_mode ?? null,
+        demo: status.data?.demo ?? null,
       }}
     >
       {children}

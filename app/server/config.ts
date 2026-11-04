@@ -103,6 +103,14 @@ const EnvSchema = z.object({
   SEND_RATE_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(30),
   /** Recipients (To + Cc + Bcc) per sent mail. */
   SEND_MAX_RECIPIENTS: z.coerce.number().int().min(1).default(20),
+  /**
+   * Public demo: writes that matter are refused (domains, destinations, users, keys, notifications), nothing is
+   * forwarded, visitors enter with one click, and the data is reset from a seed every DEMO_RESET_MINUTES.
+   */
+  DEMO_MODE: bool,
+  DEMO_RESET_MINUTES: z.coerce.number().int().min(5).default(60),
+  /** Directory with the .eml files of the demo seed (the repository's tests/fixtures; /app/demo-mail in the image). */
+  DEMO_MAIL_DIR: z.string().default("./tests/fixtures"),
   /** Replies must pass SPF, DKIM or DMARC at the receiving server (Authentication-Results). Default true. */
   REPLY_REQUIRE_AUTH: z
     .string()

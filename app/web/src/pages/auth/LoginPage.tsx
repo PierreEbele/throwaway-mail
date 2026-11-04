@@ -139,7 +139,20 @@ function PasswordForm({ returnTo, autoFocus }: { returnTo: string; autoFocus: bo
 
 export function LoginPage() {
   const [params] = useSearchParams();
-  const { ssoProvider, ssoEnabled, localEnabled, setupRequired } = useAuth();
+  const { ssoProvider, ssoEnabled, localEnabled, setupRequired, demo } = useAuth();
+  const afterSignIn = useAfterSignIn();
+  const enterDemo = useMutation({ mutationFn: () => post("/v1/auth/demo"), onSuccess: () => afterSignIn("/") });
+  if (demo)
+    return (
+      <AuthCard subtitle="Public demo: simulated mail, reset regularly" error={enterDemo.error ? (enterDemo.error as Error).message : null}>
+        <button className="btn-primary w-full py-2 text-base" autoFocus disabled={enterDemo.isPending} onClick={() => enterDemo.mutate()}>
+          Enter the demo
+        </button>
+        <p className="mt-4 text-xs text-zinc-500">
+          No account needed. Everything you change is visible to other visitors and reset every {demo.reset_minutes} minutes.
+        </p>
+      </AuthCard>
+    );
   if (setupRequired) return <Navigate to="/setup" replace />;
   const error = params.get("message") ?? (params.get("error") ? `Sign-in failed (${params.get("error")})` : null);
   const returnTo = params.get("return_to") ?? "/";

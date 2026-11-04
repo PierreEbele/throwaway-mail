@@ -2,60 +2,13 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
 import fs from "node:fs";
 import path from "node:path";
 import { ingestSignature } from "../../app/server/routes/ingest.js";
+import { DEMO_SITES } from "../../app/server/services/demo.js";
 
 const DOMAIN = "mail.example.test";
 const OUT = "docs/images";
 
-const SITES = [
-  {
-    name: "Discord",
-    url: "discord.com",
-    local: "quiet-heron-2210",
-    mail: "discord-verify-email.eml",
-    from: "noreply@discord.com",
-    category: "Social",
-  },
-  {
-    name: "Steam",
-    url: "store.steampowered.com",
-    local: "brave-falcon-7742",
-    mail: "steam-guard.eml",
-    from: "noreply@steampowered.com",
-    category: "Games",
-  },
-  {
-    name: "PayPal",
-    url: "paypal.com",
-    local: "calm-badger-1187",
-    mail: "paypal-code.eml",
-    from: "service@paypal.fr",
-    category: "Shopping",
-  },
-  {
-    name: "Amazon",
-    url: "amazon.com",
-    local: "amber-lynx-5307",
-    mail: "amazon-otp.eml",
-    from: "account-update@amazon.com",
-    category: "Shopping",
-  },
-  {
-    name: "Microsoft",
-    url: "microsoft.com",
-    local: "misty-crane-6034",
-    mail: "microsoft-security-code.eml",
-    from: "account-security-noreply@accountprotection.microsoft.com",
-    category: "Dev",
-  },
-  {
-    name: "GitHub",
-    url: "github.com",
-    local: "silver-otter-4821",
-    mail: "github-device-verification.eml",
-    from: "noreply@github.com",
-    category: "Dev",
-  },
-];
+// Same sites, categories and mails as the public demo seed (DEMO_MODE).
+const SITES = DEMO_SITES;
 
 async function deliver(request: APIRequestContext, to: string, from: string, fixture: string) {
   const raw = fs.readFileSync(path.resolve("tests/fixtures", fixture));

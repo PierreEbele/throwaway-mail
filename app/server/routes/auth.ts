@@ -5,7 +5,8 @@ import type { ApiRouter, Ctx } from "../lib/http.js";
 import { clientIp } from "../lib/http.js";
 import { users, type User } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
-import { HttpError } from "../lib/errors.js";
+import { HttpError, notFound } from "../lib/errors.js";
+import { demoResetAt, demoUser } from "../services/demo.js";
 import { SESSION_COOKIE, createSession, deleteSession } from "../auth/tokens.js";
 import { limitIp } from "../auth/limits.js";
 import type { SsoIdentity } from "../auth/oidc.js";
@@ -78,8 +79,27 @@ export function registerAuth(r: ApiRouter, localLogin: boolean) {
       sso: { enabled: d.oidc.enabled, provider: d.oidc.providerName },
       local: { enabled: local, setup_required: local && !hasUsers(d) },
       cloudflare_mode: d.cf.mode,
+      /** Public demo (DEMO_MODE): one-click sign-in, data reset every reset_minutes. */
+      demo: d.config.DEMO_MODE ? { reset_minutes: d.config.DEMO_RESET_MINUTES, reset_at: demoResetAt(d) } : null,
     });
   });
+
+  r.add(
+    {
+      method: "post",
+      path: "/v1/auth/demo",
+      summary: "Public demo only (DEMO_MODE): sign in as the demo account",
+      tags: ["auth"],
+      auth: "none",
+    },
+    (c) => {
+      const d = c.get("deps");
+      const user = d.config.DEMO_MODE ? demoUser(d) : undefined;
+      if (!user) throw notFound("Route");
+      const s = signIn(c, user);
+      return c.json({ user: userOut(user), csrf_token: s.csrfToken });
+    },
+  );
 
   if (localLogin) registerLocalAuth(r);
 

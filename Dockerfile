@@ -30,11 +30,14 @@ ENV NODE_ENV=production \
     DATA_DIR=/data \
     MIGRATIONS_DIR=/app/migrations \
     WEB_DIST_DIR=/app/dist/web \
+    DEMO_MAIL_DIR=/app/demo-mail \
     NODE_OPTIONS=--max-old-space-size=256
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY app/server/db/migrations ./migrations
 COPY scripts/backup.sh ./scripts/backup.sh
+# Seed mail of the public demo (DEMO_MODE=1)
+COPY tests/fixtures ./demo-mail
 COPY package.json ./
 USER node
 VOLUME ["/data"]

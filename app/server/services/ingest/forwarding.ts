@@ -9,7 +9,7 @@ import type { IngestResult } from "./types.js";
 
 /** Every verified destination mail for this address goes to right now (extra destinations included). */
 export function forwardTargets(deps: Deps, address: Address): string[] {
-  if (!address.forwardEnabled) return [];
+  if (!address.forwardEnabled || deps.config.DEMO_MODE) return [];
   const extra = deps.db
     .select({ email: destinations.email })
     .from(addressDestinations)
