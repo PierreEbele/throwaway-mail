@@ -14,6 +14,29 @@ APP_URL = "https://mail.example.com"
 FALLBACK_FORWARD = "example.com=alice@example.com,example.dev=alice@example.com,example.org=bob@example.com"
 # Time to wait for the app before falling back.
 INGEST_TIMEOUT_MS = "5000"
+# "forward" (default): while the app is unreachable, forward to the address's last known destinations (ROUTES below)
+# or FALLBACK_FORWARD. "reject": answer with a temporary error only, so the sending server retries later.
+FALLBACK_MODE = "forward"
+# Days a cached route (ROUTES) stays valid without mail confirming it.
+ROUTE_TTL_DAYS = "30"
+# Optional: URL that receives a JSON POST each time the fallback is used (ntfy topic, monitoring webhook...).
+# ALERT_WEBHOOK = "https://ntfy.sh/your-secret-topic"
+
+# Optional: remembers each address's forward destinations, so the fallback forwards to the right person.
+# Create with:  pnpm exec wrangler kv namespace create ROUTES   and paste the id here.
+# [[kv_namespaces]]
+# binding = "ROUTES"
+# id = "<namespace id>"
+
+# Optional: mail forwarded by the fallback is queued and replayed to the app once it is back, so it is stored too.
+# Create with:  pnpm exec wrangler queues create throwaway-mail-retry
+# [[queues.producers]]
+# binding = "RETRY_QUEUE"
+# queue = "throwaway-mail-retry"
+# [[queues.consumers]]
+# queue = "throwaway-mail-retry"
+# max_batch_size = 10
+# max_retries = 20
 
 # Secret (not in this file):  npx wrangler secret put INGEST_SECRET   (same value as INGEST_SECRET in the app's .env)
 
