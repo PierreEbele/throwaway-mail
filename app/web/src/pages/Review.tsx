@@ -75,7 +75,7 @@ function Item({ item }: { item: ReviewItem }) {
       <ul className="mt-2 space-y-0.5 text-sm text-zinc-600 dark:text-zinc-400">
         {item.recent.slice(0, 3).map((m) => (
           <li key={m.id} className="truncate">
-            <span className="text-zinc-500">{m.from}</span> — {m.subject ?? "(no subject)"}
+            <span className="text-zinc-500">{m.from}</span>: {m.subject ?? "(no subject)"}
           </li>
         ))}
       </ul>

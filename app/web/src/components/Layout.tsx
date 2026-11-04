@@ -277,7 +277,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               onClick={() => toggleHidden(c)}
               aria-pressed={c.hidden}
               aria-label={c.hidden ? `Show ${c.name} in the Inbox` : `Hide ${c.name} from the Inbox`}
-              title={c.hidden ? "Hidden from the Inbox — click to show" : "Hide from the Inbox"}
+              title={c.hidden ? "Hidden from the Inbox, click to show" : "Hide from the Inbox"}
             >
               <EyeIcon off={c.hidden} />
             </button>
@@ -403,7 +403,7 @@ function DemoBanner() {
   if (!demo) return null;
   const next = demo.reset_at ? demo.reset_at + demo.reset_minutes * 60_000 : null;
   return (
-    <div role="note" data-testid="demo-banner" className="bg-indigo-600 px-4 py-1.5 text-center text-xs text-white dark:bg-indigo-500">
+    <div role="note" data-testid="demo-banner" className="bg-[#b8461f] px-4 py-1.5 text-center text-xs text-white">
       Public demo: mail is simulated, nothing is forwarded, domains, destinations, users and keys are read-only. Everything is reset every{" "}
       {demo.reset_minutes} minutes{next ? ` (next ${new Date(next).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})` : ""}.
     </div>

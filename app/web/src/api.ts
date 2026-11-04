@@ -31,12 +31,7 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
     const details = Array.isArray(e?.details)
       ? e.details.map((d: { path: string; message: string }) => `${d.path ? d.path + ": " : ""}${d.message}`).join("; ")
       : "";
-    throw new ApiError(
-      res.status,
-      e?.code ?? "error",
-      `${e?.message ?? `HTTP ${res.status}`}${details ? ` — ${details}` : ""}`,
-      e?.details,
-    );
+    throw new ApiError(res.status, e?.code ?? "error", `${e?.message ?? `HTTP ${res.status}`}${details ? `: ${details}` : ""}`, e?.details);
   }
   setCsrf(json?.csrf_token);
   return json as T;

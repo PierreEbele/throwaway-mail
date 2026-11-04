@@ -35,7 +35,7 @@ export function useSiteRejected(a: Address) {
         qc.invalidateQueries();
         if (!r.address) return;
         navigator.clipboard.writeText(r.address.email).catch(() => {});
-        toast(`New address ${r.address.email} copied — try it on the site`, "success");
+        toast(`New address ${r.address.email} copied, try it on the site`, "success");
         nav(`/addresses/${r.address.id}`);
       },
       (e: Error) =>
@@ -57,7 +57,7 @@ export function useReplace(a: Address) {
       (r) => {
         qc.invalidateQueries();
         navigator.clipboard.writeText(r.address.email).catch(() => {});
-        toast(`New address ${r.address.email} copied — update it on the site`, "success");
+        toast(`New address ${r.address.email} copied, update it on the site`, "success");
         if (a.site_url) window.open(a.site_url, "_blank", "noopener,noreferrer");
         nav(`/addresses/${r.address.id}`);
       },
