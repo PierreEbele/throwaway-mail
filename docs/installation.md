@@ -106,7 +106,7 @@ Logs are JSON lines: `docker compose logs -f app`. Health: `https://APP_DOMAIN/h
 
 Every mail domain must use Cloudflare DNS, in the same account as the Worker.
 
-Create an API token (_My Profile → API Tokens → Create custom token_) with:
+Create an API token (_My Profile → API Tokens → Create custom token_) with the permissions below. [Cloudflare tokens, step by step](cloudflare-tokens.md) walks through every click.
 
 | Scope                             | Permission | Used for                                                                                                                                   |
 | --------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -115,6 +115,7 @@ Create an API token (_My Profile → API Tokens → Create custom token_) with:
 | Zone → Email Routing Rules        | Edit       | read and set the catch-all rule                                                                                                            |
 | Zone → DNS                        | Read       | report missing MX/SPF records                                                                                                              |
 | Account → Email Routing Addresses | Edit       | create destinations (sends the verification mail), read their state                                                                        |
+| Account → Workers Scripts         | Read       | optional: lets Setup check confirm the Worker is deployed                                                                                  |
 
 Zone resources: _All zones_ (or only your mail domains). Account resources: your account. `CF_ACCOUNT_ID` is shown on the dashboard overview page.
 
