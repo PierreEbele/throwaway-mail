@@ -49,6 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw e;
       }
     },
+    // A rate limit (429) or a restart must not look like a sign-out: retry with back-off.
+    retry: (n, e) => n < 5 && !(e instanceof ApiError && e.status === 401),
+    retryDelay: (n) => Math.min(1000 * 2 ** n, 30_000),
     staleTime: 5 * 60_000,
   });
   return (
