@@ -287,7 +287,7 @@ async function cloudflareChecks(deps: Deps, cfDomains: Domain[]): Promise<Check[
         title: "Cloudflare API token",
         status: "error",
         detail: msg(e),
-        hint: "CF_API_TOKEN is invalid or Cloudflare is unreachable. Check the value (no quotes or spaces) and the server's outbound access.",
+        hint: "CF_API_TOKEN is invalid or Cloudflare is unreachable. Check the value (no quotes or spaces) and the server's outbound access. Step by step: docs/cloudflare-tokens.md.",
       },
     ];
   }
