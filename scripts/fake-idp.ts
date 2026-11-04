@@ -15,7 +15,7 @@ export interface FakeUser {
 }
 
 export const FAKE_USERS: Record<string, FakeUser> = {
-  dory: { sub: "sub-dory", email: "dory@example.test", name: "Dory", preferred_username: "dory", groups: ["admins"] },
+  admin: { sub: "sub-admin", email: "admin@example.test", name: "Admin", preferred_username: "admin", groups: ["admins"] },
   alice: { sub: "sub-alice", email: "alice@example.test", name: "Alice", preferred_username: "alice", groups: ["family"] },
   bob: { sub: "sub-bob", email: "bob@example.test", name: "Bob", preferred_username: "bob", groups: ["family"] },
 };
@@ -25,7 +25,7 @@ export async function startFakeIdp(opts: { port?: number; clientId: string; clie
   const jwk = { ...(await exportJWK(publicKey)), kid: "fake-1", alg: "RS256", use: "sig" };
   const codes = new Map<string, { user: FakeUser; nonce?: string; challenge: string; redirectUri: string }>();
   const tokens = new Map<string, FakeUser>();
-  let current: FakeUser = FAKE_USERS.dory!;
+  let current: FakeUser = FAKE_USERS.admin!;
   let issuer = "";
   let denyNext: string | null = null;
 

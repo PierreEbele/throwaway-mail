@@ -208,8 +208,8 @@ describe("mixed mode (SSO and local accounts)", () => {
     const status = (await new Client(t).get("/v1/auth/status")).json;
     expect(status.sso.enabled).toBe(true);
     expect(status.local).toEqual({ enabled: true, setup_required: true });
-    await setup(t, FAKE_USERS.dory!.email);
-    idp.setUser(FAKE_USERS.dory!);
+    await setup(t, FAKE_USERS.admin!.email);
+    idp.setUser(FAKE_USERS.admin!);
     const refused = await ssoCallback(t);
     expect(refused.headers.get("location")).toMatch(/error=local_account_exists/);
     idp.setUser(FAKE_USERS.alice!);

@@ -8,7 +8,7 @@ Runs everything locally with a mocked Cloudflare and a fake OpenID provider that
 
 ```bash
 pnpm install && pnpm build
-pnpm fake-oidc &                       # fake IdP on http://127.0.0.1:3298 (user "dory", group admins)
+pnpm fake-oidc &                       # fake IdP on http://127.0.0.1:3298 (user "admin", group admins)
 CF_MOCK=1 OIDC_ISSUER=http://127.0.0.1:3298 OIDC_CLIENT_SECRET=dev-oidc-secret OIDC_ALLOW_INSECURE=1 pnpm start
 ```
 

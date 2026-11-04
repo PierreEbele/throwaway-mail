@@ -63,7 +63,7 @@ export function DirectoriesCard() {
         <input
           id="dir-name"
           className="input"
-          placeholder="e.g. dory"
+          placeholder="e.g. alex"
           pattern="[a-z0-9]{3,32}"
           value={name}
           onChange={(e) => setName(e.target.value.toLowerCase())}

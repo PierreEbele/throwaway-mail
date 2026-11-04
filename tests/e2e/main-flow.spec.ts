@@ -4,7 +4,7 @@ import path from "node:path";
 import { ingestSignature } from "../../app/server/routes/ingest.js";
 
 test("SSO sign-in, domain, address lifecycle and live code", async ({ page, request }) => {
-  // Single sign-on through the (fake) identity provider; "dory" is in the admins group
+  // Single sign-on through the (fake) identity provider; "admin" is in the admins group
   await page.goto("/");
   await expect(page).toHaveURL(/\/login/);
   await page.getByRole("link", { name: "Sign in with Authelia" }).click();

@@ -34,12 +34,12 @@ async function ssoLogin(t: TestApp, returnTo = "/", tamperState = false, host?: 
 describe("single sign-on (OpenID Connect)", () => {
   it("logs in, creates the user and maps the admins group to admin", async () => {
     const t = app();
-    idp.setUser(FAKE_USERS.dory!);
+    idp.setUser(FAKE_USERS.admin!);
     const r = await ssoLogin(t, "/addresses/x");
     expect(r.status).toBe(302);
     expect(r.location).toBe("/addresses/x");
     const me = await r.client.get("/v1/auth/me");
-    expect(me.json.user).toMatchObject({ email: "dory@example.test", name: "Dory", role: "admin" });
+    expect(me.json.user).toMatchObject({ email: "admin@example.test", name: "Admin", role: "admin" });
     expect(me.json.csrf_token).toBeTruthy();
     // second login reuses the same account
     const again = await ssoLogin(t);
@@ -76,7 +76,7 @@ describe("single sign-on (OpenID Connect)", () => {
 
   it("rejects a callback whose state is not bound to this browser", async () => {
     const t = app();
-    idp.setUser(FAKE_USERS.dory!);
+    idp.setUser(FAKE_USERS.admin!);
     const r = await ssoLogin(t, "/", true);
     expect(r.location).toMatch(/error=sso_state_mismatch/);
     expect(r.client.cookie).toBe("");
@@ -91,7 +91,7 @@ describe("single sign-on (OpenID Connect)", () => {
 
   it("sends each public hostname back to its own callback URL", async () => {
     const t = app({ APP_URL: "https://mail.one.test", APP_EXTRA_URLS: "https://mail.two.test" });
-    idp.setUser(FAKE_USERS.dory!);
+    idp.setUser(FAKE_USERS.admin!);
     const viaTwo = await t.app.request("/v1/auth/oidc/login", { headers: { host: "mail.two.test" } });
     expect(new URL(viaTwo.headers.get("location")!).searchParams.get("redirect_uri")).toBe("https://mail.two.test/v1/auth/oidc/callback");
     const viaEvil = await t.app.request("/v1/auth/oidc/login", { headers: { host: "evil.test" } });
@@ -103,7 +103,7 @@ describe("single sign-on (OpenID Connect)", () => {
 
   it("never redirects off-site after login", async () => {
     const t = app();
-    idp.setUser(FAKE_USERS.dory!);
+    idp.setUser(FAKE_USERS.admin!);
     for (const evil of ["https://evil.example", "//evil.example", "/\\evil.example"]) {
       expect((await ssoLogin(t, evil)).location).toBe("/");
     }
