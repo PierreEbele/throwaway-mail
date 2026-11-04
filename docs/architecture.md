@@ -12,7 +12,8 @@ Sender → MX (Cloudflare) → Email Routing catch-all → Email Worker
 ```
 
 There is no SMTP server and no port 25: Cloudflare receives and forwards, the app stores, parses and decides. If the
-app is unreachable, the Worker forwards to `FALLBACK_FORWARD` or rejects with a temporary error.
+app is unreachable, the Worker forwards to the address's cached destinations (`ROUTES` KV) or `FALLBACK_FORWARD`,
+queues a copy for the app (`RETRY_QUEUE`), or else rejects with a temporary error (see operations.md).
 
 ### Second transport: IMAP/SMTP mailbox
 
