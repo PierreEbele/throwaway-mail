@@ -10,7 +10,8 @@ import { findUserByEmail, isLocalUser, normalizeEmail, validInvite } from "../au
 import type { Deps } from "../context.js";
 import { audit } from "../services/audit.js";
 import { userOut } from "../services/serialize.js";
-import { signIn, type LoginLimit } from "./auth.js";
+import { signIn } from "./auth.js";
+import { accountFailed, accountSucceeded, checkAccount, limitIp } from "../auth/limits.js";
 
 const email = z.string().trim().email().max(254);
 const name = z.string().trim().max(100).optional();
@@ -35,7 +36,7 @@ function signedIn(c: Parameters<typeof signIn>[0], user: User) {
 }
 
 /** E-mail + password accounts: first-run setup, login, password change and invite acceptance. */
-export function registerLocalAuth(r: ApiRouter, limit: LoginLimit) {
+export function registerLocalAuth(r: ApiRouter) {
   r.add(
     {
       method: "post",
@@ -46,7 +47,7 @@ export function registerLocalAuth(r: ApiRouter, limit: LoginLimit) {
       body: z.object({ email, name, password: passwordSchema }),
     },
     async (c, { body }) => {
-      limit(c);
+      limitIp(c);
       const d = c.get("deps");
       const passwordHash = await hashPassword(body.password);
       // Checked after hashing (async) so two concurrent requests cannot both pass.
@@ -70,17 +71,22 @@ export function registerLocalAuth(r: ApiRouter, limit: LoginLimit) {
       body: z.object({ email: z.string().max(254), password: z.string().max(1000) }),
     },
     async (c, { body }) => {
-      limit(c);
+      limitIp(c);
       const d = c.get("deps");
+      // Unknown e-mails are counted too, so lockouts do not reveal which accounts exist.
+      const accountKey = `login:${normalizeEmail(body.email)}`;
+      checkAccount(c, accountKey);
       const user = findUserByEmail(d, body.email);
       const ok =
         user && isLocalUser(user) && user.passwordHash
           ? await verifyPassword(body.password, user.passwordHash)
           : await verifyAgainstDummy(body.password);
       if (!ok || !user) {
+        accountFailed(c, accountKey);
         d.logger.info("password login refused", { ip: clientIp(c) });
         throw new HttpError(401, "invalid_credentials", "Wrong e-mail or password");
       }
+      accountSucceeded(c, accountKey);
       if (user.disabled) throw new HttpError(403, "account_disabled", "Your account is disabled in this app");
       d.logger.info("password login", { user_id: user.id, role: user.role });
       return signedIn(c, user);
@@ -97,12 +103,17 @@ export function registerLocalAuth(r: ApiRouter, limit: LoginLimit) {
       body: z.object({ current_password: z.string().max(1000), new_password: passwordSchema }),
     },
     async (c, { body }) => {
-      limit(c);
+      limitIp(c);
       const d = c.get("deps");
       const me = c.get("user")!;
       if (!isLocalUser(me) || !me.passwordHash) throw badRequest("Your password is managed by single sign-on");
-      if (!(await verifyPassword(body.current_password, me.passwordHash)))
+      const accountKey = `password:${me.id}`;
+      checkAccount(c, accountKey);
+      if (!(await verifyPassword(body.current_password, me.passwordHash))) {
+        accountFailed(c, accountKey);
         throw new HttpError(403, "invalid_credentials", "The current password is wrong");
+      }
+      accountSucceeded(c, accountKey);
       const passwordHash = await hashPassword(body.new_password);
       const current = c.get("session")?.id ?? "";
       d.db.transaction((tx) => {
@@ -125,7 +136,7 @@ export function registerLocalAuth(r: ApiRouter, limit: LoginLimit) {
       auth: "none",
     },
     (c) => {
-      limit(c);
+      limitIp(c);
       const d = c.get("deps");
       const inv = validInvite(d, c.req.param("token")!);
       if (!inv) return c.json({ valid: false, email: null, role: null, reset: false });
@@ -143,10 +154,16 @@ export function registerLocalAuth(r: ApiRouter, limit: LoginLimit) {
       body: z.object({ name, password: passwordSchema }),
     },
     async (c, { body }) => {
-      limit(c);
+      limitIp(c);
       const d = c.get("deps");
       const token = c.req.param("token")!;
-      if (!validInvite(d, token)) throw notFound("Invite (it may have expired or already been used)");
+      // Guessing tokens: invalid links count as failures of the caller's IP.
+      const accountKey = `invite:${clientIp(c)}`;
+      checkAccount(c, accountKey);
+      if (!validInvite(d, token)) {
+        accountFailed(c, accountKey);
+        throw notFound("Invite (it may have expired or already been used)");
+      }
       const passwordHash = await hashPassword(body.password);
       // Re-validated synchronously after hashing so a link can only be used once.
       const result = d.db.transaction((tx) => {

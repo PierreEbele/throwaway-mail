@@ -9,6 +9,7 @@ import type { Logger } from "./logger.js";
 import { dnsMxResolver, dnsResolver } from "./lib/outbound.js";
 import { realMailClients } from "./services/mailbox/clients.js";
 import { MailboxRunner } from "./services/mailbox/runner.js";
+import { AuthLimits } from "./auth/ratelimit.js";
 
 export function buildDeps(config: Config, logger: Logger, overrides: Partial<Deps> = {}): Deps {
   const db = overrides.db ?? openDatabase(config.databasePath, config.MIGRATIONS_DIR);
@@ -32,6 +33,12 @@ export function buildDeps(config: Config, logger: Logger, overrides: Partial<Dep
     resolve: dnsResolver,
     resolveMx: dnsMxResolver,
     mail: realMailClients,
+    authLimits: new AuthLimits({
+      ipLimit: config.LOGIN_RATE_LIMIT_PER_MINUTE,
+      ipWindowMs: 60_000,
+      accountFailures: config.LOGIN_MAX_FAILURES,
+      accountWindowMs: config.LOGIN_LOCKOUT_MINUTES * 60_000,
+    }),
     ...overrides,
   };
   deps.mailboxes ??= new MailboxRunner(deps as Deps);

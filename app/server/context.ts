@@ -9,6 +9,7 @@ import type { OidcService } from "./auth/oidc.js";
 import type { MxResolver, Resolver } from "./lib/outbound.js";
 import type { MailClients } from "./services/mailbox/types.js";
 import type { MailboxRunner } from "./services/mailbox/runner.js";
+import type { AuthLimits } from "./auth/ratelimit.js";
 
 export interface Deps {
   config: Config;
@@ -29,6 +30,8 @@ export interface Deps {
   mail: MailClients;
   /** Background pollers of IMAP domains (call sync() after adding, editing or removing one). */
   mailboxes: MailboxRunner;
+  /** Rate limits and lockout of login-like endpoints; replaced in tests. */
+  authLimits: AuthLimits;
 }
 
 export interface SessionInfo {

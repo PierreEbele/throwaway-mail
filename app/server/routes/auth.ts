@@ -7,7 +7,7 @@ import { users, type User } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
 import { HttpError } from "../lib/errors.js";
 import { SESSION_COOKIE, createSession, deleteSession } from "../auth/tokens.js";
-import { RateLimiter } from "../auth/ratelimit.js";
+import { limitIp } from "../auth/limits.js";
 import type { SsoIdentity } from "../auth/oidc.js";
 import type { Deps } from "../context.js";
 import { audit } from "../services/audit.js";
@@ -52,21 +52,6 @@ function loginRedirect(c: Ctx, code: string, message: string) {
   return c.redirect(`/login?${u}`, 302);
 }
 
-export type LoginLimit = (c: Ctx) => void;
-
-/** One per-IP budget shared by every login-like endpoint (SSO, password, setup, invites). */
-function loginLimiter(): LoginLimit {
-  let limiter: RateLimiter | null = null;
-  return (c) => {
-    limiter ??= new RateLimiter(c.get("deps").config.LOGIN_RATE_LIMIT_PER_MINUTE);
-    const res = limiter.hit(`login:${clientIp(c)}`);
-    if (!res.ok) {
-      c.header("retry-after", String(res.retryAfter));
-      throw new HttpError(429, "rate_limited", `Too many attempts, retry in ${res.retryAfter}s`);
-    }
-  };
-}
-
 /** Opens a browser session for the user (session cookie) and records the sign-in. */
 export function signIn(c: Ctx, user: User) {
   const d = c.get("deps");
@@ -86,8 +71,6 @@ const hasUsers = (d: Deps) => !!d.db.select({ id: users.id }).from(users).limit(
 
 /** Local accounts routes are only registered when local login is enabled (otherwise they 404). */
 export function registerAuth(r: ApiRouter, localLogin: boolean) {
-  const limit = loginLimiter();
-
   r.add({ method: "get", path: "/v1/auth/status", summary: "Login methods and Cloudflare mode", tags: ["auth"], auth: "none" }, (c) => {
     const d = c.get("deps");
     const local = d.config.localLoginEnabled;
@@ -98,7 +81,7 @@ export function registerAuth(r: ApiRouter, localLogin: boolean) {
     });
   });
 
-  if (localLogin) registerLocalAuth(r, limit);
+  if (localLogin) registerLocalAuth(r);
 
   r.add(
     {
@@ -111,7 +94,7 @@ export function registerAuth(r: ApiRouter, localLogin: boolean) {
       responses: { 302: "Redirect to the identity provider" },
     },
     async (c, { query }) => {
-      limit(c);
+      limitIp(c);
       const d = c.get("deps");
       try {
         const { url, state } = await d.oidc.start(query.return_to ?? "/", c.req.header("host"));
@@ -140,7 +123,7 @@ export function registerAuth(r: ApiRouter, localLogin: boolean) {
       responses: { 302: "Redirect into the app, or to /login with an error" },
     },
     async (c) => {
-      limit(c);
+      limitIp(c);
       const d = c.get("deps");
       const url = new URL(c.req.url);
       const browserState = getCookie(c, STATE_COOKIE);

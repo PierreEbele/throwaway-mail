@@ -33,6 +33,9 @@ const EnvSchema = z.object({
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().default(240),
   LOGIN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().default(10),
+  /** Failed sign-in / two-factor attempts per account before it is locked out for LOGIN_LOCKOUT_MINUTES. */
+  LOGIN_MAX_FAILURES: z.coerce.number().int().min(1).default(10),
+  LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().min(1).default(15),
   SESSION_TTL_DAYS: z.coerce.number().int().default(14),
   PARSER_LLM_FALLBACK: bool,
   // Single sign-on (OpenID Connect). Optional when local accounts are enabled (LOCAL_LOGIN).
