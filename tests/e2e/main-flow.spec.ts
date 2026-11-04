@@ -49,7 +49,11 @@ test("SSO sign-in, domain, address lifecycle and live code", async ({ page, requ
   // Rename
   await page.getByRole("button", { name: "Edit site" }).click();
   await page.getByLabel("Site name").fill("GitHub (work)");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page
+    .locator("form")
+    .filter({ has: page.getByLabel("Site name") })
+    .getByRole("button", { name: "Save" })
+    .click();
   await expect(page.getByRole("heading", { name: /GitHub \(work\)/ })).toBeVisible();
 
   // Pause / resume
