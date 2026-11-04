@@ -1,10 +1,61 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { ingestSignature } from "../../app/server/routes/ingest.js";
 
 const DOMAIN = "mail.example.test";
 const OUT = "docs/images";
+
+const SITES = [
+  {
+    name: "Discord",
+    url: "discord.com",
+    local: "quiet-heron-2210",
+    mail: "discord-verify-email.eml",
+    from: "noreply@discord.com",
+    category: "Social",
+  },
+  {
+    name: "Steam",
+    url: "store.steampowered.com",
+    local: "brave-falcon-7742",
+    mail: "steam-guard.eml",
+    from: "noreply@steampowered.com",
+    category: "Games",
+  },
+  {
+    name: "PayPal",
+    url: "paypal.com",
+    local: "calm-badger-1187",
+    mail: "paypal-code.eml",
+    from: "service@paypal.fr",
+    category: "Shopping",
+  },
+  {
+    name: "Amazon",
+    url: "amazon.com",
+    local: "amber-lynx-5307",
+    mail: "amazon-otp.eml",
+    from: "account-update@amazon.com",
+    category: "Shopping",
+  },
+  {
+    name: "Microsoft",
+    url: "microsoft.com",
+    local: "misty-crane-6034",
+    mail: "microsoft-security-code.eml",
+    from: "account-security-noreply@accountprotection.microsoft.com",
+    category: "Dev",
+  },
+  {
+    name: "GitHub",
+    url: "github.com",
+    local: "silver-otter-4821",
+    mail: "github-device-verification.eml",
+    from: "noreply@github.com",
+    category: "Dev",
+  },
+];
 
 async function deliver(request: APIRequestContext, to: string, from: string, fixture: string) {
   const raw = fs.readFileSync(path.resolve("tests/fixtures", fixture));
@@ -22,7 +73,19 @@ async function deliver(request: APIRequestContext, to: string, from: string, fix
   expect(res.ok()).toBeTruthy();
 }
 
-test("README screenshots", async ({ page, request }) => {
+/** Waits for toasts to disappear, then saves docs/images/<name>.png. */
+async function shot(page: Page, name: string) {
+  await expect(page.locator('[role="status"][aria-live] > *')).toHaveCount(0, { timeout: 10_000 });
+  await page.screenshot({ path: `${OUT}/${name}.png` });
+}
+
+async function open(page: Page, url: string, heading: string | RegExp) {
+  await page.goto(url);
+  await expect(page.getByRole("heading", { name: heading }).first()).toBeVisible();
+}
+
+test("documentation screenshots", async ({ page, request }) => {
+  test.setTimeout(120_000);
   await page.goto("/");
   await page.getByRole("link", { name: "Sign in with Authelia" }).click();
   await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
@@ -32,27 +95,52 @@ test("README screenshots", async ({ page, request }) => {
   await page.getByRole("button", { name: "Add domain" }).click();
   await expect(page.getByTestId(`domain-${DOMAIN}`).getByText("active", { exact: true })).toBeVisible();
 
-  const sites = [
-    { name: "Discord", url: "discord.com", local: "quiet-heron-2210", mail: "discord-verify-email.eml", from: "noreply@discord.com" },
-    { name: "Amazon", url: "amazon.com", local: "amber-lynx-5307", mail: "amazon-otp.eml", from: "account-update@amazon.com" },
-    { name: "GitHub", url: "github.com", local: "silver-otter-4821", mail: "github-device-verification.eml", from: "noreply@github.com" },
-  ];
-  for (const s of sites) {
+  await page.getByRole("link", { name: "Inbox" }).click();
+  for (const category of new Set(SITES.map((s) => s.category))) {
+    await page.getByRole("button", { name: "New category" }).click();
+    await page.getByLabel("Name").fill(category);
+    await page.getByRole("button", { name: "Create", exact: true }).click();
+    await expect(page.getByRole("link", { name: new RegExp(`^${category}`) })).toBeVisible();
+  }
+
+  for (const s of SITES) {
     await page.getByRole("link", { name: "Inbox" }).click();
     await page.getByRole("button", { name: "+ New" }).click();
     await page.getByLabel("Site name").fill(s.name);
     await page.getByLabel(/Site URL/).fill(s.url);
     await page.getByLabel(/Local part/).fill(s.local);
+    if (s.name === "GitHub") await shot(page, "new-address");
     await page.getByRole("button", { name: "Create address" }).click();
     await expect(page.getByRole("heading", { name: s.name })).toBeVisible();
+    await page.getByLabel("Category", { exact: true }).selectOption({ label: s.category });
     await deliver(request, `${s.local}@${DOMAIN}`, s.from, s.mail);
   }
+  await page.getByRole("button", { name: "Pin", exact: true }).click();
   await expect(page.getByTestId("latest-code")).toHaveText("593201");
-  await expect(page.locator('[role="status"][aria-live] > *')).toHaveCount(0, { timeout: 10_000 }); // toasts gone
-  await page.screenshot({ path: `${OUT}/address.png` });
+  await page.getByRole("link", { name: "Inbox" }).click();
+  await page.getByRole("link", { name: /GitHub, silver-otter-4821/ }).click();
+  await expect(page.getByTestId("latest-code")).toHaveText("593201");
+  await shot(page, "inbox");
 
-  await page.goto("/admin/setup-check");
-  await expect(page.getByRole("heading", { name: "Setup check" })).toBeVisible();
+  await page.getByRole("link", { name: /^Shopping/ }).click();
+  await expect(page.getByRole("heading", { name: "Shopping" })).toBeVisible();
+  await shot(page, "category");
+
+  await open(page, "/digest", /This week/);
+  await shot(page, "digest");
+  await open(page, "/destinations", /Destinations/);
+  await shot(page, "destinations");
+  await open(page, "/keys", /API keys/);
+  await shot(page, "api-keys");
+  await open(page, "/admin/domains", /Domains/);
+  await shot(page, "domains");
+  await open(page, "/admin/users", /Users/);
+  await shot(page, "users");
+  await open(page, "/admin/audit", "Audit log");
+  await shot(page, "audit-log");
+  await open(page, "/admin/health", /Health/);
+  await shot(page, "health");
+  await open(page, "/admin/setup-check", "Setup check");
   await page.getByText(/checked/).waitFor();
-  await page.screenshot({ path: `${OUT}/setup-check.png` });
+  await shot(page, "setup-check");
 });
