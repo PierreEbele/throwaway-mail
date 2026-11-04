@@ -202,7 +202,7 @@ for (const id of Object.keys(TOGGLES))
   else if (!active) status("No provider set up yet: identities use @example.com addresses.");
 })();
 
-// Firefox (MV3) and the optional host permission on Chrome: "all sites" is asked for with a click.
+// Firefox (MV3) does not grant "all sites" at install time: ask for it (needs a click).
 const ALL_SITES = { origins: ["http://*/*", "https://*/*"] };
 async function checkSitePermission() {
   const banner = document.getElementById("perm-banner");

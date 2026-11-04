@@ -27,6 +27,7 @@ globalThis.AliasProviders = (() => {
   // "shop.example.co.uk" -> "example": the readable part of a host name, for local parts.
   const SECOND_LEVEL = new Set(["co", "com", "org", "net", "gov", "ac", "edu", "ne", "or", "gouv"]);
   function siteLabel(host) {
+    if (/^[\d.]+$|:/.test(String(host || ""))) return "site"; // IP address: no name to show
     const parts = String(host || "")
       .toLowerCase()
       .replace(/^www\d*\./, "")

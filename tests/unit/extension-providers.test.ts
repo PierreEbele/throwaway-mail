@@ -95,6 +95,7 @@ describe("alias providers", () => {
     expect(a).toMatchObject({ host: "www.netflix.com", provider: "none" });
     expect(P.siteLabel("shop.bbc.co.uk")).toBe("bbc");
     expect(P.siteLabel("localhost")).toBe("localhost");
+    expect(P.siteLabel("127.0.0.1")).toBe("site");
     const local = P.get("none");
     expect((await local.createAlias({ mode: "plus", address: "Me@Gmail.com" }, ctx)).email).toBe("me+example@gmail.com");
     expect(local.configured({ mode: "plus", address: "not-an-address" })).toBe(false);
