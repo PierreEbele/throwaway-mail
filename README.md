@@ -40,7 +40,7 @@ app polls a catch-all mailbox of any provider over IMAP and forwards over SMTP. 
 **Integrations**
 
 - Push notifications: ntfy, Gotify, Telegram, signed webhooks
-- Firefox extension: fills sign-up forms with a fresh address and pastes the code
+- Firefox and Chrome extension: fills sign-up forms with a fresh address and pastes the code
 - Bitwarden / Vaultwarden username generator (SimpleLogin and addy.io compatible API)
 - REST API with OpenAPI docs, live events (SSE) and a [Node.js SDK](sdk/README.md)
 
@@ -73,7 +73,7 @@ pnpm simulate --to <address> tests/fixtures/github-device-verification.eml
 - [User guide](docs/user-guide.md)
 - [Configuration](docs/configuration.md) · [Operations](docs/operations.md)
 - [API](docs/api.md) · [Node.js SDK](sdk/README.md)
-- [Firefox extension](docs/extension.md) · [Bitwarden](docs/bitwarden.md)
+- [Browser extension](docs/extension.md) · [Bitwarden](docs/bitwarden.md)
 - [Architecture](docs/architecture.md) · [Development](docs/development.md) · [Design decisions](DECISIONS.md)
 
 ## Requirements

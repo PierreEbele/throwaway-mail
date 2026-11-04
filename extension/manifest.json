@@ -32,12 +32,12 @@
   },
   "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
-    "scripts": ["generator.js", "throwaway.js", "background.js"]
+    "scripts": ["compat.js", "generator.js", "throwaway.js", "background.js"]
   },
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["content.js"],
+      "js": ["compat.js", "content.js"],
       "run_at": "document_idle"
     }
   ]

@@ -1,6 +1,6 @@
 "use strict";
 // Throwaway Mail API client (Bearer API key). Shared by the popup and the options page.
-// The key stays in this Firefox profile's browser.storage.local and is only sent to the configured server.
+// The key stays in this browser profile's extension storage (browser.storage.local) and is only sent to the configured server.
 const Throwaway = (() => {
   const KEYS = ["tmServer", "tmApiKey", "tmDomain"];
 
