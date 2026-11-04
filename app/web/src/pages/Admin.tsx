@@ -11,6 +11,7 @@ import { fullDate, timeAgo } from "../util";
 import { AddDomainForm, POLICY_HELP } from "./admin/AddDomainForm";
 import { MailboxPanel } from "./admin/MailboxPanel";
 import { BackupCard, ProbeCard, type BackupHealth, type ProbeHealth } from "./admin/ReliabilityCards";
+import { AutoCreatePanel } from "./admin/AutoCreatePanel";
 
 export function DomainsPage() {
   const qc = useQueryClient();
@@ -130,6 +131,7 @@ export function DomainsPage() {
                 </button>
               </div>
             </div>
+            {d.unknown_policy === "auto_create" && <AutoCreatePanel d={d} users={usersQ.data} />}
             {d.previous_catch_all &&
               (() => {
                 const oldFwd = d.previous_catch_all.actions.find((a) => a.type === "forward")?.value?.[0];

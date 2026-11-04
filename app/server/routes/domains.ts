@@ -2,12 +2,13 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { ApiRouter } from "../lib/http.js";
 import { clientIp } from "../lib/http.js";
-import { addresses, domainMailboxes, domains, messages, users, type Domain } from "../db/schema.js";
+import { addresses, categories, domainMailboxes, domains, messages, users, type Domain } from "../db/schema.js";
 import type { Deps } from "../context.js";
 import { newId } from "../lib/crypto.js";
 import { DOMAIN_RE } from "../lib/email.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { audit } from "../services/audit.js";
+import { categoryByName } from "../services/categories.js";
 import { checkDomain, restoreCatchAll } from "../services/domains.js";
 import { domainOut } from "../services/serialize.js";
 import { getMailbox, mailboxInput, mailboxOut, mailboxValues } from "../services/mailbox/settings.js";
@@ -17,7 +18,14 @@ function ownerOf(d: Deps, dom: Domain) {
 }
 function full(d: Deps, dom: Domain) {
   const mailbox = dom.transport === "imap" ? getMailbox(d, dom.id) : null;
-  return { ...domainOut(dom, true, ownerOf(d, dom)), ...(mailbox ? { mailbox: mailboxOut(mailbox) } : {}) };
+  const category = dom.autoCreateCategoryId
+    ? (d.db.select({ name: categories.name }).from(categories).where(eq(categories.id, dom.autoCreateCategoryId)).get()?.name ?? null)
+    : null;
+  return {
+    ...domainOut(dom, true, ownerOf(d, dom)),
+    auto_create_category: category,
+    ...(mailbox ? { mailbox: mailboxOut(mailbox) } : {}),
+  };
 }
 
 /** Hand a domain (and its "To sort" box with the mail in it) over to another user. */
@@ -34,6 +42,41 @@ function transferDomain(d: Deps, dom: Domain, newOwnerId: string) {
       tx.update(messages).set({ userId: newOwnerId }).where(eq(messages.addressId, b.id)).run();
     }
   });
+}
+
+const autoCreateFields = {
+  auto_create_user_id: z.string().nullable().optional().describe("auto_create: owner of created addresses (null: the domain owner)"),
+  auto_create_category: z
+    .string()
+    .trim()
+    .max(40)
+    .nullable()
+    .optional()
+    .describe("auto_create: category name for created addresses, created for that user if missing (null/empty: matched from the sender)"),
+};
+
+/** Validates the auto-create settings; returns the column values to store. */
+function autoCreateValues(
+  d: Deps,
+  body: { auto_create_user_id?: string | null; auto_create_category?: string | null },
+  current: { userId: string | null; ownerId: string | null; categoryId: string | null },
+) {
+  const set: { autoCreateUserId?: string | null; autoCreateCategoryId?: string | null } = {};
+  let userId = current.userId;
+  if (body.auto_create_user_id !== undefined) {
+    if (body.auto_create_user_id && !d.db.select().from(users).where(eq(users.id, body.auto_create_user_id)).get())
+      throw badRequest("Unknown auto_create_user_id");
+    userId = set.autoCreateUserId = body.auto_create_user_id || null;
+    // The category belongs to a user: changing the user without naming a category resets it.
+    if (body.auto_create_category === undefined && userId !== current.userId) set.autoCreateCategoryId = null;
+  }
+  if (body.auto_create_category !== undefined) {
+    const effective = userId ?? current.ownerId;
+    const user = effective ? d.db.select().from(users).where(eq(users.id, effective)).get() : undefined;
+    if (body.auto_create_category && !user) throw badRequest("The domain has no owner to create the category for");
+    set.autoCreateCategoryId = body.auto_create_category ? categoryByName(d, user!, body.auto_create_category, true) : null;
+  }
+  return set;
 }
 
 export function registerDomains(r: ApiRouter) {
@@ -62,6 +105,7 @@ export function registerDomains(r: ApiRouter) {
         owner_id: z.string().optional(),
         transport: z.enum(["cloudflare", "imap"]).default("cloudflare"),
         mailbox: mailboxInput.optional(),
+        ...autoCreateFields,
       }),
       description:
         'owner_id: user who receives the domain\'s "To sort" box (default: you). transport "imap" needs `mailbox` (passwords are write-only and stored encrypted with APP_SECRET); the domain becomes active once the connection test passes.',
@@ -80,6 +124,7 @@ export function registerDomains(r: ApiRouter) {
         createdBy: body.owner_id ?? c.get("user")!.id,
         createdAt: d.now(),
       };
+      Object.assign(row, autoCreateValues(d, body, { userId: null, ownerId: row.createdBy, categoryId: null }));
       const mailbox = body.transport === "imap" ? mailboxValues(d, body.mailbox!) : null;
       d.db.transaction((tx) => {
         tx.insert(domains).values(row).run();
@@ -109,6 +154,7 @@ export function registerDomains(r: ApiRouter) {
         forward_unknown: z.boolean().optional(),
         owner_id: z.string().optional(),
         mailbox: mailboxInput.optional(),
+        ...autoCreateFields,
       }),
     },
     async (c, { body }) => {
@@ -118,6 +164,14 @@ export function registerDomains(r: ApiRouter) {
       if (!dom) throw notFound("Domain");
       const set: Partial<typeof dom> = {};
       if (body.unknown_policy) set.unknownPolicy = body.unknown_policy;
+      Object.assign(
+        set,
+        autoCreateValues(d, body, {
+          userId: dom.autoCreateUserId,
+          ownerId: body.owner_id ?? dom.createdBy,
+          categoryId: dom.autoCreateCategoryId,
+        }),
+      );
       if (body.forward_unknown !== undefined) {
         const previous = dom.previousCatchAllJson
           ? (JSON.parse(dom.previousCatchAllJson) as { actions: Array<{ type: string; value?: string[] }> })

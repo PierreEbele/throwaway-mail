@@ -28,6 +28,8 @@ export function domainOut(d: Domain, full: boolean, owner?: { id: string; name: 
     dns_missing: d.dnsMissingJson ? JSON.parse(d.dnsMissingJson) : [],
     previous_catch_all: d.previousCatchAllJson ? JSON.parse(d.previousCatchAllJson) : null,
     catchall_forward_to: d.catchallForwardTo,
+    auto_create_user_id: d.autoCreateUserId,
+    auto_create_category_id: d.autoCreateCategoryId,
     created_at: d.createdAt,
     last_checked_at: d.lastCheckedAt,
     last_ingest_at: d.lastIngestAt,

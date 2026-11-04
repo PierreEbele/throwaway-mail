@@ -130,6 +130,9 @@ export interface Domain {
   owner?: { id: string; name: string | null; email: string } | null;
   previous_catch_all?: { enabled: boolean; actions: Array<{ type: string; value?: string[] }> } | null;
   catchall_forward_to?: string | null;
+  auto_create_user_id?: string | null;
+  auto_create_category_id?: string | null;
+  auto_create_category?: string | null;
   dns_missing?: DnsRecord[];
   created_at?: number;
   last_checked_at?: number | null;

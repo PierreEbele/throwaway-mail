@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import type { Deps } from "../../context.js";
-import { addresses, directories, users, type Address, type Domain } from "../../db/schema.js";
+import { addresses, categories, directories, users, type Address, type Domain } from "../../db/schema.js";
 import { newId } from "../../lib/crypto.js";
 import { LOCAL_PART_RE } from "../../lib/email.js";
 import { matchCategory } from "../categories.js";
@@ -18,26 +18,39 @@ function resolveUnknown(deps: Deps, domain: Domain, local: string, senderDomain:
   if (!owner || domain.unknownPolicy === "reject") return null;
   const now = deps.now();
   if (domain.unknownPolicy === "auto_create" && LOCAL_PART_RE.test(local)) {
+    // Catch-all auto-create: the configured user (else the domain owner) gets a real address on the fly.
+    const userId =
+      (domain.autoCreateUserId && deps.db.select({ id: users.id }).from(users).where(eq(users.id, domain.autoCreateUserId)).get()?.id) ||
+      owner;
+    const fixedCategory = domain.autoCreateCategoryId
+      ? deps.db
+          .select({ id: categories.id })
+          .from(categories)
+          .where(and(eq(categories.id, domain.autoCreateCategoryId), eq(categories.userId, userId)))
+          .get()?.id
+      : undefined;
+    const siteUrl = senderDomain ? `https://${senderDomain}` : null;
     const row = {
       id: newId("adr"),
-      userId: owner,
+      userId,
       domainId: domain.id,
       localPart: local,
       siteName: senderDomain ? senderDomain : "Auto-created",
-      siteUrl: senderDomain ? `https://${senderDomain}` : null,
+      siteUrl,
       label: "auto-created",
-      categoryId: matchCategory(deps, owner, senderDomain ?? "", senderDomain ? `https://${senderDomain}` : null),
+      categoryId: fixedCategory ?? matchCategory(deps, userId, senderDomain ?? "", siteUrl),
       createdAt: now,
       updatedAt: now,
     };
-    deps.db.insert(addresses).values(row).onConflictDoNothing().run();
-    return (
+    const created = deps.db.insert(addresses).values(row).onConflictDoNothing().run().changes === 1;
+    const a =
       deps.db
         .select()
         .from(addresses)
         .where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, local)))
-        .get() ?? null
-    );
+        .get() ?? null;
+    if (a && created) deps.bus.publish(a.userId, { type: "address.created", address_id: a.id });
+    return a;
   }
   // "inbox" (or auto_create with an unusable local part): the domain owner's unassigned box.
   deps.db
