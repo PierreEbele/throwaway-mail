@@ -6,6 +6,7 @@ import { badRequest } from "../lib/errors.js";
 import { addressOut } from "../services/serialize.js";
 import { categoryByName, checkCategory } from "../services/categories.js";
 import { domainOf, repliesUnavailableReason } from "../services/replies.js";
+import { noMailWarning } from "../services/sites.js";
 import { addressWithCounts, checkDestination, createAddress, messageCounts, ownedAddress } from "../services/addresses.js";
 
 const SiteUrl = z
@@ -27,11 +28,17 @@ export function registerAddresses(r: ApiRouter) {
       path: "/v1/addresses",
       summary: "Create an address for a site",
       description:
-        "The local part defaults to a readable random string (word-word-1234). `domain` is a domain name or id; defaults to the first active domain.",
+        "The local part defaults to a readable random string (word-word-1234). `domain` is a domain name or id. Without it, the domain follows the user's domain choice (first, random, rotate) and skips domains the site is known to reject (`avoided_domains` in the response).",
       tags: ["addresses"],
       auth: "user",
       body: z.object({
         domain: z.string().trim().toLowerCase().optional(),
+        preferred_domain: z
+          .string()
+          .trim()
+          .toLowerCase()
+          .optional()
+          .describe("Domain to use when `domain` is not given, unless the site is known to reject it"),
         site_name: z.string().trim().min(1).max(120),
         site_url: SiteUrl.optional(),
         local_part: z.string().trim().toLowerCase().optional(),
@@ -60,9 +67,9 @@ export function registerAddresses(r: ApiRouter) {
       if (body.category !== undefined && body.category_id !== undefined) throw badRequest("Pass category or category_id, not both");
       const { category, create_category, ...rest } = body;
       const category_id = category !== undefined ? categoryByName(d, user, category, create_category) : rest.category_id;
-      const { a, domain } = createAddress(d, user, { ...rest, category_id });
+      const { a, domain, avoided } = createAddress(d, user, { ...rest, category_id });
       const o = addressWithCounts(d, a, domain);
-      return c.json({ id: a.id, email: o.email, address: o }, 201);
+      return c.json({ id: a.id, email: o.email, address: o, avoided_domains: avoided }, 201);
     },
   );
 
@@ -153,7 +160,13 @@ export function registerAddresses(r: ApiRouter) {
         d,
         rows.map((x) => x.a.id),
       );
-      return c.json({ addresses: rows.map((x) => addressOut(x.a, x.domain, cnt.get(x.a.id))) });
+      const now = d.now();
+      return c.json({
+        addresses: rows.map((x) => ({
+          ...addressOut(x.a, x.domain, cnt.get(x.a.id)),
+          no_mail_warning: noMailWarning(x.a, cnt.get(x.a.id)?.total ?? 0, now, user.noMailWarnMinutes),
+        })),
+      });
     },
   );
 

@@ -1,6 +1,17 @@
-import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import type { Deps } from "../context.js";
-import { addressDestinations, addresses, destinations, domains, extractedItems, messages, type Address, type User } from "../db/schema.js";
+import {
+  addressDestinations,
+  addresses,
+  destinations,
+  domains,
+  extractedItems,
+  messages,
+  siteRejections,
+  users,
+  type Address,
+  type User,
+} from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
 import { LOCAL_PART_RE } from "../lib/email.js";
 import { readableLocalPart } from "../lib/words.js";
@@ -8,6 +19,7 @@ import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { addressOut } from "./serialize.js";
 import { checkCategory, matchCategory } from "./categories.js";
 import { domainOf, repliesUnavailableReason } from "./replies.js";
+import { noMailWarning, pickDomain } from "./sites.js";
 
 export function messageCounts(deps: Deps, ids: string[]) {
   const map = new Map<string, { unread: number; total: number }>();
@@ -38,7 +50,12 @@ export function ownedAddress(deps: Deps, user: User, id: string) {
   return row;
 }
 
+export function warnMinutes(deps: Deps, userId: string): number {
+  return deps.db.select({ m: users.noMailWarnMinutes }).from(users).where(eq(users.id, userId)).get()?.m ?? 0;
+}
+
 export function addressWithCounts(deps: Deps, a: Address, domain: string) {
+  const counts = messageCounts(deps, [a.id]).get(a.id);
   const extra = deps.db
     .select({ id: addressDestinations.destinationId })
     .from(addressDestinations)
@@ -46,10 +63,14 @@ export function addressWithCounts(deps: Deps, a: Address, domain: string) {
     .all()
     .map((x) => x.id);
   return {
-    ...addressOut(a, domain, messageCounts(deps, [a.id]).get(a.id)),
+    ...addressOut(a, domain, counts),
     extra_destination_ids: extra,
     /** Why reverse-alias replies cannot be used on this address's domain (null: they can). */
     replies_unavailable: repliesUnavailableReason(deps, domainOf(deps, a)),
+    /** Nothing received yet, some minutes after creation: the site may not have sent its code, or rejected the domain. */
+    no_mail_warning: noMailWarning(a, counts?.total ?? 0, deps.now(), warnMinutes(deps, a.userId)),
+    /** The user reported that this address's site rejected its domain. */
+    site_rejected: !!deps.db.select({ id: siteRejections.id }).from(siteRejections).where(eq(siteRejections.addressId, a.id)).get(),
   };
 }
 
@@ -85,17 +106,22 @@ export interface NewAddress {
   expires_in_days?: number;
   /** Pause the address automatically after this many mails. */
   max_messages?: number | null;
+  /** Used when `domain` is not given, unless the site rejected it. */
+  preferred_domain?: string;
+  /** Never pick these domains (when `domain` is not given). */
+  exclude_domain_ids?: string[];
 }
 
 /** Creates an address for `user`. Shared by `POST /v1/addresses` and the alias-service compatibility API. */
-export function createAddress(d: Deps, user: User, body: NewAddress): { a: Address; domain: string } {
+export function createAddress(d: Deps, user: User, body: NewAddress): { a: Address; domain: string; avoided: string[] } {
+  const pick = body.domain ? null : pickDomain(d, user, body, { preferred: body.preferred_domain, exclude: body.exclude_domain_ids });
   const domain = body.domain
     ? d.db
         .select()
         .from(domains)
         .where(or(eq(domains.name, body.domain), eq(domains.id, body.domain)))
         .get()
-    : d.db.select().from(domains).where(eq(domains.status, "active")).orderBy(asc(domains.createdAt)).get();
+    : pick!.domain;
   if (!domain) throw badRequest(body.domain ? `Unknown domain ${body.domain}` : "No active domain is configured yet");
   if (domain.status !== "active") throw badRequest(`Domain ${domain.name} is not active yet`);
   if (body.local_part !== undefined && !LOCAL_PART_RE.test(body.local_part)) {
@@ -127,9 +153,56 @@ export function createAddress(d: Deps, user: User, body: NewAddress): { a: Addre
     if (res.changes === 1) {
       const a = d.db.select().from(addresses).where(eq(addresses.id, row.id)).get()!;
       d.bus.publish(user.id, { type: "address.created", address_id: a.id });
-      return { a, domain: domain.name };
+      return { a, domain: domain.name, avoided: pick?.avoided.map((x) => x.name) ?? [] };
     }
     if (body.local_part) throw conflict(`${body.local_part}@${domain.name} is already taken`);
   }
   throw conflict("Could not allocate a unique address, try again");
+}
+
+/**
+ * Create a fresh address for the same site (copying category, forwarding, pin and protections) and pause or archive
+ * the old one. The new address keeps the old domain unless `exclude_domain_ids` asks for another one.
+ */
+export function replaceAddress(
+  d: Deps,
+  user: User,
+  old: Address,
+  opts: { archive_old?: boolean; exclude_domain_ids?: string[] } = {},
+): { a: Address; domain: string } {
+  const { a, domain } = createAddress(d, user, {
+    domain: opts.exclude_domain_ids ? undefined : old.domainId,
+    exclude_domain_ids: opts.exclude_domain_ids,
+    site_name: old.siteName,
+    site_url: old.siteUrl,
+    label: old.label ?? undefined,
+    forward: old.forwardEnabled,
+    destination_id: old.destinationId ?? undefined,
+    category_id: old.categoryId,
+  });
+  d.db
+    .update(addresses)
+    .set({
+      pinned: old.pinned,
+      blockPromos: old.blockPromos,
+      siteLock: old.siteLock,
+      blockedSendersJson: old.blockedSendersJson,
+      trustedSendersJson: old.trustedSendersJson,
+    })
+    .where(eq(addresses.id, a.id))
+    .run();
+  d.db
+    .update(addresses)
+    .set({
+      status: opts.archive_old ? "archived" : "paused",
+      pinned: false,
+      leakSender: null,
+      leakAt: null,
+      label: `replaced by ${a.localPart}@${domain}`,
+      updatedAt: d.now(),
+    })
+    .where(eq(addresses.id, old.id))
+    .run();
+  d.bus.publish(user.id, { type: "address.updated", address_id: old.id });
+  return { a: d.db.select().from(addresses).where(eq(addresses.id, a.id)).get()!, domain };
 }

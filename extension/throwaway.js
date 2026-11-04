@@ -56,12 +56,19 @@ const Throwaway = (() => {
         site_name: url.hostname,
         site_url: url.origin,
         label: label ? `Throwaway Mail · ${label}` : "Throwaway Mail",
-        ...(c.domain ? { domain: c.domain } : {}),
+        // preferred, not forced: the server skips a domain this site is known to reject.
+        ...(c.domain ? { preferred_domain: c.domain } : {}),
         ...(c.expiresDays ? { expires_in_days: c.expiresDays } : {}),
         ...(c.maxMessages ? { max_messages: c.maxMessages } : {}),
       },
     });
-    return { id: data.id, email: data.email, host: url.hostname, createdAt: data.address?.created_at ?? Date.now() };
+    return {
+      id: data.id,
+      email: data.email,
+      host: url.hostname,
+      createdAt: data.address?.created_at ?? Date.now(),
+      avoidedDomains: data.avoided_domains || [],
+    };
   }
 
   // Address already created for this site (site_name = exact host name; server-side `site` is a LIKE).

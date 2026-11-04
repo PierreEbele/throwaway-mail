@@ -5,7 +5,7 @@ import { DAY } from "../lib/time.js";
 import { addresses } from "../db/schema.js";
 import { addressOut } from "../services/serialize.js";
 import { checkCategory } from "../services/categories.js";
-import { createAddress, ownedAddress } from "../services/addresses.js";
+import { ownedAddress, replaceAddress } from "../services/addresses.js";
 
 /** Replacing, extending and mass-pausing addresses. */
 export function registerLifecycle(r: ApiRouter) {
@@ -24,43 +24,8 @@ export function registerLifecycle(r: ApiRouter) {
       const d = c.get("deps");
       const user = c.get("user")!;
       const { a: old } = ownedAddress(d, user, c.req.param("id")!);
-      const { a, domain } = createAddress(d, user, {
-        domain: old.domainId,
-        site_name: old.siteName,
-        site_url: old.siteUrl,
-        label: old.label ?? undefined,
-        forward: old.forwardEnabled,
-        destination_id: old.destinationId ?? undefined,
-        category_id: old.categoryId,
-      });
-      d.db
-        .update(addresses)
-        .set({
-          pinned: old.pinned,
-          blockPromos: old.blockPromos,
-          siteLock: old.siteLock,
-          blockedSendersJson: old.blockedSendersJson,
-          trustedSendersJson: old.trustedSendersJson,
-        })
-        .where(eq(addresses.id, a.id))
-        .run();
-      d.db
-        .update(addresses)
-        .set({
-          status: body.archive_old ? "archived" : "paused",
-          pinned: false,
-          leakSender: null,
-          leakAt: null,
-          label: `replaced by ${a.localPart}@${domain}`,
-          updatedAt: d.now(),
-        })
-        .where(eq(addresses.id, old.id))
-        .run();
-      d.bus.publish(user.id, { type: "address.updated", address_id: old.id });
-      return c.json(
-        { address: addressOut(d.db.select().from(addresses).where(eq(addresses.id, a.id)).get()!, domain), replaced_id: old.id },
-        201,
-      );
+      const { a, domain } = replaceAddress(d, user, old, { archive_old: body.archive_old });
+      return c.json({ address: addressOut(a, domain), replaced_id: old.id }, 201);
     },
   );
 

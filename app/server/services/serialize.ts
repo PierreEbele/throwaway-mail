@@ -15,6 +15,10 @@ export function userOut(u: User) {
     two_factor: u.totpEnabledAt !== null && !!u.totpSecret,
     created_at: u.createdAt,
     last_login_at: u.lastLoginAt,
+    /** Domain of new addresses when none is given: "first", "random" or "rotate". */
+    domain_choice: u.domainChoice,
+    /** Minutes after which an address that received nothing is flagged (0: never). */
+    no_mail_warn_minutes: u.noMailWarnMinutes,
   };
 }
 

@@ -28,6 +28,12 @@ export const users = sqliteTable("users", {
    * Null: forwards keep every original header.
    */
   forwardHeaderAllowlistJson: text("forward_header_allowlist_json"),
+  /** Domain of new addresses when none is given: "first" active domain, a "random" one, or "rotate" through them. */
+  domainChoice: text("domain_choice", { enum: ["first", "random", "rotate"] })
+    .notNull()
+    .default("first"),
+  /** Flag addresses that received nothing this many minutes after creation (0: never). */
+  noMailWarnMinutes: integer("no_mail_warn_minutes").notNull().default(15),
 });
 
 /** One-time two-factor recovery codes (sha256 hashes). */
@@ -510,6 +516,30 @@ export const reverseContacts = sqliteTable(
   (t) => [uniqueIndex("reverse_contacts_address_email_uq").on(t.addressId, t.email)],
 );
 
+/**
+ * A site refused an address on one of our domains ("this site rejected the address"). `site` is the normalised site
+ * key (host without www, or the lower-case site name). Used to pick another domain for that site automatically.
+ */
+export const siteRejections = sqliteTable(
+  "site_rejections",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    site: text("site").notNull(),
+    domainId: text("domain_id")
+      .notNull()
+      .references(() => domains.id, { onDelete: "cascade" }),
+    addressId: text("address_id").references(() => addresses.id, { onDelete: "set null" }),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("site_rejections_user_site_domain_uq").on(t.userId, t.site, t.domainId),
+    index("site_rejections_site_idx").on(t.site),
+  ],
+);
+
 export const auditLog = sqliteTable(
   "audit_log",
   {
@@ -611,6 +641,7 @@ export type Message = typeof messages.$inferSelect;
 export type ReverseContact = typeof reverseContacts.$inferSelect;
 export type NotifyTarget = typeof notifyTargets.$inferSelect;
 export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
+export type SiteRejection = typeof siteRejections.$inferSelect;
 export type ExtractedItem = typeof extractedItems.$inferSelect;
 export type Rule = typeof rules.$inferSelect;
 export type DeliveryFailure = typeof deliveryFailures.$inferSelect;

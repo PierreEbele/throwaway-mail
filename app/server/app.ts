@@ -31,6 +31,7 @@ import { registerDirectories } from "./routes/directories.js";
 import { registerStale } from "./routes/stale.js";
 import { registerBulk } from "./routes/bulk.js";
 import { registerLifecycle } from "./routes/lifecycle.js";
+import { registerSites } from "./routes/sites.js";
 import { registerSenders } from "./routes/senders.js";
 import { registerInsights } from "./routes/insights.js";
 import { registerNewsletters } from "./routes/newsletters.js";
@@ -132,6 +133,7 @@ export function createApp(deps: Deps) {
   // Before registerAddresses: /v1/addresses/bulk must not be taken for /v1/addresses/:id.
   registerBulk(api);
   registerLifecycle(api);
+  registerSites(api);
   registerSenders(api);
   registerInsights(api);
   registerNewsletters(api);
