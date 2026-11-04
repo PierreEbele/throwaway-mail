@@ -7,6 +7,7 @@ import { readableLocalPart } from "../lib/words.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { addressOut } from "./serialize.js";
 import { checkCategory, matchCategory } from "./categories.js";
+import { domainOf, repliesUnavailableReason } from "./replies.js";
 
 export function messageCounts(deps: Deps, ids: string[]) {
   const map = new Map<string, { unread: number; total: number }>();
@@ -44,7 +45,12 @@ export function addressWithCounts(deps: Deps, a: Address, domain: string) {
     .where(eq(addressDestinations.addressId, a.id))
     .all()
     .map((x) => x.id);
-  return { ...addressOut(a, domain, messageCounts(deps, [a.id]).get(a.id)), extra_destination_ids: extra };
+  return {
+    ...addressOut(a, domain, messageCounts(deps, [a.id]).get(a.id)),
+    extra_destination_ids: extra,
+    /** Why reverse-alias replies cannot be used on this address's domain (null: they can). */
+    replies_unavailable: repliesUnavailableReason(deps, domainOf(deps, a)),
+  };
 }
 
 export function checkDestination(deps: Deps, user: User, id: string | null | undefined) {

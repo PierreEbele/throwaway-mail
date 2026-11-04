@@ -11,6 +11,7 @@ import { listInfo } from "../../lib/listheaders.js";
 import { listed, looksLikeLeak, parseList, senderDomain } from "../../lib/senders.js";
 import { runParser } from "../../parser/index.js";
 import { pauseExpired } from "../reminders.js";
+import { handleReply, REVERSE_LOCAL_RE } from "../replies.js";
 import { authResult } from "./auth.js";
 import { afterStore, recordLeak, rejectLockedLeak } from "./effects.js";
 import { forwardDecision, forwardTargets } from "./forwarding.js";
@@ -37,6 +38,9 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
   }
 
   deps.db.update(domains).set({ lastIngestAt: deps.now() }).where(eq(domains.id, domain.id)).run();
+  // r+<token>@domain (normalizeRecipient drops the "+tag", so match the raw recipient): a reply to relay.
+  const reverse = REVERSE_LOCAL_RE.exec(input.envelopeTo.trim().replace(/^<|>$/g, "").split("@")[0]!.toLowerCase());
+  if (reverse) return handleReply(deps, domain, reverse[1]!, input);
   const sender = normalizeRecipient(input.envelopeFrom);
   const resolved = resolveRecipient(deps, domain, rcpt.local, sender?.domain ?? null);
   if (!resolved) {

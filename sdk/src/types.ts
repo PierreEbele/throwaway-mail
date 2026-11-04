@@ -29,6 +29,10 @@ export interface Address {
   feed_token: string | null;
   max_messages: number | null;
   burn_after_code: boolean;
+  /** Reverse-alias replies (forwarded mail carries a per-sender reply address). */
+  replies_enabled: boolean;
+  /** Single-address responses only: why replies cannot be enabled (null: they can). */
+  replies_unavailable?: string | null;
   burned: { reason: string; at: number | null } | null;
   leak: { sender: string; at: number | null } | null;
   unread_count: number;

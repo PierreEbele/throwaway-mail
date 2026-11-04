@@ -12,6 +12,7 @@ import { EditSiteDialog } from "./EditSiteDialog";
 import { ForwardingCard } from "./ForwardingCard";
 import { MessagesPane, type Box } from "./MessagesPane";
 import { ProtectionCard } from "./ProtectionCard";
+import { RepliesCard } from "./RepliesCard";
 import { SendersCard } from "./SendersCard";
 import { StatsCard } from "./StatsCard";
 
@@ -61,6 +62,7 @@ export function AddressDetailPage() {
         <SendersCard a={a} />
         <ProtectionCard a={a} onChange={onUpdate} />
       </div>
+      {!a.is_unassigned && <RepliesCard a={a} onChange={onUpdate} />}
       <MessagesPane a={a} box={box} setBox={setBox} messages={messages} />
       <EditSiteDialog address={a} open={editing} onClose={() => setEditing(false)} />
     </div>

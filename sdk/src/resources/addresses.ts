@@ -43,6 +43,8 @@ export interface UpdateAddressParams {
   siteLock?: boolean;
   maxMessages?: number | null;
   burnAfterCode?: boolean;
+  /** Reverse-alias replies; refused when the domain has no outbound SMTP. */
+  repliesEnabled?: boolean;
 }
 
 export interface ListAddressesParams {
@@ -161,6 +163,7 @@ export class Addresses {
       block_promos: p.blockPromos,
       site_lock: p.siteLock,
       burn_after_code: p.burnAfterCode,
+      replies_enabled: p.repliesEnabled,
     });
     return (await this.http.patch<{ address: Address }>(`/v1/addresses/${seg(id)}`, body, opts)).address;
   }

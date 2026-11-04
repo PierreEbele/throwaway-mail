@@ -5,6 +5,7 @@ import { addressDestinations, addresses, categories, domains, extractedItems, me
 import { badRequest } from "../lib/errors.js";
 import { addressOut } from "../services/serialize.js";
 import { categoryByName, checkCategory } from "../services/categories.js";
+import { domainOf, repliesUnavailableReason } from "../services/replies.js";
 import { addressWithCounts, checkDestination, createAddress, messageCounts, ownedAddress } from "../services/addresses.js";
 
 const SiteUrl = z
@@ -186,12 +187,20 @@ export function registerAddresses(r: ApiRouter) {
         site_lock: z.boolean().optional(),
         max_messages: z.number().int().min(1).max(100_000).nullable().optional(),
         burn_after_code: z.boolean().optional(),
+        replies_enabled: z
+          .boolean()
+          .optional()
+          .describe("Reverse-alias replies: forwarded mail gets a Reply-To that sends replies from the alias (needs outbound SMTP)"),
       }),
     },
     (c, { body }) => {
       const d = c.get("deps");
       const user = c.get("user")!;
       const { a, domain } = ownedAddress(d, user, c.req.param("id")!);
+      if (body.replies_enabled) {
+        const why = repliesUnavailableReason(d, domainOf(d, a));
+        if (why) throw badRequest(why);
+      }
       checkDestination(d, user, body.destination_id);
       for (const id of body.extra_destination_ids ?? []) checkDestination(d, user, id);
       if (body.category !== undefined && body.category_id !== undefined) throw badRequest("Pass category or category_id, not both");
@@ -213,6 +222,7 @@ export function registerAddresses(r: ApiRouter) {
       if (body.site_lock !== undefined) set.siteLock = body.site_lock;
       if (body.max_messages !== undefined) set.maxMessages = body.max_messages;
       if (body.burn_after_code !== undefined) set.burnAfterCode = body.burn_after_code;
+      if (body.replies_enabled !== undefined) set.repliesEnabled = body.replies_enabled;
       if (body.status === "active") Object.assign(set, { burnReason: null, burnedAt: null });
       if (body.site_name !== undefined) set.siteName = body.site_name;
       if (body.site_url !== undefined) set.siteUrl = body.site_url;

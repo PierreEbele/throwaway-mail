@@ -78,6 +78,7 @@ export function addressOut(a: Address, domainName: string, counts?: { unread: nu
     feed_token: a.feedToken,
     max_messages: a.maxMessages,
     burn_after_code: a.burnAfterCode,
+    replies_enabled: a.repliesEnabled,
     burned: a.burnReason ? { reason: a.burnReason, at: a.burnedAt } : null,
     leak: a.leakSender ? { sender: a.leakSender, at: a.leakAt } : null,
     unread_count: counts?.unread ?? 0,

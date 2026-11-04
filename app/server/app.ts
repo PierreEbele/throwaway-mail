@@ -17,6 +17,7 @@ import { registerAuth } from "./routes/auth.js";
 import { registerAdmin } from "./routes/admin.js";
 import { registerInvites } from "./routes/invites.js";
 import { registerAddresses } from "./routes/addresses.js";
+import { registerReplies } from "./routes/replies.js";
 import { registerMessages } from "./routes/messages.js";
 import { registerDomains } from "./routes/domains.js";
 import { registerDestinations } from "./routes/destinations.js";
@@ -133,6 +134,7 @@ export function createApp(deps: Deps) {
   registerNotify(api);
   registerFeeds(api);
   registerAddresses(api);
+  registerReplies(api);
   registerMessages(api);
   registerDomains(api);
   registerDestinations(api);

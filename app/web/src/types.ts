@@ -42,6 +42,9 @@ export interface Address {
   extra_destination_ids?: string[];
   max_messages: number | null;
   burn_after_code: boolean;
+  replies_enabled: boolean;
+  /** Only on single-address responses: why reverse-alias replies cannot be used (null: they can). */
+  replies_unavailable?: string | null;
   burned: { reason: string; at: number } | null;
   leak: { sender: string; at: number } | null;
 }

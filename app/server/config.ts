@@ -74,6 +74,21 @@ const EnvSchema = z.object({
   /** End-to-end probe: SMTP relay used to send the test mail (smtp://user:pass@host:587 or smtps://…:465). */
   PROBE_SMTP_URL: z.string().url().optional(),
   PROBE_FROM: z.string().optional(),
+  /**
+   * Outbound SMTP server for reverse-alias replies on Cloudflare domains (IMAP domains use their own SMTP server):
+   * smtps://user:pass@host:465 (implicit TLS), smtp://user:pass@host:587 (STARTTLS), smtp://host:25?tls=none.
+   */
+  SMTP_RELAY_URL: z
+    .string()
+    .regex(/^smtps?:\/\//, "SMTP_RELAY_URL must start with smtp:// or smtps://")
+    .optional(),
+  /** Envelope sender for mail sent through SMTP_RELAY_URL (default: the alias itself). */
+  SMTP_RELAY_FROM: z.string().email().optional(),
+  /** Replies must pass SPF, DKIM or DMARC at the receiving server (Authentication-Results). Default true. */
+  REPLY_REQUIRE_AUTH: z
+    .string()
+    .optional()
+    .transform((v) => !(v === "0" || v === "false" || v === "no")),
 });
 
 export type Config = ReturnType<typeof loadConfig>;

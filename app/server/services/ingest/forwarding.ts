@@ -3,6 +3,7 @@ import { and, asc, eq, isNotNull } from "drizzle-orm";
 import type { Deps } from "../../context.js";
 import { addressDestinations, destinations, type Address } from "../../db/schema.js";
 import { encryptForward } from "../pgp.js";
+import { contactFor, domainOf, outboundFor, rewriteForward } from "../replies.js";
 import type { IngestResult } from "./types.js";
 
 /** Every verified destination mail for this address goes to right now (extra destinations included). */
@@ -37,6 +38,21 @@ export function forwardTarget(deps: Deps, address: Address): string | null {
   return dest?.verifiedAt ? dest.email : null;
 }
 
+/** The forwarded copy with a reverse Reply-To, or null when replies are off / impossible for this mail. */
+function replyRewrite(deps: Deps, address: Address, email: Email, raw: Uint8Array, alias: string): Buffer | null {
+  const sender = email.from?.address?.toLowerCase();
+  if (!address.repliesEnabled || !sender || !sender.includes("@")) return null;
+  const domain = domainOf(deps, address);
+  if (!outboundFor(deps, domain)) return null;
+  const contact = contactFor(deps, address, sender, email.from?.name || null);
+  return rewriteForward(raw, {
+    alias,
+    reverse: `r+${contact.token}@${domain.name}`,
+    senderEmail: sender,
+    senderName: email.from?.name || null,
+  });
+}
+
 /**
  * messages.forward_to holds "a@x, b@y". Destinations with an OpenPGP key get an encrypted copy the Worker sends
  * itself; the others are plain Cloudflare forwards.
@@ -61,8 +77,14 @@ export async function forwardDecision(
       .all()
       .map((d) => [d.email, d]),
   );
-  const plain = all.filter((e) => !keys.has(e));
   const send: NonNullable<IngestResult["send"]> = [];
+  // Reverse-alias replies: every copy is rewritten (From the alias, Reply-To r+<token>), so none can be a plain
+  // forward of the original; the Worker (send_email) or the mailbox's SMTP server sends them as new messages.
+  const rewritten = replyRewrite(deps, address, email, raw, alias);
+  if (rewritten) raw = rewritten;
+  const plain = rewritten ? [] : all.filter((e) => !keys.has(e));
+  if (rewritten)
+    for (const to of all.filter((e) => !keys.has(e))) send.push({ from: alias, to, raw_base64: Buffer.from(rewritten).toString("base64") });
   for (const to of all.filter((e) => keys.has(e))) {
     const dest = keys.get(to)!;
     try {
