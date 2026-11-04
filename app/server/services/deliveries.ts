@@ -1,3 +1,4 @@
+import { emitForwardFailed } from "./ingest/effects.js";
 import PostalMime from "postal-mime";
 import { and, eq } from "drizzle-orm";
 import type { Deps } from "../context.js";
@@ -123,6 +124,7 @@ export function recordAttempts(deps: Deps, messageId: string, attempts: Delivery
         createdAt: now,
       })
       .run();
+    if (!instead && !a.fallback_for) emitForwardFailed(deps, msg.id, a.to, reason);
   }
   const okTargets = attempts.filter((a) => a.ok).map((a) => a.to);
   // Destinations not mentioned in the report were delivered (older Workers only report failures).

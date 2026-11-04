@@ -10,6 +10,7 @@ import { dnsMxResolver, dnsResolver } from "./lib/outbound.js";
 import { realMailClients } from "./services/mailbox/clients.js";
 import { MailboxRunner } from "./services/mailbox/runner.js";
 import { AuthLimits } from "./auth/ratelimit.js";
+import { relayAddressEvents } from "./services/notify.js";
 
 export function buildDeps(config: Config, logger: Logger, overrides: Partial<Deps> = {}): Deps {
   const db = overrides.db ?? openDatabase(config.databasePath, config.MIGRATIONS_DIR);
@@ -42,5 +43,6 @@ export function buildDeps(config: Config, logger: Logger, overrides: Partial<Dep
     ...overrides,
   };
   deps.mailboxes ??= new MailboxRunner(deps as Deps);
+  deps.bus.tap((userId, e) => relayAddressEvents(deps as Deps, userId, e));
   return deps as Deps;
 }

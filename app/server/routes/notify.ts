@@ -1,13 +1,14 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { ApiRouter } from "../lib/http.js";
 import type { Deps } from "../context.js";
-import { notifyTargets, type NotifyTarget, type User } from "../db/schema.js";
+import { notifyTargets, webhookDeliveries, type NotifyTarget, type User } from "../db/schema.js";
 import { newId, randomString } from "../lib/crypto.js";
 import { badRequest, notFound } from "../lib/errors.js";
 import { parseList } from "../lib/senders.js";
 import { NOTIFY_EVENTS, sendTo } from "../services/notify.js";
 import { OutboundUrlError, checkOutboundUrl } from "../lib/outbound.js";
+import { attempt, deliveryOut, redeliver } from "../services/webhooks.js";
 
 /** Tokens are write-only: only a hint is returned. */
 const out = (t: NotifyTarget) => ({
@@ -22,6 +23,8 @@ const out = (t: NotifyTarget) => ({
   enabled: t.enabled,
   last_ok_at: t.lastOkAt,
   last_error: t.lastError,
+  consecutive_failures: t.consecutiveFailures,
+  paused_at: t.pausedAt,
   created_at: t.createdAt,
 });
 
@@ -135,6 +138,8 @@ export function registerNotify(r: ApiRouter) {
       if (body.chat_id !== undefined) set.chatId = body.chat_id || null;
       if (body.events) set.eventsJson = JSON.stringify(body.events);
       if (body.enabled !== undefined) set.enabled = body.enabled;
+      // Enabling again also resumes a webhook paused after repeated failures.
+      if (body.enabled) Object.assign(set, { pausedAt: null, consecutiveFailures: 0 });
       if (Object.keys(set).length) d.db.update(notifyTargets).set(set).where(eq(notifyTargets.id, t.id)).run();
       return c.json({ target: out(owned(d, user, t.id)) });
     },
@@ -163,6 +168,73 @@ export function registerNotify(r: ApiRouter) {
         data: { test: true },
       });
       return c.json(res);
+    },
+  );
+
+  r.add(
+    {
+      method: "get",
+      path: "/v1/notify-targets/:id/deliveries",
+      summary: "Recent deliveries of a webhook (kept 14 days, newest first)",
+      tags: ["notifications"],
+      auth: "user",
+      query: z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) }),
+    },
+    (c, { query }) => {
+      const d = c.get("deps");
+      const t = owned(d, c.get("user")!, c.req.param("id")!);
+      const rows = d.db
+        .select()
+        .from(webhookDeliveries)
+        .where(eq(webhookDeliveries.targetId, t.id))
+        .orderBy(desc(webhookDeliveries.createdAt))
+        .limit(query.limit)
+        .all();
+      return c.json({ deliveries: rows.map(deliveryOut) });
+    },
+  );
+
+  r.add(
+    {
+      method: "post",
+      path: "/v1/notify-targets/:id/deliveries/:did/resend",
+      summary: "Send a delivery again (same event id and body, new signature)",
+      tags: ["notifications"],
+      auth: "user",
+    },
+    async (c) => {
+      const d = c.get("deps");
+      const t = owned(d, c.get("user")!, c.req.param("id")!);
+      const old = d.db
+        .select()
+        .from(webhookDeliveries)
+        .where(and(eq(webhookDeliveries.id, c.req.param("did")!), eq(webhookDeliveries.targetId, t.id)))
+        .get();
+      if (!old) throw notFound("Delivery");
+      const row = redeliver(d, old);
+      const res = await attempt(d, row.id);
+      const now = d.db.select().from(webhookDeliveries).where(eq(webhookDeliveries.id, row.id)).get()!;
+      return c.json({
+        ok: res?.ok ?? false,
+        error: res?.error ?? (res ? undefined : "target paused or disabled"),
+        delivery: deliveryOut(now),
+      });
+    },
+  );
+
+  r.add(
+    {
+      method: "post",
+      path: "/v1/notify-targets/:id/resume",
+      summary: "Resume a webhook paused after repeated failures (pending deliveries are retried)",
+      tags: ["notifications"],
+      auth: "user",
+    },
+    (c) => {
+      const d = c.get("deps");
+      const t = owned(d, c.get("user")!, c.req.param("id")!);
+      d.db.update(notifyTargets).set({ pausedAt: null, consecutiveFailures: 0, enabled: true }).where(eq(notifyTargets.id, t.id)).run();
+      return c.json({ target: out(owned(d, c.get("user")!, t.id)) });
     },
   );
 }

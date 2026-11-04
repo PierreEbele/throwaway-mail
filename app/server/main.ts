@@ -11,6 +11,7 @@ import { backfillAuthResults } from "./services/maintenance.js";
 import { scheduledBackup } from "./services/backup/index.js";
 import { probeTick } from "./services/probe.js";
 import { startSubmission } from "./services/submission.js";
+import { processWebhookOutbox } from "./services/webhooks.js";
 
 // Local (non-Docker) runs may keep settings in .env.
 try {
@@ -100,6 +101,15 @@ const probeTimer = setInterval(() => {
     .finally(() => (probing = false));
 }, 60_000);
 probeTimer.unref();
+let outboxRunning = false;
+const outboxTimer = setInterval(() => {
+  if (outboxRunning) return;
+  outboxRunning = true;
+  processWebhookOutbox(deps)
+    .catch((e) => logger.error("webhook outbox job crashed", { err: e as Error }))
+    .finally(() => (outboxRunning = false));
+}, 15_000);
+outboxTimer.unref();
 
 const server = serve({ fetch: app.fetch, port: config.PORT, hostname: config.HOST }, (info) => {
   logger.info("listening", { port: info.port, host: config.HOST, app_url: config.APP_URL });
@@ -113,6 +123,7 @@ function shutdown(signal: string) {
   clearInterval(retentionTimer);
   clearInterval(reminderTimer);
   clearInterval(probeTimer);
+  clearInterval(outboxTimer);
   if (backupTimer) clearInterval(backupTimer);
   deps.mailboxes.stop();
   void stopSubmission?.();

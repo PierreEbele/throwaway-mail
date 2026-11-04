@@ -15,7 +15,7 @@ import { runParser } from "../../parser/index.js";
 import { pauseExpired } from "../reminders.js";
 import { handleReply, REVERSE_LOCAL_RE } from "../replies.js";
 import { authResult } from "./auth.js";
-import { afterStore, recordLeak, rejectLockedLeak } from "./effects.js";
+import { afterStore, emitBlocked, recordLeak, rejectLockedLeak } from "./effects.js";
 import {
   destinationEmails,
   fallbackChain,
@@ -88,9 +88,14 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     return { action: "reject", reason: "unknown_recipient" };
   }
   const { address, preservedForward } = resolved;
-  if (address.status !== "active") return { action: "reject", reason: `address_${address.status}` };
+  const envelopeSender = sender?.full ?? null;
+  if (address.status !== "active") {
+    emitBlocked(deps, address, rcpt.full, envelopeSender, `address_${address.status}`);
+    return { action: "reject", reason: `address_${address.status}` };
+  }
   if (address.expiresAt && address.expiresAt <= deps.now()) {
     pauseExpired(deps, address.id);
+    emitBlocked(deps, address, rcpt.full, envelopeSender, "address_expired");
     return { action: "reject", reason: "address_expired" };
   }
 
@@ -98,6 +103,7 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
   const fromDomain = senderDomain(email.from?.address) ?? sender?.domain ?? null;
   if (fromDomain && listed(parseList(address.blockedSendersJson), fromDomain)) {
     log.info("reject: blocked sender", { address_id: address.id, sender: fromDomain });
+    emitBlocked(deps, address, rcpt.full, email.from?.address ?? envelopeSender, "sender_blocked");
     return { action: "reject", reason: "sender_blocked" };
   }
   const messageIdHeader = email.messageId?.trim() || null;
@@ -146,6 +152,7 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
   const list = listInfo(email.headers);
   if (address.blockPromos && list.bulk && !parsed.code) {
     log.info("reject: promotional mail blocked", { address_id: address.id });
+    emitBlocked(deps, address, rcpt.full, email.from?.address ?? envelopeSender, "promotional_blocked");
     return { action: "reject", reason: "promotional_blocked" };
   }
   const clean = email.html ? sanitizeEmail(email.html) : null;
@@ -199,6 +206,7 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     const from = email.from!.address!.toLowerCase();
     rejectLockedLeak(deps, address, rcpt.full, from);
     log.info("reject: site-locked address", { address_id: address.id, sender: from });
+    emitBlocked(deps, address, rcpt.full, from, "sender_not_site");
     return { action: "reject", reason: "sender_not_site" };
   }
   deps.db.transaction((tx) => {

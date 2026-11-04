@@ -26,6 +26,12 @@ export class EventBus {
   }
   publish(userId: string, event: AppEvent) {
     this.ee.emit(`u:${userId}`, event);
+    this.ee.emit("all", userId, event);
+  }
+  /** Every event of every user (server-side consumers such as automation webhooks). */
+  tap(fn: (userId: string, e: AppEvent) => void): () => void {
+    this.ee.on("all", fn);
+    return () => this.ee.off("all", fn);
   }
   subscribe(userId: string, fn: (e: AppEvent) => void): () => void {
     this.ee.on(`u:${userId}`, fn);

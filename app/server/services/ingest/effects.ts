@@ -124,3 +124,33 @@ export function rejectLockedLeak(deps: Deps, address: Address, rcpt: string, sen
     data: { address_id: address.id, address: rcpt, site: address.siteName, from: sender, rejected: true },
   }).catch(() => {});
 }
+
+/** A mail refused for an existing address (blocked sender, promotions, site lock, paused or expired address). */
+export function emitBlocked(deps: Deps, address: Address, rcpt: string, from: string | null, reason: string) {
+  void notify(deps, address.userId, {
+    type: "message.blocked",
+    title: `Mail blocked: ${address.siteName}`,
+    body: `${rcpt} refused mail from ${from ?? "?"} (${reason}).`,
+    url: addressLink(deps, address),
+    data: { address_id: address.id, address: rcpt, site: address.siteName, from, reason },
+  }).catch(() => {});
+}
+
+/** A forward refused for good by the SMTP server of an IMAP domain. */
+export function emitForwardFailed(deps: Deps, messageId: string | undefined, to: string, error: string) {
+  if (!messageId) return;
+  const row = deps.db
+    .select({ a: addresses, rcpt: messages.envelopeTo })
+    .from(messages)
+    .innerJoin(addresses, eq(addresses.id, messages.addressId))
+    .where(eq(messages.id, messageId))
+    .get();
+  if (!row) return;
+  void notify(deps, row.a.userId, {
+    type: "forward.failed",
+    title: `Forward failed: ${row.a.siteName}`,
+    body: `Mail for ${row.rcpt} could not be forwarded to ${to}: ${error}`,
+    url: addressLink(deps, row.a),
+    data: { address_id: row.a.id, address: row.rcpt, site: row.a.siteName, message_id: messageId, to, error },
+  }).catch(() => {});
+}

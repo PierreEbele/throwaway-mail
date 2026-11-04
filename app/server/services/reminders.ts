@@ -12,8 +12,16 @@ export const EXPIRY_WARNING_MS = 24 * 3600_000;
 export function pauseExpired(deps: Deps, addressId?: string): number {
   const now = deps.now();
   const rows = deps.db
-    .select({ id: addresses.id, userId: addresses.userId })
+    .select({
+      id: addresses.id,
+      userId: addresses.userId,
+      siteName: addresses.siteName,
+      localPart: addresses.localPart,
+      domain: domains.name,
+      expiresAt: addresses.expiresAt,
+    })
     .from(addresses)
+    .innerJoin(domains, eq(domains.id, addresses.domainId))
     .where(
       and(
         eq(addresses.status, "active"),
@@ -30,6 +38,13 @@ export function pauseExpired(deps: Deps, addressId?: string): number {
       .where(eq(addresses.id, r.id))
       .run();
     deps.bus.publish(r.userId, { type: "address.updated", address_id: r.id });
+    void notify(deps, r.userId, {
+      type: "address.expired",
+      title: `${r.siteName}: address expired`,
+      body: `${r.localPart}@${r.domain} expired and now rejects mail.`,
+      url: `${deps.config.APP_URL.replace(/\/$/, "")}/addresses/${r.id}`,
+      data: { address_id: r.id, address: `${r.localPart}@${r.domain}`, site: r.siteName, expires_at: r.expiresAt },
+    }).catch(() => {});
   }
   if (rows.length && !addressId) deps.logger.info("expired addresses paused", { count: rows.length });
   return rows.length;

@@ -1,10 +1,12 @@
 import { createHmac } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import type { Deps } from "../context.js";
-import { notifyTargets, users, type NotifyTarget } from "../db/schema.js";
+import { addresses, domains, notifyTargets, users, type NotifyTarget } from "../db/schema.js";
+import type { AppEvent } from "./events.js";
 import { checkOutboundUrl } from "../lib/outbound.js";
 import { parseList } from "../lib/senders.js";
 import { metrics } from "./metrics.js";
+import { enqueueWebhooks } from "./webhooks.js";
 
 export const NOTIFY_EVENTS = [
   "message.received",
@@ -14,6 +16,12 @@ export const NOTIFY_EVENTS = [
   "address.burned",
   "system.alert",
   "message.sent",
+  // Mostly for automation webhooks (n8n, Zapier, Home Assistant...); push targets may subscribe too.
+  "address.created",
+  "address.deleted",
+  "address.expired",
+  "message.blocked",
+  "forward.failed",
 ] as const;
 export type NotifyEventType = (typeof NOTIFY_EVENTS)[number];
 
@@ -31,7 +39,7 @@ export function webhookSignature(secret: string, ts: string, body: string) {
   return createHmac("sha256", secret).update(`${ts}.${body}`).digest("hex");
 }
 
-function request(t: NotifyTarget, e: NotifyEvent, now: number): { url: string; init: RequestInit } {
+function request(t: NotifyTarget, e: NotifyEvent): { url: string; init: RequestInit } {
   const json = (url: string, body: unknown, headers: Record<string, string> = {}) => ({
     url,
     init: { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) },
@@ -61,29 +69,18 @@ function request(t: NotifyTarget, e: NotifyEvent, now: number): { url: string; i
         text: `${e.title}\n${e.body}${e.url ? `\n${e.url}` : ""}`,
         disable_web_page_preview: true,
       });
-    case "webhook": {
-      const body = JSON.stringify({ type: e.type, title: e.title, body: e.body, url: e.url ?? null, sent_at: now, ...e.data });
-      const ts = String(Math.floor(now / 1000));
-      return {
-        url: t.url!,
-        init: {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-tm-event": e.type,
-            "x-tm-timestamp": ts,
-            ...(t.secret ? { "x-tm-signature": webhookSignature(t.secret, ts, body) } : {}),
-          },
-          body,
-        },
-      };
-    }
+    case "webhook":
+      throw new Error("webhooks go through the outbox (services/webhooks.ts)");
   }
 }
 
 /** Sends one event to one target; records the outcome. */
 export async function sendTo(deps: Deps, t: NotifyTarget, e: NotifyEvent): Promise<{ ok: boolean; error?: string }> {
-  const { url, init } = request(t, e, deps.now());
+  if (t.kind === "webhook") {
+    const [res] = (await enqueueWebhooks(deps, [t], e)) as Array<{ ok: boolean; error?: string } | null>;
+    return res ?? { ok: false, error: t.pausedAt ? "paused after repeated failures" : "not sent" };
+  }
+  const { url, init } = request(t, e);
   try {
     // Re-checked at every send: the target's DNS may have changed since it was saved.
     const owner = deps.db.select({ role: users.role }).from(users).where(eq(users.id, t.userId)).get();
@@ -109,8 +106,9 @@ export function notify(deps: Deps, userId: string, e: NotifyEvent): Promise<unkn
     .from(notifyTargets)
     .where(and(eq(notifyTargets.userId, userId), eq(notifyTargets.enabled, true)))
     .all()
-    .filter((t) => parseList(t.eventsJson).includes(e.type));
-  return Promise.all(targets.map((t) => sendTo(deps, t, e)));
+    .filter((t) => parseList(t.eventsJson).includes(e.type) && !t.pausedAt);
+  const hooks = targets.filter((t) => t.kind === "webhook");
+  return Promise.all([enqueueWebhooks(deps, hooks, e), ...targets.filter((t) => t.kind !== "webhook").map((t) => sendTo(deps, t, e))]);
 }
 
 /** Instance problems (failed backup, failed end-to-end probe): every active admin's targets subscribed to system.alert. */
@@ -121,4 +119,42 @@ export function notifyAdmins(deps: Deps, e: Omit<NotifyEvent, "type">): Promise<
     .where(and(eq(users.role, "admin"), eq(users.disabled, false)))
     .all();
   return Promise.all(admins.map((a) => notify(deps, a.id, { ...e, type: "system.alert" })));
+}
+
+/** Turns live address events into address.created / address.deleted notifications (webhooks for automation). */
+export function relayAddressEvents(deps: Deps, userId: string, e: AppEvent) {
+  if ((e.type !== "address.created" && e.type !== "address.deleted") || !e.address_id) return;
+  const link = `${deps.config.APP_URL.replace(/\/$/, "")}/addresses/${e.address_id}`;
+  if (e.type === "address.deleted") {
+    void notify(deps, userId, {
+      type: "address.deleted",
+      title: "Address deleted",
+      body: `Address ${e.address_id} was deleted.`,
+      data: { address_id: e.address_id },
+    }).catch(() => {});
+    return;
+  }
+  const row = deps.db
+    .select({ a: addresses, domain: domains.name })
+    .from(addresses)
+    .innerJoin(domains, eq(domains.id, addresses.domainId))
+    .where(eq(addresses.id, e.address_id))
+    .get();
+  if (!row) return;
+  const email = `${row.a.localPart}@${row.domain}`;
+  void notify(deps, userId, {
+    type: "address.created",
+    title: `New address for ${row.a.siteName}`,
+    body: email,
+    url: link,
+    data: {
+      address_id: row.a.id,
+      address: email,
+      site: row.a.siteName,
+      site_url: row.a.siteUrl,
+      label: row.a.label,
+      expires_at: row.a.expiresAt,
+      auto_created: row.a.label === "auto-created",
+    },
+  }).catch(() => {});
 }
