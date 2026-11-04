@@ -1,5 +1,18 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadConfig } from "../../app/server/config.js";
+
+describe(".env.example", () => {
+  it("documents every variable the app reads", () => {
+    const root = path.join(__dirname, "../..");
+    const schema = fs.readFileSync(path.join(root, "app/server/config.ts"), "utf8");
+    const example = fs.readFileSync(path.join(root, ".env.example"), "utf8");
+    const keys = [...schema.matchAll(/^\s+([A-Z][A-Z0-9_]+): z\./gm)].map((m) => m[1]);
+    expect(keys.length).toBeGreaterThan(20);
+    for (const k of keys) expect(example, k).toMatch(new RegExp(`^(# )?${k}=`, "m"));
+  });
+});
 
 describe("config", () => {
   it("treats empty variables as unset (Docker Compose passes them as empty strings)", () => {

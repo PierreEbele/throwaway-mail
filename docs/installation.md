@@ -18,15 +18,38 @@ Not on Cloudflare? Skip steps 2 and 3 and see
 
 Any small Linux VPS (1 vCPU, 1 GB RAM is plenty: the app uses about 40 MB and Caddy about 20 MB).
 
+### Option A: published image (recommended)
+
+A multi-arch image (amd64 and arm64) is published on GitHub Container Registry at
+`ghcr.io/pierreebele/throwaway-mail`. Tags: `latest` (last release), `1`, `1.2`, `1.2.3` (pinned releases),
+`edge` (every commit on `main`).
+
 ```bash
 # Debian/Ubuntu
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-plugin curl
+sudo mkdir -p /opt/throwaway-mail && cd /opt/throwaway-mail
+BASE=https://raw.githubusercontent.com/PierreEbele/throwaway-mail/main
+sudo curl -fsSL $BASE/docker-compose.example.yml -o docker-compose.yml
+sudo curl -fsSL $BASE/.env.example -o .env
+sudo curl -fsSLO $BASE/Caddyfile                    # only for the bundled Caddy
+sudo nano .env                                      # see below
+sudo docker compose --profile caddy up -d           # bundled Caddy with automatic TLS
+```
+
+`.env.example` lists every setting with a comment. Pin a release with `TM_VERSION=1.2` in `.env`.
+
+### Option B: build from source
+
+```bash
 sudo apt-get update && sudo apt-get install -y docker.io docker-compose-plugin git
-sudo git clone <your repo> /opt/throwaway-mail && cd /opt/throwaway-mail
+sudo git clone https://github.com/PierreEbele/throwaway-mail /opt/throwaway-mail && cd /opt/throwaway-mail
 sudo cp .env.example .env && sudo nano .env      # see below
 sudo docker compose --profile caddy up -d --build     # bundled Caddy with automatic TLS
 ```
 
-In `.env` set at least `APP_DOMAIN`, `INGEST_SECRET` (`openssl rand -hex 32`), optionally the `OIDC_*` settings ([single sign-on](#4-accounts-and-single-sign-on)), and later `CF_API_TOKEN` / `CF_ACCOUNT_ID`. The app starts without Cloudflare credentials; domain and destination actions then show a clear error.
+### Settings
+
+In `.env` set at least `APP_DOMAIN`, `INGEST_SECRET` (`openssl rand -hex 32`), optionally the `OIDC_*` settings ([single sign-on](#4-accounts-and-single-sign-on)), and later `CF_API_TOKEN` / `CF_ACCOUNT_ID`. The app starts without Cloudflare credentials; domain and destination actions then show a clear error. Once it runs, _Admin → Setup check_ (or `docker compose exec app node dist/doctor.js`) tells you what is still missing.
 
 **Behind an existing reverse proxy** (e.g. Caddy on the host): run `docker compose up -d` without the profile. The app listens on `127.0.0.1:${APP_PORT:-3310}`. A host Caddy block:
 
@@ -50,7 +73,8 @@ DNS for the app: create an `A` (and `AAAA`) record for `APP_DOMAIN` pointing at 
 Updating:
 
 ```bash
-cd /opt/throwaway-mail && git pull && docker compose up -d --build
+cd /opt/throwaway-mail && docker compose pull && docker compose up -d       # published image
+cd /opt/throwaway-mail && git pull && docker compose up -d --build         # from source
 ```
 
 If `docker compose build` complains about buildx, build with `docker build -t throwaway-mail:latest .` and start with `--no-build`.

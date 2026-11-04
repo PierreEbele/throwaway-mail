@@ -1,0 +1,56 @@
+# Throwaway Mail from the published image: no clone, no build.
+#   mkdir throwaway-mail && cd throwaway-mail
+#   curl -fsSLO https://raw.githubusercontent.com/PierreEbele/throwaway-mail/main/docker-compose.example.yml
+#   curl -fsSL https://raw.githubusercontent.com/PierreEbele/throwaway-mail/main/.env.example -o .env
+#   mv docker-compose.example.yml docker-compose.yml && nano .env
+#   docker compose up -d                    # behind your own reverse proxy → 127.0.0.1:${APP_PORT:-3310}
+#   docker compose --profile caddy up -d    # standalone, bundled Caddy with automatic TLS, needs the Caddyfile:
+#     curl -fsSLO https://raw.githubusercontent.com/PierreEbele/throwaway-mail/main/Caddyfile
+#
+# Tags: latest (last release), 1 / 1.2 / 1.2.3 (pinned), edge (main branch).
+services:
+  app:
+    image: ghcr.io/pierreebele/throwaway-mail:${TM_VERSION:-latest}
+    container_name: throwaway-mail
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # Every variable from .env reaches the app (see .env.example for the list).
+    env_file: .env
+    environment:
+      APP_URL: ${APP_URL:-https://${APP_DOMAIN:-localhost}}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - data:/data
+    ports:
+      - "127.0.0.1:${APP_PORT:-3310}:3000"
+    mem_limit: 384m
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  # Optional TLS front (automatic Let's Encrypt certificate for APP_DOMAIN).
+  caddy:
+    profiles: ["caddy"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-localhost}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    mem_limit: 128m
+
+volumes:
+  data:
+  caddy_data:
+  caddy_config:
