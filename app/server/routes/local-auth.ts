@@ -87,13 +87,25 @@ export function registerLocalAuth(r: ApiRouter) {
       if (!ok || !user) {
         accountFailed(c, accountKey);
         d.logger.info("password login refused", { ip: clientIp(c) });
+        audit(
+          d,
+          user?.id ?? null,
+          "auth.login_failed",
+          normalizeEmail(body.email),
+          { method: "password", reason: "wrong_credentials" },
+          clientIp(c),
+        );
         throw new HttpError(401, "invalid_credentials", "Wrong e-mail or password");
       }
       accountSucceeded(c, accountKey);
-      if (user.disabled) throw new HttpError(403, "account_disabled", "Your account is disabled in this app");
+      if (user.disabled) {
+        audit(d, user.id, "auth.login_failed", user.email, { method: "password", reason: "account_disabled" }, clientIp(c));
+        throw new HttpError(403, "account_disabled", "Your account is disabled in this app");
+      }
       if (twoFactorEnabled(user))
         return c.json({ two_factor_required: true, challenge: createChallenge(d, user.id), expires_in: CHALLENGE_TTL_MS / 1000 });
       d.logger.info("password login", { user_id: user.id, role: user.role });
+      audit(d, user.id, "auth.login", user.id, { method: "password" }, clientIp(c));
       return signedIn(c, user);
     },
   );

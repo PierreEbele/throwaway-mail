@@ -136,10 +136,12 @@ export function registerAuth(r: ApiRouter, localLogin: boolean) {
         const user = upsertSsoUser(d, identity, clientIp(c));
         signIn(c, user);
         d.logger.info("sso login", { user_id: user.id, role: user.role });
+        audit(d, user.id, "auth.login", user.id, { method: "sso" }, clientIp(c));
         return c.redirect(returnTo, 302);
       } catch (e) {
         if (e instanceof HttpError) {
           d.logger.info("sso login refused", { code: e.code, ip: clientIp(c) });
+          audit(d, null, "auth.login_failed", null, { method: "sso", reason: e.code }, clientIp(c));
           return loginRedirect(c, e.code, e.message);
         }
         throw e;

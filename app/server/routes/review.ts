@@ -1,5 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
+import { audit } from "../services/audit.js";
 import type { ApiRouter } from "../lib/http.js";
 import type { Deps } from "../context.js";
 import { addresses, destinations, domains, messages, type User } from "../db/schema.js";
@@ -58,6 +59,7 @@ async function ensureDestination(deps: Deps, user: User, email: string) {
   if (!dest) {
     const row = { id: newId("dst"), userId: user.id, email, createdAt: deps.now() };
     deps.db.insert(destinations).values(row).run();
+    audit(deps, user.id, "destination.created", row.id, { email, via: "review" });
     dest = deps.db.select().from(destinations).where(eq(destinations.id, row.id)).get()!;
   }
   if (!dest.verifiedAt) dest = await refreshDestination(deps, dest);

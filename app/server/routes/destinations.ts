@@ -1,6 +1,8 @@
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { ApiRouter, Ctx } from "../lib/http.js";
+import { clientIp } from "../lib/http.js";
+import { audit } from "../services/audit.js";
 import { destinations } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
@@ -83,6 +85,7 @@ export function registerDestinations(r: ApiRouter) {
         }
       }
       d.db.insert(destinations).values(row).run();
+      audit(d, user.id, "destination.created", row.id, { email: row.email, verify_by: byApp ? "app" : "cloudflare" }, clientIp(c));
       const created = d.db.select().from(destinations).where(eq(destinations.id, row.id)).get()!;
       return c.json({ destination: destinationOut(byApp ? await sendAppVerification(d, created) : created) }, 201);
     },
@@ -175,6 +178,7 @@ export function registerDestinations(r: ApiRouter) {
           .catch((e) => d.logger.warn("cloudflare destination delete failed", { err: (e as Error).message }));
       }
       d.db.delete(destinations).where(eq(destinations.id, row.id)).run();
+      audit(d, c.get("user")!.id, "destination.deleted", row.id, { email: row.email }, clientIp(c));
       return c.json({ ok: true });
     },
   );

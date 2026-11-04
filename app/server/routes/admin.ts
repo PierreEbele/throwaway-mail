@@ -193,23 +193,61 @@ export function registerAdmin(r: ApiRouter) {
     {
       method: "get",
       path: "/v1/admin/audit",
-      summary: "Audit log",
+      summary: "Audit log, newest first; filter by action (exact, or a prefix ending with '.' such as 'auth.'), user, target or IP",
       tags: ["admin"],
       auth: "admin",
-      query: z.object({ limit: z.coerce.number().int().min(1).max(500).default(100) }),
+      query: z.object({
+        limit: z.coerce.number().int().min(1).max(500).default(100),
+        offset: z.coerce.number().int().min(0).default(0),
+        action: z.string().trim().max(100).optional(),
+        user_id: z.string().trim().max(100).optional(),
+        target: z.string().trim().max(254).optional(),
+        ip: z.string().trim().max(100).optional(),
+      }),
     },
     (c, { query }) => {
-      const rows = c.get("deps").db.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(query.limit).all();
+      const db = c.get("deps").db;
+      const like = (s: string) => s.replace(/[\\%_]/g, (m) => `\\${m}`);
+      const where = and(
+        query.action
+          ? query.action.endsWith(".")
+            ? sql`${auditLog.action} like ${like(query.action) + "%"} escape '\\'`
+            : eq(auditLog.action, query.action)
+          : undefined,
+        query.user_id ? eq(auditLog.userId, query.user_id) : undefined,
+        query.target ? eq(auditLog.target, query.target) : undefined,
+        query.ip ? eq(auditLog.ip, query.ip) : undefined,
+      );
+      const rows = db
+        .select({ e: auditLog, email: users.email })
+        .from(auditLog)
+        .leftJoin(users, eq(users.id, auditLog.userId))
+        .where(where)
+        .orderBy(desc(auditLog.createdAt), desc(auditLog.id))
+        .limit(query.limit)
+        .offset(query.offset)
+        .all();
+      const total = db
+        .select({ n: sql<number>`count(*)` })
+        .from(auditLog)
+        .where(where)
+        .get()!.n;
+      const actions = db.selectDistinct({ a: auditLog.action }).from(auditLog).orderBy(auditLog.action).all();
       return c.json({
-        entries: rows.map((e) => ({
+        entries: rows.map(({ e, email }) => ({
           id: e.id,
           user_id: e.userId,
+          user_email: email,
           action: e.action,
           target: e.target,
           meta: e.metaJson ? JSON.parse(e.metaJson) : null,
           ip: e.ip,
           created_at: e.createdAt,
         })),
+        total,
+        offset: query.offset,
+        limit: query.limit,
+        actions: actions.map((r) => r.a),
       });
     },
   );
