@@ -4,6 +4,7 @@
 #   dist/throwaway-mail-<version>-chrome.zip  Chrome/Chromium MV3 (service worker, contextMenus, PNG icons)
 # Firefox: about:debugging -> Load Temporary Add-on, or AMO "unlisted" signing.
 # Chrome: chrome://extensions -> Developer mode -> Load unpacked (unzipped folder), or the Chrome Web Store.
+# extension/store/ (listing drafts) is left out of both packages.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -13,12 +14,12 @@ CHROME="$ROOT/dist/throwaway-mail-$VERSION-chrome.zip"
 mkdir -p dist
 rm -f "$FIREFOX" "$CHROME"
 
-(cd extension && zip -qr -X "$FIREFOX" . -x '*.DS_Store' -x 'service-worker.js' -x 'icons/*.png')
+(cd extension && zip -qr -X "$FIREFOX" . -x '*.DS_Store' -x 'service-worker.js' -x 'icons/*.png' -x 'store/*')
 
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 cp -r extension/. "$STAGE/"
-rm -f "$STAGE/icons/throwaway-mail.svg"
+rm -rf "$STAGE/icons/throwaway-mail.svg" "$STAGE/store"
 node scripts/chrome-manifest.mjs extension/manifest.json >"$STAGE/manifest.json"
 (cd "$STAGE" && zip -qr -X "$CHROME" . -x '*.DS_Store')
 

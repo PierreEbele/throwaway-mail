@@ -13,3 +13,6 @@ backups
 .claude/
 worker/wrangler.local.toml
 DECISIONS.md
+
+# Local store listing drafts (not published with the source)
+extension/store/
