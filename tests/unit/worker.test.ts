@@ -142,3 +142,63 @@ describe("per-domain fallback", () => {
     expect(m.forwardedTo).toBe("bob@x.test");
   });
 });
+
+describe("fallback destinations", () => {
+  it("tries the fallbacks in order and reports failures the app records", async () => {
+    const t = makeTestApp();
+    const admin = await setupAdmin(t);
+    await addDomain(admin);
+    const dest = async (email: string) => {
+      const d = (await admin.post("/v1/destinations", { email })).json.destination;
+      await admin.post(`/v1/destinations/${d.id}/refresh`);
+      return d;
+    };
+    const main = await dest("broken@me.example");
+    const second = await dest("also-broken@me.example");
+    const third = await dest("ok@me.example");
+    await admin.put("/v1/forwarding/fallbacks", { destination_ids: [second.id, third.id] });
+    const a = (await admin.post("/v1/addresses", { site_name: "S" })).json.address;
+    await admin.patch(`/v1/addresses/${a.id}`, { forward_enabled: true, destination_id: main.id });
+    const calls: string[] = [];
+    const appFetch = ((url: string, init: RequestInit) => {
+      calls.push(new URL(url).pathname);
+      return t.app.request(new URL(url).pathname, init);
+    }) as unknown as typeof fetch;
+
+    const m = fakeMessage(a.email, simpleEml({ text: "hello", subject: "Hi" }));
+    const forward = m.forward;
+    m.forward = async (rcpt: string) => {
+      if (rcpt === "also-broken@me.example") throw new Error("550 5.1.1 user unknown");
+      return forward(rcpt);
+    };
+    expect(await handleEmail(m, env, appFetch)).toBe("forwarded");
+    expect(m.forwardedAll).toEqual(["ok@me.example"]);
+    expect(calls).toEqual(["/ingest", "/ingest/report"]);
+    const failures = (await admin.get("/v1/delivery-failures")).json.failures;
+    expect(failures.map((f: { destination: string }) => f.destination).sort()).toEqual(["also-broken@me.example", "broken@me.example"]);
+    expect(failures.find((f: { destination: string }) => f.destination === "broken@me.example").delivered_to).toBe("ok@me.example");
+
+    // All delivered: nothing to report.
+    calls.length = 0;
+    await admin.patch(`/v1/addresses/${a.id}`, { destination_id: third.id });
+    const ok = fakeMessage(a.email, simpleEml({ text: "again" }));
+    expect(await handleEmail(ok, env, appFetch)).toBe("forwarded");
+    expect(calls).toEqual(["/ingest"]);
+  });
+
+  it("never redirects an encrypted copy", async () => {
+    const answer = (async () =>
+      new Response(
+        JSON.stringify({
+          action: "forward",
+          message_id: "msg_1",
+          send: [{ from: "a@x.test", to: "pgp@me.example", raw_base64: btoa("x"), encrypted: true }],
+          fallback_to: ["ok@me.example"],
+        }),
+      )) as unknown as typeof fetch;
+    const m = fakeMessage("a@x.test", "Subject: hi\r\n\r\nx");
+    // No SEND_EMAIL binding: the encrypted send fails, and the clear fallback must not be used.
+    expect(await handleEmail(m, env, answer)).toBe("stored");
+    expect(m.forwardedAll).toEqual([]);
+  });
+});

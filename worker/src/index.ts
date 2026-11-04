@@ -1,7 +1,10 @@
 /**
  * Throwaway Mail — Cloudflare Email Worker.
  * Receives every mail of every managed domain (catch-all rule), hands it to the app, and applies the app's decision:
- *   forward → message.forward(each of forward_to_all, or forward_to)   reject → message.setReject()   store_only → nothing
+ *   forward → message.forward(each of forward_to_all, or forward_to), SEND_EMAIL for each `send` copy; a failed
+ *             destination is replaced by the first fallback_to that accepts it, and failures are reported to
+ *             /ingest/report
+ *   reject → message.setReject()   store_only → nothing
  * If the app is unreachable / errors / times out (FALLBACK_MODE=forward, the default), the mail is forwarded to the
  * address's last known destinations (ROUTES KV cache) or else to FALLBACK_FORWARD; a copy is queued on RETRY_QUEUE so
  * the app stores it once it is back, and ALERT_WEBHOOK is told. With nowhere to forward it (or FALLBACK_MODE=reject)
@@ -65,9 +68,22 @@ interface Decision {
   action: "forward" | "store_only" | "reject";
   forward_to?: string;
   forward_to_all?: string[];
-  /** PGP-encrypted copies to send as new messages (needs the SEND_EMAIL binding). */
-  send?: Array<{ from: string; to: string; raw_base64: string }>;
+  /** Copies to send as new messages (needs the SEND_EMAIL binding): PGP-encrypted (`encrypted`) or changed copies. */
+  send?: Array<{ from: string; to: string; raw_base64: string; encrypted?: boolean }>;
+  /** Tried in order when forwarding (or sending a clear copy) to a destination fails. */
+  fallback_to?: string[];
   reason?: string;
+  message_id?: string;
+  duplicate?: boolean;
+}
+
+/** One delivery attempt, as reported to the app (POST /ingest/report). */
+export interface DeliveryAttempt {
+  to: string;
+  ok: boolean;
+  error?: string;
+  /** The destination this attempt replaced (a fallback). */
+  fallback_for?: string;
 }
 
 export type Outcome = "forwarded" | "stored" | "rejected" | "fallback_forwarded" | "temp_rejected";
@@ -134,6 +150,70 @@ async function rememberRoute(env: Env, rcpt: string, targets: string[]) {
   }
 }
 
+/**
+ * Forwards to every target and sends every copy; when one fails, the decision's fallback_to destinations are tried
+ * in order until one accepts it (encrypted copies are never redirected). A forwarding failure must not bounce the
+ * mail: it is stored in the app already.
+ */
+async function deliver(
+  message: EmailMessageLike,
+  decision: Decision,
+  targets: string[],
+  env: Env,
+  makeEmail?: MakeEmail,
+): Promise<DeliveryAttempt[]> {
+  const attempts: DeliveryAttempt[] = [];
+  const delivered = new Set<string>();
+  const planned = new Set([...targets, ...(decision.send ?? []).map((m) => m.to)]);
+  const tryOne = async (to: string, run: () => Promise<void>, fallbackFor?: string) => {
+    try {
+      await run();
+      delivered.add(to);
+      attempts.push({ to, ok: true, ...(fallbackFor ? { fallback_for: fallbackFor } : {}) });
+      return true;
+    } catch (err) {
+      console.error(JSON.stringify({ msg: fallbackFor ? "fallback failed" : "forward failed", to, err: String(err) }));
+      attempts.push({ to, ok: false, error: String(err).slice(0, 500), ...(fallbackFor ? { fallback_for: fallbackFor } : {}) });
+      return false;
+    }
+  };
+  const withFallback = async (to: string, run: (dest: string) => Promise<void>, allowed: boolean) => {
+    if ((await tryOne(to, () => run(to))) || !allowed) return;
+    for (const fb of decision.fallback_to ?? []) {
+      if (delivered.has(fb) || planned.has(fb)) continue;
+      if (await tryOne(fb, () => run(fb), to)) return;
+    }
+  };
+  for (const to of targets) await withFallback(to, (dest) => message.forward(dest), true);
+  for (const m of decision.send ?? []) {
+    const send = async (dest: string) => {
+      if (!env.SEND_EMAIL || !makeEmail) throw new Error("SEND_EMAIL binding missing (needed for PGP-encrypted and rewritten forwarding)");
+      const raw = new TextDecoder().decode(Uint8Array.from(atob(m.raw_base64), (c) => c.charCodeAt(0)));
+      await env.SEND_EMAIL.send(makeEmail(m.from, dest, raw));
+    };
+    await withFallback(m.to, send, !m.encrypted);
+  }
+  return attempts;
+}
+
+/** Tells the app which forwards failed and which fallbacks took over (signed like /ingest). Best effort. */
+async function report(env: Env, fetchImpl: typeof fetch, messageId: string, deliveries: DeliveryAttempt[]) {
+  try {
+    const body = enc.encode(JSON.stringify({ message_id: messageId, deliveries }));
+    const ts = String(Math.floor(Date.now() / 1000));
+    const signature = await sign(env.INGEST_SECRET, `${ts}\nreport\nreport\n`, body);
+    const res = await fetchImpl(`${env.APP_URL.replace(/\/$/, "")}/ingest/report`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-tm-timestamp": ts, "x-tm-signature": signature },
+      body,
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (err) {
+    console.error(JSON.stringify({ msg: "delivery report failed", message_id: messageId, err: String(err) }));
+  }
+}
+
 export async function handleEmail(
   message: EmailMessageLike,
   env: Env,
@@ -162,27 +242,10 @@ export async function handleEmail(
 
   switch (decision.action) {
     case "forward": {
-      let ok = 0;
-      for (const to of targets) {
-        try {
-          await message.forward(to);
-          ok++;
-        } catch (err) {
-          // Stored in the app already; a forwarding failure (e.g. destination unverified) must not bounce the mail.
-          console.error(JSON.stringify({ msg: "forward failed", to, err: String(err) }));
-        }
-      }
-      for (const m of decision.send ?? []) {
-        try {
-          if (!env.SEND_EMAIL || !makeEmail) throw new Error("SEND_EMAIL binding missing (needed for PGP-encrypted forwarding)");
-          const raw = new TextDecoder().decode(Uint8Array.from(atob(m.raw_base64), (c) => c.charCodeAt(0)));
-          await env.SEND_EMAIL.send(makeEmail(m.from, m.to, raw));
-          ok++;
-        } catch (err) {
-          console.error(JSON.stringify({ msg: "encrypted send failed", to: m.to, err: String(err) }));
-        }
-      }
-      return ok ? "forwarded" : "stored";
+      const attempts = await deliver(message, decision, targets, env, makeEmail);
+      if (decision.message_id && !decision.duplicate && attempts.some((a) => !a.ok))
+        await report(env, fetchImpl, decision.message_id, attempts);
+      return attempts.some((a) => a.ok) ? "forwarded" : "stored";
     }
     case "reject":
       message.setReject(
