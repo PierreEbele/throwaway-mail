@@ -11,7 +11,7 @@ Useful details: affected version or commit, a description of the impact, and ste
 
 ## Scope
 
-In scope: the app (`app/`), the Email Worker (`worker/`), the browser extension (`extension/`) and the SDK (`sdk/`).
+In scope: the app (`app/`), the Email Worker (`worker/`) and the SDK (`sdk/`). The browser extension has its own repository, [Aliasfill](https://github.com/PierreEbele/Aliasfill).
 Out of scope: issues that need an already compromised admin account or host, and missing hardening of your own
 reverse proxy or identity provider.
 
