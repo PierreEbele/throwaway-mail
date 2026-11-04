@@ -23,8 +23,20 @@ export interface CatchAllRule {
   actions: Array<{ type: string; value?: string[] }>;
 }
 
+export interface TokenInfo {
+  /** "active", "disabled" or "expired". */
+  status: string;
+  expiresOn: string | null;
+}
+
 export interface CloudflareClient {
   readonly mode: "live" | "mock" | "unconfigured";
+  /** State of the API token itself (any valid token may call this). */
+  verifyToken(): Promise<TokenInfo>;
+  /** Whether Email Routing is enabled on the zone. */
+  emailRoutingEnabled(zoneId: string): Promise<boolean>;
+  /** Whether the Email Worker is deployed; null when the token may not read Workers scripts. */
+  workerExists(name: string): Promise<boolean | null>;
   findZone(domain: string): Promise<ZoneInfo | null>;
   enableEmailRouting(zoneId: string, domain: string): Promise<void>;
   setCatchAllToWorker(zoneId: string, workerName: string): Promise<void>;

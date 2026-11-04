@@ -29,8 +29,18 @@ export function makeTestApp(env: Record<string, string> = {}, overrides: Partial
   });
   const db = openDatabase(":memory:", path.join(__dirname, "..", "app/server/db/migrations"));
   const cf = new MockCloudflareClient();
-  // Tests never touch real DNS: every name resolves to a public documentation address.
-  const deps = buildDeps(config, silentLogger, { db, cf, resolve: async () => ["93.184.216.34"], ...overrides });
+  // Tests never touch real DNS: every name resolves to a public documentation address, every domain has
+  // Cloudflare Email Routing MX records.
+  const deps = buildDeps(config, silentLogger, {
+    db,
+    cf,
+    resolve: async () => ["93.184.216.34"],
+    resolveMx: async () => [
+      { exchange: "route1.mx.cloudflare.net", priority: 10 },
+      { exchange: "route2.mx.cloudflare.net", priority: 20 },
+    ],
+    ...overrides,
+  });
   const app = createApp(deps);
   return { app, deps, cf };
 }

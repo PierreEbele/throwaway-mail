@@ -11,6 +11,7 @@ import { badRequest, notFound } from "../lib/errors.js";
 import { audit } from "../services/audit.js";
 import { userOut } from "../services/serialize.js";
 import { getMailbox } from "../services/mailbox/settings.js";
+import { runDiagnostics } from "../services/diagnostics.js";
 
 function dbBytes(deps: Deps) {
   let total = 0;
@@ -110,6 +111,17 @@ export function registerAdmin(r: ApiRouter) {
       auth: "admin",
     },
     (c) => c.json(healthSnapshot(c.get("deps"))),
+  );
+
+  r.add(
+    {
+      method: "get",
+      path: "/v1/admin/diagnostics",
+      summary: "Setup check: configuration, sign-in, Cloudflare, domains and backups, each ok/warn/error with a hint",
+      tags: ["admin"],
+      auth: "admin",
+    },
+    async (c) => c.json(await runDiagnostics(c.get("deps"))),
   );
 
   r.add({ method: "get", path: "/v1/admin/users", summary: "List users", tags: ["admin"], auth: "admin" }, (c) => {

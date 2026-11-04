@@ -7,6 +7,9 @@ export class UnconfiguredCloudflareClient implements CloudflareClient {
   private fail(): never {
     throw new CloudflareError("Cloudflare is not configured: set CF_API_TOKEN and CF_ACCOUNT_ID in the app's .env and restart it", 503);
   }
+  verifyToken = async () => this.fail();
+  emailRoutingEnabled = async () => this.fail();
+  workerExists = async () => this.fail();
   findZone = async () => this.fail();
   enableEmailRouting = async () => this.fail();
   setCatchAllToWorker = async () => this.fail();

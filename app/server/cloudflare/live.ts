@@ -1,4 +1,4 @@
-import type { CatchAllRule, CloudflareClient, DestinationInfo, DnsRecord, ZoneInfo } from "./index.js";
+import type { CatchAllRule, CloudflareClient, DestinationInfo, DnsRecord, TokenInfo, ZoneInfo } from "./index.js";
 import { CloudflareError } from "./index.js";
 
 const API = "https://api.cloudflare.com/client/v4";
@@ -45,6 +45,26 @@ export class LiveCloudflareClient implements CloudflareClient {
       );
     }
     return json.result;
+  }
+
+  async verifyToken(): Promise<TokenInfo> {
+    const r = await this.call<{ status: string; expires_on?: string | null }>("GET", "/user/tokens/verify");
+    return { status: r.status, expiresOn: r.expires_on ?? null };
+  }
+
+  async emailRoutingEnabled(zoneId: string): Promise<boolean> {
+    const r = await this.call<{ enabled: boolean }>("GET", `/zones/${zoneId}/email/routing`);
+    return !!r.enabled;
+  }
+
+  async workerExists(name: string): Promise<boolean | null> {
+    try {
+      const scripts = await this.call<Array<{ id: string }>>("GET", `/accounts/${this.accountId}/workers/scripts`);
+      return scripts.some((s) => s.id === name);
+    } catch (e) {
+      if (e instanceof CloudflareError && (e.status === 403 || e.cfCode === 10000)) return null;
+      throw e;
+    }
   }
 
   async findZone(domain: string): Promise<ZoneInfo | null> {

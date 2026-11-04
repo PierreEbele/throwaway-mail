@@ -6,7 +6,7 @@ import type { EventBus } from "./services/events.js";
 import type { ParserStrategy } from "./parser/index.js";
 import type { User } from "./db/schema.js";
 import type { OidcService } from "./auth/oidc.js";
-import type { Resolver } from "./lib/outbound.js";
+import type { MxResolver, Resolver } from "./lib/outbound.js";
 import type { MailClients } from "./services/mailbox/types.js";
 import type { MailboxRunner } from "./services/mailbox/runner.js";
 
@@ -23,6 +23,8 @@ export interface Deps {
   fetch: typeof fetch;
   /** DNS resolution used to refuse outbound requests to private addresses; replaced in tests. */
   resolve: Resolver;
+  /** MX lookups (setup diagnostics); replaced in tests. */
+  resolveMx: MxResolver;
   /** IMAP / SMTP clients of mailbox domains; replaced in tests. */
   mail: MailClients;
   /** Background pollers of IMAP domains (call sync() after adding, editing or removing one). */

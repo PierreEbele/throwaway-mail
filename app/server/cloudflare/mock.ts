@@ -15,6 +15,15 @@ export class MockCloudflareClient implements CloudflareClient {
   destinations = new Map<string, DestinationInfo & { checks: number }>();
   private seq = 0;
 
+  async verifyToken() {
+    return { status: "active", expiresOn: null };
+  }
+  async emailRoutingEnabled(zoneId: string): Promise<boolean> {
+    return this.zone(zoneId).routing;
+  }
+  async workerExists(): Promise<boolean | null> {
+    return true;
+  }
   async findZone(domain: string): Promise<ZoneInfo | null> {
     if (domain.includes("invalid")) return null;
     return { id: `mockzone_${domain.replace(/\W/g, "_")}`, name: domain, status: "active" };

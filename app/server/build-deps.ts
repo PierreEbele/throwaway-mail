@@ -6,7 +6,7 @@ import { OidcService } from "./auth/oidc.js";
 import { EventBus } from "./services/events.js";
 import { LlmFallbackStrategy } from "./parser/index.js";
 import type { Logger } from "./logger.js";
-import { dnsResolver } from "./lib/outbound.js";
+import { dnsMxResolver, dnsResolver } from "./lib/outbound.js";
 import { realMailClients } from "./services/mailbox/clients.js";
 import { MailboxRunner } from "./services/mailbox/runner.js";
 
@@ -30,6 +30,7 @@ export function buildDeps(config: Config, logger: Logger, overrides: Partial<Dep
     oidc: new OidcService(config, logger),
     fetch: (input, init) => fetch(input, init),
     resolve: dnsResolver,
+    resolveMx: dnsMxResolver,
     mail: realMailClients,
     ...overrides,
   };

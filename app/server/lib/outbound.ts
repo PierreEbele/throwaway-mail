@@ -1,10 +1,22 @@
-import { lookup } from "node:dns/promises";
+import { lookup, resolveMx } from "node:dns/promises";
 import { isIP } from "node:net";
 
 /** Resolves a host name to its IP addresses (replaced in tests). */
 export type Resolver = (host: string) => Promise<string[]>;
 
 export const dnsResolver: Resolver = async (host) => (await lookup(host, { all: true, verbatim: true })).map((a) => a.address);
+
+/** MX records of a domain, best (lowest priority) first; [] when it has none (replaced in tests). */
+export type MxResolver = (domain: string) => Promise<Array<{ exchange: string; priority: number }>>;
+
+export const dnsMxResolver: MxResolver = async (domain) => {
+  try {
+    return (await resolveMx(domain)).sort((a, b) => a.priority - b.priority);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENODATA" || (e as NodeJS.ErrnoException).code === "ENOTFOUND") return [];
+    throw e;
+  }
+};
 
 /** Loopback, private, link-local, CGNAT, unique-local and unspecified addresses. */
 export function isPrivateIp(ip: string): boolean {
