@@ -12,6 +12,7 @@ import { authWarning } from "../../lib/phishing.js";
 import { listInfo } from "../../lib/listheaders.js";
 import { listed, looksLikeLeak, parseList, senderDomain } from "../../lib/senders.js";
 import { runParser } from "../../parser/index.js";
+import { unsubscribeCandidates } from "../../parser/unsubscribe.js";
 import { pauseExpired } from "../reminders.js";
 import { handleReply, REVERSE_LOCAL_RE } from "../replies.js";
 import { authResult } from "./auth.js";
@@ -150,6 +151,8 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
 
   const parsed = await runParser({ subject: email.subject, text: email.text, html: email.html }, deps.parserStrategies);
   const list = listInfo(email.headers);
+  // No List-Unsubscribe URL: fall back to an unsubscribe link or button found in the body.
+  const unsub = list.url ? null : unsubscribeCandidates({ text: email.text, html: email.html }).find((u) => u.url);
   if (address.blockPromos && list.bulk && !parsed.code) {
     log.info("reject: promotional mail blocked", { address_id: address.id });
     emitBlocked(deps, address, rcpt.full, email.from?.address ?? envelopeSender, "promotional_blocked");
@@ -230,7 +233,7 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
         trackersRemoved: clean?.trackers ?? 0,
         authWarning: address.isUnassigned ? null : authWarning(address.siteUrl, email.from?.address ?? null, auth),
         isBulk: list.bulk,
-        unsubscribeUrl: list.url,
+        unsubscribeUrl: list.url ?? unsub?.url ?? null,
         unsubscribeMailto: list.mailto,
         unsubscribeOneClick: list.oneClick,
         forwarded: !!forwardTo,

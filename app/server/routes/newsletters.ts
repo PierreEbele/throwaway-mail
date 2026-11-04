@@ -1,9 +1,27 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { ApiRouter } from "../lib/http.js";
 import { addresses, messages } from "../db/schema.js";
 import { badRequest, notFound } from "../lib/errors.js";
 import { checkOutboundUrl } from "../lib/outbound.js";
+import { ownedAddress } from "../services/addresses.js";
+import { pickUnsubscribe, unsubscribeCandidates, type UnsubscribeCandidate } from "../parser/unsubscribe.js";
+
+type Row = typeof messages.$inferSelect;
+
+function candidatesOf(m: Row): UnsubscribeCandidate[] {
+  let headers: Array<{ key: string; value: string }> = [];
+  try {
+    headers = m.headersJson ? JSON.parse(m.headersJson) : [];
+  } catch {
+    /* ignore */
+  }
+  const found = unsubscribeCandidates({ headers, text: m.text, html: m.html });
+  // Stored at ingest (from the original, unsanitized body): keep it in case the sanitized HTML lost it.
+  if (m.unsubscribeUrl || m.unsubscribeMailto)
+    found.push({ kind: m.unsubscribeOneClick ? "one_click" : "body", url: m.unsubscribeUrl, mailto: m.unsubscribeMailto });
+  return pickUnsubscribe(found);
+}
 
 /** Newsletter handling (List-Unsubscribe). */
 export function registerNewsletters(r: ApiRouter) {
@@ -27,7 +45,10 @@ export function registerNewsletters(r: ApiRouter) {
         .where(and(eq(messages.id, c.req.param("id")!), eq(messages.userId, user.id)))
         .get();
       if (!m) throw notFound("Message");
-      if (!m.unsubscribeUrl && !m.unsubscribeMailto) throw badRequest("This message has no List-Unsubscribe header");
+      const target = m.unsubscribeUrl || m.unsubscribeMailto ? null : (candidatesOf(m)[0] ?? null);
+      const url = target ? target.url : m.unsubscribeUrl;
+      const mailto = target ? target.mailto : m.unsubscribeMailto;
+      if (!url && !mailto) throw badRequest("This message has no unsubscribe link");
       if (body.block)
         d.db
           .update(addresses)
@@ -55,7 +76,57 @@ export function registerNewsletters(r: ApiRouter) {
       }
       if (done) d.db.update(messages).set({ unsubscribedAt: d.now() }).where(eq(messages.id, m.id)).run();
       d.bus.publish(user.id, { type: "address.updated", address_id: m.addressId });
-      return c.json({ done, error, url: done ? null : m.unsubscribeUrl, mailto: done ? null : m.unsubscribeMailto, blocked: body.block });
+      return c.json({ done, error, url: done ? null : url, mailto: done ? null : mailto, blocked: body.block });
+    },
+  );
+
+  r.add(
+    {
+      method: "get",
+      path: "/v1/addresses/:id/unsubscribe",
+      summary: "Best unsubscribe offer for an address",
+      description:
+        "Scans the address's recent messages (List-Unsubscribe headers, then unsubscribe links and buttons in the body) and returns the best candidate: " +
+        "one-click first, then https, then mailto, then a body link. Senders already unsubscribed from are skipped. `offer` is null when nothing was found.",
+      tags: ["messages"],
+      auth: "user",
+      responses: { 200: "{ offer: { message_id, from, from_name, kind, url, mailto, label } | null, senders }" },
+    },
+    async (c) => {
+      const d = c.get("deps");
+      const user = c.get("user")!;
+      const { a } = ownedAddress(d, user, c.req.param("id")!);
+      const rows = d.db
+        .select()
+        .from(messages)
+        .where(and(eq(messages.addressId, a.id), eq(messages.userId, user.id)))
+        .orderBy(desc(messages.receivedAt))
+        .limit(200)
+        .all();
+      const done = new Set(rows.filter((m) => m.unsubscribedAt).map((m) => (m.fromAddr ?? "").toLowerCase()));
+      const offers: Array<UnsubscribeCandidate & { message_id: string; from: string | null; from_name: string | null }> = [];
+      for (const m of rows) {
+        if (done.has((m.fromAddr ?? "").toLowerCase())) continue;
+        const best = candidatesOf(m)[0];
+        if (best) offers.push({ ...best, message_id: m.id, from: m.fromAddr, from_name: m.fromName });
+      }
+      const ranked = pickUnsubscribe(offers);
+      const senders = new Set(ranked.map((o) => (o.from ?? "").toLowerCase())).size;
+      const o = ranked[0];
+      return c.json({
+        offer: o
+          ? {
+              message_id: o.message_id,
+              from: o.from,
+              from_name: o.from_name,
+              kind: o.kind,
+              url: o.url,
+              mailto: o.mailto,
+              label: o.label ?? null,
+            }
+          : null,
+        senders,
+      });
     },
   );
 }

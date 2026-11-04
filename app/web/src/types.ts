@@ -378,3 +378,13 @@ export interface AddressSettingsResponse {
   settings: AddressSettings;
   examples: string[];
 }
+
+export interface UnsubscribeOffer {
+  message_id: string;
+  from: string | null;
+  from_name: string | null;
+  kind: "one_click" | "https" | "mailto" | "body";
+  url: string | null;
+  mailto: string | null;
+  label: string | null;
+}

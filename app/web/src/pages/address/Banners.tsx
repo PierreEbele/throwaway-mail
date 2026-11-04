@@ -1,6 +1,7 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { post } from "../../api";
-import type { Address } from "../../types";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { get, post } from "../../api";
+import type { Address, UnsubscribeOffer } from "../../types";
 import { useToast } from "../../components/ui";
 import { invalidate } from "../../queries";
 import { fullDate, hostOf, timeAgo } from "../../util";
@@ -97,6 +98,73 @@ export function LeakBanner({ a, onPause }: { a: Address; onPause: () => void }) 
           Dismiss
         </button>
       </div>
+    </div>
+  );
+}
+
+const dismissKey = (o: UnsubscribeOffer) => `unsub-dismissed:${o.from ?? ""}:${o.url ?? o.mailto ?? ""}`;
+
+/** Offers to unsubscribe from the best newsletter target found in this address's mail. */
+export function UnsubscribeBanner({ a }: { a: Address }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [, rerender] = useState(0);
+  const q = useQuery({
+    queryKey: ["address", a.id, "unsubscribe"],
+    queryFn: () => get<{ offer: UnsubscribeOffer | null; senders: number }>(`/v1/addresses/${a.id}/unsubscribe`),
+  });
+  const o = q.data?.offer;
+  if (!o || localStorage.getItem(dismissKey(o)) === "1") return null;
+  const run = async () => {
+    setBusy(true);
+    try {
+      const r = await post<{ done: boolean; error: string | null; url: string | null; mailto: string | null }>(
+        `/v1/messages/${o.message_id}/unsubscribe`,
+        { block: false },
+      );
+      invalidate(qc, ["message", o.message_id], ["address", a.id]);
+      if (r.done) toast("Unsubscribed", "success");
+      else if (r.url || r.mailto) {
+        window.open(r.url ?? r.mailto!, "_blank", "noopener,noreferrer");
+        toast("Finish unsubscribing on the page that just opened", "success");
+      } else toast(r.error ?? "Could not unsubscribe", "error");
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const dismiss = () => {
+    localStorage.setItem(dismissKey(o), "1");
+    rerender((n) => n + 1);
+  };
+  const others = (q.data?.senders ?? 1) - 1;
+  return (
+    <div
+      data-testid="unsubscribe-banner"
+      className="flex flex-wrap items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-300"
+    >
+      <span className="min-w-0 flex-1 truncate">
+        Newsletter from <strong className="font-medium">{o.from_name || o.from || "an unknown sender"}</strong>
+        {o.from_name && o.from && <span className="text-zinc-500"> ({o.from})</span>}
+        {others > 0 && <span className="text-zinc-500">, and {others} more</span>}. Unsubscribe?
+      </span>
+      <button
+        className="btn-secondary px-2 py-0.5 text-xs"
+        disabled={busy}
+        onClick={run}
+        title={o.kind === "one_click" ? "One-click unsubscribe" : "Opens the unsubscribe page"}
+      >
+        Unsubscribe
+      </button>
+      <button
+        className="px-1 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+        onClick={dismiss}
+        aria-label="Hide this suggestion"
+      >
+        Hide
+      </button>
     </div>
   );
 }

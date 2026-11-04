@@ -7,6 +7,7 @@ import { ErrorText, Spinner, useToast } from "../../components/ui";
 import { invalidate } from "../../queries";
 import { useDestinations } from "../Addresses";
 import { AddressHeader } from "./AddressHeader";
+import { UnsubscribeBanner } from "./Banners";
 import { CodeCard } from "./CodeCard";
 import { EditSiteDialog } from "./EditSiteDialog";
 import { ForwardingCard } from "./ForwardingCard";
@@ -52,6 +53,7 @@ export function AddressDetailPage() {
 
   return (
     <div className="space-y-6">
+      <UnsubscribeBanner a={a} />
       <AddressHeader a={a} back={back} onUpdate={onUpdate} onEdit={() => setEditing(true)} />
       <div className="grid gap-4 2xl:grid-cols-3">
         <CodeCard code={code} />
