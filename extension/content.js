@@ -4,7 +4,7 @@
 //  2. if a disposable address for this site is waiting for a code, waits for it and pastes it on arrival;
 //  3. on a one-time-code page of a site with a disposable address, offers (or auto-fills) its latest code.
 // Nothing is sent until the user clicks; only the code wait (after a fill) queries the
-// Throwaway Mail server, through the background script.
+// Throwaway Mail server, through the background script (only when it is the active alias provider).
 (() => {
   if (window.top !== window || window.__throwawayContent) return;
   window.__throwawayContent = true;
@@ -97,14 +97,14 @@
         const n = r?.report?.filled || 0;
         if (r?.bitwarden) {
           render(
-            `<p><strong>${esc(r.name)}</strong></p><p>${n} field${n > 1 ? "s" : ""} filled. Now fill the e-mail (alias generator) and password with Bitwarden.</p><p class="muted">The code will be pasted as soon as it arrives.</p>`,
+            `<p><strong>${esc(r.name)}</strong></p><p>${n} field${n > 1 ? "s" : ""} filled. Now fill the e-mail (alias generator) and password with Bitwarden.</p>${r.codes ? `<p class="muted">The code will be pasted as soon as it arrives.</p>` : ""}`,
           ).addEventListener("click", (e2) => e2.target.closest("[data-a=close]") && close());
           return void watchEmail();
         }
         render(
-          `<p><strong>${esc(r.name)}</strong><br><span class="muted">${esc(r.email)}</span></p><p>${n} field${n > 1 ? "s" : ""} filled. Check it, then submit the form yourself.</p>`,
+          `<p><strong>${esc(r.name)}</strong><br><span class="muted">${esc(r.email)}${r.provider ? ` · ${esc(r.provider)}` : ""}</span></p><p>${n} field${n > 1 ? "s" : ""} filled. Check it, then submit the form yourself.</p>`,
         ).addEventListener("click", (e2) => e2.target.closest("[data-a=close]") && close());
-        void watchCode();
+        if (r.codes) void watchCode();
       }
     });
   }

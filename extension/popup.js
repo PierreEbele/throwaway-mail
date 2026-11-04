@@ -406,15 +406,22 @@ function tmStatus(message, error = false) {
   $("tm-status").textContent = message;
   $("tm-status").dataset.tone = error ? "error" : "normal";
 }
+// Active alias provider ({ provider, cfg }) or null; `codes` = it can fetch verification codes (Throwaway Mail).
+let active = null;
+const canFetchCodes = () => !!active?.provider.codes;
 async function tmRender() {
-  const on = await Throwaway.enabled().catch(() => false);
-  $("tm-badge").replaceChildren(document.createElement("i"), on ? " THROWAWAY" : " LOCAL");
+  active = await AliasProviders.active().catch(() => null);
+  const on = !!active;
+  const name = active?.provider.name || "";
+  $("tm-badge").replaceChildren(document.createElement("i"), on ? ` ${active.provider.short}` : " LOCAL");
   $("tm-badge").classList.toggle("on", on);
-  $("tm-badge").title = on ? "Real e-mail addresses via Throwaway Mail" : "@example.com addresses, nothing leaves the browser";
+  $("tm-badge").title = on
+    ? `Addresses from ${active.provider.id === "none" ? "your own domain or mailbox (no network)" : name}${canFetchCodes() ? ", codes fetched automatically" : ""}`
+    : "@example.com addresses, nothing leaves the browser";
   const alias = profile?.throwaway;
   $("tm-email-note").hidden = !on;
   $("tm-email-note").textContent = alias ? "DISPOSABLE" : "DISPOSABLE ON FILL";
-  $("tm-panel").hidden = !(on && alias);
+  $("tm-panel").hidden = !(canFetchCodes() && alias?.id);
   if (alias) $("tm-address").textContent = alias.email;
   $("tm-code").textContent = tmCode?.code || "—";
   $("tm-copy").disabled = $("tm-paste").disabled = !tmCode?.code;
@@ -438,7 +445,7 @@ async function activeTabUrl() {
 // Before filling: create (or reuse) the disposable address for the open site.
 // Returns false if the fill must be aborted.
 async function ensureAlias() {
-  if (!selectedFields.has("email") || !(await Throwaway.enabled())) return true;
+  if (!selectedFields.has("email") || !(await AliasProviders.active())) return true;
   const url = await activeTabUrl();
   if (!/^https?:/.test(url)) {
     status("Open a website’s form and try again.", true);
@@ -448,7 +455,7 @@ async function ensureAlias() {
   if (profile.throwaway?.host === host) return true;
   status(`Creating a disposable address for ${host}…`);
   try {
-    const alias = await Throwaway.createAddress(url, profile.fullName);
+    const alias = await AliasProviders.createAlias(url, profile.fullName);
     profile = { ...profile, email: alias.email, throwaway: alias };
     tmCode = null;
     render();
@@ -457,8 +464,8 @@ async function ensureAlias() {
     return true;
   } catch (e) {
     status(
-      e.status === 401
-        ? "Invalid Throwaway Mail API key. Check the settings."
+      e.status === 401 || e.status === 403
+        ? `${AliasProviders.errorMessage(active?.provider, e)} Check the settings.`
         : `Could not create a disposable address: ${e.message}. Nothing was filled.`,
       true,
     );
@@ -487,21 +494,21 @@ async function ensureIdentity() {
 // even if the popup closes or the site moves to another page.
 async function handOffCode(tabId) {
   const { autoCode } = await browser.storage.local.get("autoCode");
-  if (autoCode === false || !profile?.throwaway) return;
+  if (autoCode === false || !profile?.throwaway?.id || !canFetchCodes()) return;
   await browser.runtime.sendMessage({ type: "pending-set", host: profile.throwaway.host, alias: profile.throwaway }).catch(() => {});
   await browser.tabs.sendMessage(tabId, { type: "watch-code" }).catch(() => {});
   tmStatus("The code will be pasted into the page as soon as it arrives.");
 }
 async function tmPoll(wait) {
   const alias = profile?.throwaway;
-  if (!alias) return;
+  if (!alias?.id || !canFetchCodes()) return;
   const since = tmCode?.message_id || alias.createdAt;
   tmWaiting = wait > 0;
   void tmRender();
   if (wait) tmStatus("Waiting for an e-mail (up to 2 min). Keep this window open.");
   try {
     let found = null;
-    for (let i = 0; i < (wait ? 2 : 1) && !found; i++) found = await Throwaway.waitForCode(alias.id, since, wait);
+    for (let i = 0; i < (wait ? 2 : 1) && !found; i++) found = await active.provider.waitForCode(active.cfg, alias, since, wait);
     if (found) {
       tmCode = found;
       if (found.code && wait) setTimeout(() => $("tm-paste").click(), 0);
@@ -512,7 +519,7 @@ async function tmPoll(wait) {
       );
     } else if (wait) tmStatus("Nothing yet. Try again after asking the site to send the code.");
   } catch (e) {
-    tmStatus(`Throwaway Mail unreachable: ${e.message}`, true);
+    tmStatus(`${active?.provider.name || "Server"} unreachable: ${e.message}`, true);
   } finally {
     tmWaiting = false;
     void tmRender();
@@ -643,7 +650,7 @@ syncControls();
     if (saved.settingsVersion !== 3) await saveSettings();
     syncControls();
     await tmRender();
-    if (profile?.throwaway && (await Throwaway.enabled())) void tmPoll(0);
+    if (profile?.throwaway?.id && canFetchCodes()) void tmPoll(0);
   } catch {
     status("Local storage unavailable. You can still generate a profile.", true);
   }

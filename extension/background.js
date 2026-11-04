@@ -1,6 +1,7 @@
 "use strict";
-// Background script: fills a page with a fresh identity + a disposable address,
-// and relays network requests for content scripts (which cannot reach the server because of CORS).
+// Background script: fills a page with a fresh identity + a disposable address from the active alias provider
+// (providers/*.js), and relays network requests for content scripts (which cannot reach the server because of CORS).
+// Verification codes need a provider that reads mail (`codes`: Throwaway Mail only).
 // Addresses "waiting for a code" are kept per site in storage.local (tmPending)
 // to survive page changes between sign-up and code entry.
 
@@ -55,6 +56,12 @@ async function settings() {
   };
 }
 
+// Throwaway Mail client when it is the active provider (the only one that can fetch codes), else null.
+async function codeProvider() {
+  const a = await AliasProviders.active();
+  return a?.provider.codes ? a : null;
+}
+
 async function setPending(host, alias) {
   const { tmPending = {} } = await browser.storage.local.get("tmPending");
   const now = Date.now();
@@ -85,8 +92,9 @@ async function fillNewIdentity(tabId, pageUrl) {
   let profile = keepPrevious ? s.profile : ThrowawayGenerator.generate(s.countryMode, s.profile, s.lockedFields);
   if (!keepPrevious && s.lockedFields.includes("email") && s.profile?.throwaway) profile.throwaway = s.profile.throwaway;
   profile = { ...profile, site: host };
-  if (!s.bitwardenMode && s.selectedFields.includes("email") && (await Throwaway.enabled()) && profile.throwaway?.host !== host) {
-    const alias = await Throwaway.createAddress(pageUrl, profile.fullName);
+  const provider = await AliasProviders.active();
+  if (!s.bitwardenMode && s.selectedFields.includes("email") && provider && profile.throwaway?.host !== host) {
+    const alias = await AliasProviders.createAlias(pageUrl, profile.fullName);
     profile = { ...profile, email: alias.email, throwaway: alias };
   }
   const { revision = 0 } = await browser.storage.local.get("revision");
@@ -97,9 +105,11 @@ async function fillNewIdentity(tabId, pageUrl) {
     func: (data, options) => globalThis.ThrowawayFill.fill(data, options),
     args: [profile, { overwrite: true, fields }],
   });
-  if (s.bitwardenMode) return { report: res?.result || null, name: profile.fullName, bitwarden: true };
-  if (profile.throwaway?.host === host && s.autoCode) await setPending(host, profile.throwaway);
-  return { report: res?.result || null, email: profile.email, name: profile.fullName };
+  const via = provider ? { provider: provider.provider.name, codes: !!provider.provider.codes } : { provider: null, codes: false };
+  if (s.bitwardenMode) return { report: res?.result || null, name: profile.fullName, bitwarden: true, ...via };
+  if (profile.throwaway?.host === host && profile.throwaway.id && s.autoCode && provider?.provider.codes)
+    await setPending(host, profile.throwaway);
+  return { report: res?.result || null, email: profile.email, name: profile.fullName, ...via };
 }
 
 browser.runtime.onMessage.addListener((msg, sender) => {
@@ -111,20 +121,23 @@ browser.runtime.onMessage.addListener((msg, sender) => {
       return (async () => {
         const s = await settings();
         const { dismissedHosts = [] } = await browser.storage.local.get("dismissedHosts");
+        const autoCode = s.autoCode && !!(await codeProvider());
         return {
           autoPrompt: s.autoPrompt && !dismissedHosts.includes(host),
-          autoCode: s.autoCode,
-          autoFillCode: s.autoCode && s.autoFillCode,
-          pending: host && s.autoCode ? await getPending(host) : null,
+          autoCode,
+          autoFillCode: autoCode && s.autoFillCode,
+          pending: host && autoCode ? await getPending(host) : null,
         };
       })();
     case "fill-new":
-      return fillNewIdentity(tabId, url).catch((e) => ({ error: e.status === 401 ? "Invalid Throwaway Mail API key." : e.message }));
+      return fillNewIdentity(tabId, url).catch(async (e) => ({
+        error: AliasProviders.errorMessage(AliasProviders.get(await AliasProviders.selectedId()), e),
+      }));
     case "poll-code":
       // Short long polling (20 s): each message keeps the background script awake.
       return (async () => {
         const p = host && (await getPending(host));
-        if (!p) return { done: true };
+        if (!p || !(await codeProvider())) return { done: true };
         try {
           const found = await Throwaway.waitForCode(p.id, p.since, 20);
           if (found?.code) {
@@ -146,7 +159,7 @@ browser.runtime.onMessage.addListener((msg, sender) => {
         const email = String(msg.email || "")
           .trim()
           .toLowerCase();
-        if (!host || !/^[^@\s]+@[^@\s]+$/.test(email) || !(await Throwaway.enabled())) return { ok: false };
+        if (!host || !/^[^@\s]+@[^@\s]+$/.test(email) || !(await codeProvider())) return { ok: false };
         try {
           const data = await Throwaway.request(`/v1/addresses?q=${encodeURIComponent(email)}`);
           const a = (data.addresses || []).find((x) => x.email.toLowerCase() === email);
@@ -160,7 +173,7 @@ browser.runtime.onMessage.addListener((msg, sender) => {
     case "site-code":
       // Code field detected with no wait in progress: latest code (< 15 min) of this site's address.
       return (async () => {
-        if (!host || !(await Throwaway.enabled()) || !(await settings()).autoCode) return { done: true };
+        if (!host || !(await codeProvider()) || !(await settings()).autoCode) return { done: true };
         try {
           const a = await addressForHost(host, url, false);
           if (!a) return { done: true };
@@ -191,21 +204,23 @@ browser.runtime.onMessage.addListener((msg, sender) => {
   return undefined;
 });
 
-// This site's disposable address: the current identity's, the one waiting for a code, otherwise the
-// server's (site_name = host); if `create`, a new one is created as a last resort.
+// This site's disposable address: the current identity's, the one waiting for a code, otherwise (Throwaway Mail)
+// the server's (site_name = host); if `create`, a new one is created as a last resort with the active provider.
 async function addressForHost(host, pageUrl, create) {
   const { profile } = await browser.storage.local.get("profile");
   if (profile?.throwaway?.host === host) return profile.throwaway;
-  const p = await getPending(host);
-  if (p) return { id: p.id, email: p.email, host, createdAt: p.since };
-  const a = await Throwaway.siteAddress(host);
-  if (a) return { id: a.id, email: a.email, host, createdAt: a.created_at, unread: a.unread_count || 0, leak: a.leak || null };
-  return create ? Throwaway.createAddress(pageUrl, profile?.fullName) : null;
+  if (await codeProvider()) {
+    const p = await getPending(host);
+    if (p) return { id: p.id, email: p.email, host, createdAt: p.since };
+    const a = await Throwaway.siteAddress(host);
+    if (a) return { id: a.id, email: a.email, host, createdAt: a.created_at, unread: a.unread_count || 0, leak: a.leak || null };
+  }
+  return create ? AliasProviders.createAlias(pageUrl, profile?.fullName) : null;
 }
 
 // ---------- Context menu for editable fields ----------
 browser.menus.create(
-  { id: "tm-insert", title: "Generate a Throwaway address here", contexts: ["editable"] },
+  { id: "tm-insert", title: "Insert a disposable address here", contexts: ["editable"] },
   () => void browser.runtime.lastError,
 );
 browser.menus.onClicked.addListener(async (info, tab) => {
@@ -213,17 +228,17 @@ browser.menus.onClicked.addListener(async (info, tab) => {
   const host = new URL(tab.url).hostname;
   let email;
   try {
-    if (!(await Throwaway.enabled())) throw new Error("Throwaway Mail is not configured (see the extension settings).");
+    if (!(await AliasProviders.active())) throw new Error("NOT_CONFIGURED");
     const a = await addressForHost(host, tab.url, true);
     email = a.email;
-    if ((await settings()).autoCode) await setPending(host, a);
+    if (a.id && (await settings()).autoCode && (await codeProvider())) await setPending(host, a);
   } catch (e) {
     email = null;
     await browser.scripting
       .executeScript({
         target: { tabId: tab.id, frameIds: [info.frameId ?? 0] },
         func: (m) => alert(m),
-        args: [e.status === 401 ? "Invalid Throwaway Mail API key." : e.message],
+        args: [AliasProviders.errorMessage(AliasProviders.get(await AliasProviders.selectedId()), e)],
       })
       .catch(() => {});
     return;
@@ -255,7 +270,7 @@ async function updateBadge(tabId) {
   let text = "",
     color = "#18181b";
   try {
-    if (tab && /^https?:/.test(tab.url || "") && (await Throwaway.enabled())) {
+    if (tab && /^https?:/.test(tab.url || "") && (await codeProvider())) {
       const a = await Throwaway.siteAddress(new URL(tab.url).hostname);
       if (a?.leak) {
         text = "!";

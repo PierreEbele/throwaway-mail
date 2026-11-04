@@ -9,40 +9,52 @@
   <body class="options">
     <h1>Settings</h1>
     <div id="perm-banner" class="perm" hidden>
-      <p>Firefox has not yet allowed Throwaway Mail on websites, so it cannot detect sign-up forms or paste codes on its own.</p>
+      <p>The browser has not yet allowed Throwaway Mail on websites, so it cannot detect sign-up forms or paste codes on its own.</p>
       <button id="perm-grant" class="primary" type="button">Allow on all sites</button>
     </div>
-    <p class="hint">
-      With a server configured, “Fill form” creates a real disposable address for the open site instead of an
-      <code>@example.com</code> address. The verification code received then shows in the popup.
-    </p>
     <form id="form">
-      <label for="server">Server URL</label>
-      <input id="server" type="url" placeholder="https://mail.example.com" required />
-      <label for="api-key">API key <span class="hint">(Throwaway Mail → API keys → Create)</span></label>
-      <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="tm_…" />
-      <label for="domain">Address domain</label>
-      <select id="domain">
-        <option value="">Server default</option>
-      </select>
-      <label for="expires-days">New addresses expire after</label>
-      <select id="expires-days">
-        <option value="0">Account default (Throwaway Mail → Account → New addresses)</option>
-        <option value="1">1 day</option>
-        <option value="7">7 days</option>
-        <option value="30">30 days</option>
-        <option value="90">90 days</option>
-      </select>
-      <label for="max-messages">New addresses stop after <span class="hint">(mails; empty = account default)</span></label>
-      <input id="max-messages" type="number" min="1" max="100000" placeholder="account default" />
+      <label for="provider">Where do addresses come from?</label>
+      <select id="provider"></select>
+      <p id="provider-help" class="hint"></p>
+      <div id="generic-fields"></div>
+      <div id="tm-fields" hidden>
+        <label for="server">Server URL</label>
+        <input id="server" type="url" placeholder="https://mail.example.com" />
+        <label for="api-key">API key <span class="hint">(Throwaway Mail → API keys → Create)</span></label>
+        <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="tm_…" />
+        <label for="domain">Address domain</label>
+        <select id="domain">
+          <option value="">Server default</option>
+        </select>
+        <label for="expires-days">New addresses expire after</label>
+        <select id="expires-days">
+          <option value="0">Account default (Throwaway Mail → Account → New addresses)</option>
+          <option value="1">1 day</option>
+          <option value="7">7 days</option>
+          <option value="30">30 days</option>
+          <option value="90">90 days</option>
+        </select>
+        <label for="max-messages">New addresses stop after <span class="hint">(mails; empty = account default)</span></label>
+        <input id="max-messages" type="number" min="1" max="100000" placeholder="account default" />
+      </div>
+      <div class="actions">
+        <button id="test" class="ghost" type="button">Test connection</button><button class="primary" type="submit">Save</button>
+      </div>
+      <button id="clear" class="link" type="button">Forget this provider’s key</button>
       <fieldset class="toggles">
         <legend>Automation</legend>
         <label class="check"><input type="checkbox" id="auto-prompt" /> Offer a new identity on sign-up forms</label>
-        <label class="check"><input type="checkbox" id="auto-code" /> Paste the code into the page as soon as it arrives</label>
-        <label class="check"
-          ><input type="checkbox" id="auto-fill-code" /> Fill one-time-code fields directly
-          <span class="hint">(on a code page of a site with a disposable address; otherwise a “Fill code” chip offers it)</span></label
-        >
+        <p id="codes-off" class="hint" hidden>
+          Verification codes can only be fetched with Throwaway Mail, which receives the mail itself: with this provider, read the code in
+          your mailbox.
+        </p>
+        <div id="codes-on">
+          <label class="check"><input type="checkbox" id="auto-code" /> Paste the code into the page as soon as it arrives</label>
+          <label class="check"
+            ><input type="checkbox" id="auto-fill-code" /> Fill one-time-code fields directly
+            <span class="hint">(on a code page of a site with a disposable address; otherwise a “Fill code” chip offers it)</span></label
+          >
+        </div>
         <label class="check"><input type="checkbox" id="always-new" /> New identity for every new site</label>
         <label class="check"
           ><input type="checkbox" id="bitwarden-mode" /> Let Bitwarden handle e-mail and password
@@ -59,14 +71,20 @@
           <option value="0">Never</option>
         </select>
       </fieldset>
-      <div class="actions">
-        <button id="test" class="ghost" type="button">Test connection</button><button class="primary" type="submit">Save</button>
-      </div>
-      <button id="clear" class="link" type="button">Disable (delete the key)</button>
     </form>
     <p id="status" class="status" role="status" aria-live="polite"></p>
     <script src="compat.js"></script>
     <script src="throwaway.js"></script>
+    <script src="providers/index.js"></script>
+    <script src="providers/local.js"></script>
+    <script src="providers/throwaway.js"></script>
+    <script src="providers/simplelogin.js"></script>
+    <script src="providers/addy.js"></script>
+    <script src="providers/firefox-relay.js"></script>
+    <script src="providers/fastmail.js"></script>
+    <script src="providers/forward-email.js"></script>
+    <script src="providers/duckduckgo.js"></script>
+
     <script src="options.js"></script>
   </body>
 </html>

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Throwaway Mail",
-  "version": "1.12.0",
-  "description": "Fake identities with real Throwaway Mail disposable addresses, and automatic verification code retrieval.",
+  "version": "2.0.0",
+  "description": "Fake identities for sign-up forms, with disposable addresses from your own domain or alias service.",
   "permissions": ["alarms", "activeTab", "menus", "scripting", "storage"],
   "action": {
     "default_title": "Throwaway Mail",
@@ -30,9 +30,23 @@
     "page": "options.html",
     "open_in_tab": true
   },
-  "host_permissions": ["http://*/*", "https://*/*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": {
-    "scripts": ["compat.js", "generator.js", "throwaway.js", "background.js"]
+    "scripts": [
+      "compat.js",
+      "generator.js",
+      "throwaway.js",
+      "providers/index.js",
+      "providers/local.js",
+      "providers/throwaway.js",
+      "providers/simplelogin.js",
+      "providers/addy.js",
+      "providers/firefox-relay.js",
+      "providers/fastmail.js",
+      "providers/forward-email.js",
+      "providers/duckduckgo.js",
+      "background.js"
+    ]
   },
   "content_scripts": [
     {
