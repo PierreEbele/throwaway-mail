@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { describe, expect, it } from "vitest";
-import { addDomain, makeTestApp, setupAdmin } from "../helpers.js";
+import { addDomain, ingest, makeTestApp, setupAdmin, simpleEml } from "../helpers.js";
 
 // Runs the extension's background scripts (generator + throwaway + background) against a fake `browser`.
 function loadBackground(t: ReturnType<typeof makeTestApp>, store: Record<string, any>) {
@@ -115,5 +115,26 @@ describe("extension background", () => {
     store.identityTtlHours = 1;
     await send({ type: "purge" });
     expect(store.profile.createdAt).toBeGreaterThan(0);
+  });
+
+  it("offers the latest code of the site's address on a code page, auto-fill only when turned on", async () => {
+    const { t, admin, store, send } = await setup();
+    expect(await send({ type: "state" })).toMatchObject({ autoCode: true, autoFillCode: false });
+    store.autoFillCode = true;
+    expect(await send({ type: "state" })).toMatchObject({ autoFillCode: true });
+    store.autoCode = false; // the master switch turns both off
+    expect(await send({ type: "state" })).toMatchObject({ autoCode: false, autoFillCode: false });
+    expect(await send({ type: "site-code", wait: 0 })).toEqual({ done: true });
+    store.autoCode = true;
+
+    // No address for this site: nothing to offer.
+    expect(await send({ type: "site-code", wait: 0 }, "https://bank.example.org/verify")).toEqual({ done: true });
+    const a = (await admin.post("/v1/addresses", { site_name: "bank.example.org" })).json.address;
+    expect(await send({ type: "site-code", wait: 0 }, "https://bank.example.org/verify")).toEqual({ waiting: true });
+    // The long poll returns as soon as the code arrives.
+    const waiting = send({ type: "site-code", wait: 5 }, "https://bank.example.org/verify");
+    await new Promise((r) => setTimeout(r, 100));
+    await ingest(t, a.email, simpleEml({ subject: "Your code", text: "Your one-time code is 731904" }));
+    expect(await waiting).toMatchObject({ code: "731904" });
   });
 });

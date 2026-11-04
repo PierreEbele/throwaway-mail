@@ -1,7 +1,8 @@
 "use strict";
 // Content script (all sites, top frame):
 //  1. detects a sign-up form and offers "new identity + fill";
-//  2. if a disposable address for this site is waiting for a code, waits for it and pastes it on arrival.
+//  2. if a disposable address for this site is waiting for a code, waits for it and pastes it on arrival;
+//  3. on a one-time-code page of a site with a disposable address, offers (or auto-fills) its latest code.
 // Nothing is sent until the user clicks; only the code wait (after a fill) queries the
 // Throwaway Mail server, through the background script.
 (() => {
@@ -139,52 +140,19 @@
   }
 
   // ---------- 2. Waiting for and pasting the code ----------
-  function codeTarget(len) {
-    const inputs = [...document.querySelectorAll("input")].filter(
-      (el) => shown(el) && !el.readOnly && !["hidden", "password", "email", "checkbox", "radio", "submit", "button"].includes(el.type),
-    );
-    const boxes = inputs.filter((el) => el.maxLength === 1);
-    if (len > 1 && boxes.length >= len) return { boxes };
-    const hint = /code|otp|token|verif|pin|2fa|mfa|one.?time|confirm/i;
-    const el =
-      inputs.find((i) => i.autocomplete === "one-time-code") ||
-      inputs.find((i) => hint.test(`${i.name} ${i.id} ${i.placeholder} ${i.getAttribute("aria-label") || ""}`)) ||
-      inputs.find(isOtpShape);
-    return el ? { el } : null;
-  }
-  // One-time-code field with no hint in its name: numeric and 4 to 8 characters.
-  const isOtpShape = (i) =>
-    i.maxLength >= 4 && i.maxLength <= 8 && (i.inputMode === "numeric" || i.getAttribute("pattern") === "[0-9]*" || i.type === "number");
-  // Strict detection (to offer the code with no wait in progress): avoids "promo code" fields.
-  function otpField() {
-    const inputs = [...document.querySelectorAll("input")].filter(
-      (el) => shown(el) && !el.readOnly && ["text", "number", "tel", ""].includes(el.type),
-    );
-    const hint = /\b(otp|2fa|mfa)\b|one.?time|verif|(^|[^a-z])code/i;
-    const boxes = inputs.filter(
-      (el) =>
-        el.maxLength === 1 &&
-        (el.inputMode === "numeric" || el.type === "tel" || el.type === "number" || el.autocomplete === "one-time-code"),
-    );
-    return (
-      inputs.find((i) => i.autocomplete === "one-time-code") ||
-      inputs.find(
-        (i) =>
-          hint.test(`${i.name} ${i.id} ${i.placeholder}`) &&
-          !/promo|coupon|postal|zip|gift|referr/i.test(`${i.name} ${i.id} ${i.placeholder}`) &&
-          !(i.maxLength >= 0 && i.maxLength < 4),
-      ) ||
-      inputs.find(isOtpShape) ||
-      (boxes.length >= 4 && boxes.length <= 8 ? boxes[0] : null)
-    );
-  }
+  // Detection lives in otp.js (ThrowawayOtp), loaded before this script.
+  const Otp = globalThis.ThrowawayOtp;
+  const visibleInputs = () => [...document.querySelectorAll("input")].filter(shown);
+  const codeTarget = (len) => Otp.codeTarget(visibleInputs(), len, document.activeElement);
+  const otpField = () => Otp.otpField(visibleInputs());
+  const anchorOf = (t) => t.el || t.boxes[0];
 
   // ---------- 3. "Fill code" chip next to a code field ----------
   let chip = null;
-  function showChip(field, code) {
+  function showChip(target, code) {
     chip?.remove();
     chip = document.createElement("throwaway-mail-chip");
-    const r = field.getBoundingClientRect();
+    const r = anchorOf(target).getBoundingClientRect();
     chip.style.cssText = `all:initial;position:absolute;z-index:2147483647;left:${Math.round(r.left + scrollX)}px;top:${Math.round(r.bottom + scrollY + 4)}px`;
     const sh = chip.attachShadow({ mode: "closed" });
     sh.innerHTML = `<style>button{all:unset;cursor:pointer;font:600 12px ui-sans-serif,system-ui,sans-serif;background:#18181b;color:#fff;padding:5px 10px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.18)}button:hover{background:#3f3f46}span{font-family:ui-monospace,monospace;letter-spacing:1px}</style><button title="Throwaway Mail">Fill code <span>${esc(code)}</span></button>`;
@@ -198,6 +166,7 @@
     document.documentElement.append(chip);
   }
   let offering = false;
+  let autoFill = false;
   const usedCodes = new Set();
   let lastOffer = 0;
   async function offerCode() {
@@ -212,7 +181,12 @@
         if (r?.done) return;
         if (r?.code) {
           const f = otpField();
-          if (f && !usedCodes.has(r.code)) showChip(f, r.code);
+          if (!f || usedCodes.has(r.code)) return;
+          // Auto-fill setting: fill straight away (never submitted), otherwise offer it in a chip.
+          if (autoFill && pasteCode(r.code)) {
+            usedCodes.add(r.code);
+            showCode(r.code, true);
+          } else showChip(f, r.code);
           return;
         }
         if (r?.error) await new Promise((res) => setTimeout(res, 5000));
@@ -230,12 +204,9 @@
   }
   function pasteCode(code) {
     const t = codeTarget(code.length);
-    if (!t) return false;
-    if (t.boxes) code.split("").forEach((ch, i) => setValue(t.boxes[i], ch));
-    else {
-      setValue(t.el, code);
-      t.el.focus();
-    }
+    if (!Otp.fill(t, code, setValue)) return false;
+    const last = t.el || t.boxes[Math.min(code.length, t.boxes.length) - 1];
+    last.focus();
     return true;
   }
   function showCode(code, pasted) {
@@ -285,6 +256,7 @@
   // ---------- Startup ----------
   send({ type: "state" })
     .then((state) => {
+      autoFill = !!state?.autoFillCode;
       if (state?.autoCode && !state?.pending) {
         // Code field (even without a prior fill): offer the latest code of this site's address.
         let ot = null;

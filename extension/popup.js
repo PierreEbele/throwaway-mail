@@ -530,6 +530,7 @@ $("tm-copy").addEventListener("click", async () => {
 $("tm-paste").addEventListener("click", async () => {
   try {
     const tabId = await activeTabId();
+    await browser.scripting.executeScript({ target: { tabId }, files: ["otp.js"] });
     const [res] = await browser.scripting.executeScript({ target: { tabId }, func: fillCodeInPage, args: [tmCode.code] });
     tmStatus(
       res?.result ? `Code pasted (${res.result} field${res.result > 1 ? "s" : ""}). Nothing submitted.` : "No code field found: use Copy.",
@@ -540,6 +541,7 @@ $("tm-paste").addEventListener("click", async () => {
   }
 });
 // Runs in the page: one-time-code field, focused field or one-digit boxes.
+// Runs in the page (after otp.js): same detection as the content script.
 function fillCodeInPage(code) {
   const set = (el, v) => {
     const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -547,27 +549,11 @@ function fillCodeInPage(code) {
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
   };
-  const visible = (el) =>
-    !el.disabled &&
-    !el.readOnly &&
-    el.offsetParent !== null &&
-    !["hidden", "password", "email", "checkbox", "radio", "submit", "button"].includes(el.type);
-  const inputs = [...document.querySelectorAll("input")].filter(visible);
-  const boxes = inputs.filter((el) => el.maxLength === 1);
-  if (boxes.length >= code.length && code.length > 1) {
-    const start = Math.max(0, boxes.indexOf(document.activeElement));
-    code.split("").forEach((ch, i) => boxes[start + i] && set(boxes[start + i], ch));
-    return code.length;
-  }
-  const hint = /code|otp|token|verif|pin|2fa|mfa|one.?time/i;
-  const target =
-    inputs.find((el) => el.autocomplete === "one-time-code") ||
-    (inputs.includes(document.activeElement) ? document.activeElement : null) ||
-    inputs.find((el) => hint.test(`${el.name} ${el.id} ${el.placeholder} ${el.getAttribute("aria-label") || ""}`));
-  if (!target) return 0;
-  set(target, code);
-  target.focus();
-  return 1;
+  const inputs = [...document.querySelectorAll("input")].filter((el) => el.offsetParent !== null);
+  const target = globalThis.ThrowawayOtp.codeTarget(inputs, code.length, document.activeElement);
+  if (!globalThis.ThrowawayOtp.fill(target, code, set)) return 0;
+  (target.el || target.boxes[Math.min(code.length, target.boxes.length) - 1]).focus();
+  return target.boxes ? Math.min(code.length, target.boxes.length) : 1;
 }
 $("tm-settings").addEventListener("click", (event) => {
   event.preventDefault();

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Throwaway Mail",
-  "version": "1.11.1",
+  "version": "1.12.0",
   "description": "Fake identities with real Throwaway Mail disposable addresses, and automatic verification code retrieval.",
   "permissions": ["alarms", "activeTab", "menus", "scripting", "storage"],
   "action": {
@@ -37,7 +37,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["compat.js", "content.js"],
+      "js": ["compat.js", "otp.js", "content.js"],
       "run_at": "document_idle"
     }
   ]

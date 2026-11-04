@@ -33,6 +33,7 @@ async function settings() {
   const s = await browser.storage.local.get([
     "autoPrompt",
     "autoCode",
+    "autoFillCode",
     "alwaysNew",
     "bitwardenMode",
     "selectedFields",
@@ -44,6 +45,8 @@ async function settings() {
     bitwardenMode: s.bitwardenMode === true,
     autoPrompt: s.autoPrompt !== false,
     autoCode: s.autoCode !== false,
+    // Fill a code field on sight instead of offering a "Fill code" chip (off by default).
+    autoFillCode: s.autoFillCode === true,
     alwaysNew: s.alwaysNew !== false,
     selectedFields: Array.isArray(s.selectedFields) ? s.selectedFields : Object.keys(ThrowawayGenerator.fields),
     lockedFields: Array.isArray(s.lockedFields) ? s.lockedFields : [],
@@ -111,6 +114,7 @@ browser.runtime.onMessage.addListener((msg, sender) => {
         return {
           autoPrompt: s.autoPrompt && !dismissedHosts.includes(host),
           autoCode: s.autoCode,
+          autoFillCode: s.autoCode && s.autoFillCode,
           pending: host && s.autoCode ? await getPending(host) : null,
         };
       })();
