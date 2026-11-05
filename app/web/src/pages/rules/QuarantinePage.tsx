@@ -5,10 +5,13 @@ import type { QuarantinedMessage } from "../../types";
 import { Badge, EmptyState, ErrorText, PageHeader, Spinner, confirmAction, useToast } from "../../components/ui";
 import { invalidate } from "../../queries";
 import { fullDate, timeAgo } from "../../util";
+import { useT } from "../../i18n";
 
 export function QuarantinePage() {
   const qc = useQueryClient();
   const toast = useToast();
+  const t = useT().rules.quarantine;
+  const tc = useT().common;
   const list = useQuery({
     queryKey: ["quarantine"],
     queryFn: () => get<{ messages: QuarantinedMessage[] }>("/v1/quarantine").then((r) => r.messages),
@@ -21,12 +24,12 @@ export function QuarantinePage() {
       done(m);
       toast(
         !forward
-          ? "Released into the inbox"
+          ? t.released
           : r.failed
-            ? "Released, but forwarding failed: see Failed deliveries"
+            ? t.releasedFailed
             : r.forwarded_to.length
-              ? `Released and forwarded to ${r.forwarded_to.join(", ")}`
-              : "Released (forwarding is off for this address)",
+              ? t.releasedTo(r.forwarded_to.join(", "))
+              : t.releasedNoFwd,
         r.failed ? "error" : "success",
       );
     },
@@ -36,21 +39,16 @@ export function QuarantinePage() {
     mutationFn: (m: QuarantinedMessage) => del(`/v1/quarantine/${m.id}`),
     onSuccess: (_r, m) => {
       done(m);
-      toast("Deleted", "success");
+      toast(t.deleted, "success");
     },
     onError: (e) => toast((e as Error).message, "error"),
   });
   return (
     <>
-      <PageHeader
-        title="Quarantine"
-        subtitle="Mail a rule held back: it is stored but was not forwarded. Release it to forward it now, or delete it."
-      />
+      <PageHeader title={t.title} subtitle={t.subtitle} />
       {list.isLoading && <Spinner />}
       <ErrorText error={list.error} />
-      {list.data?.length === 0 && (
-        <EmptyState title="Nothing in quarantine">Rules with the "Quarantine it" action put mail here.</EmptyState>
-      )}
+      {list.data?.length === 0 && <EmptyState title={t.emptyTitle}>{t.emptyBody}</EmptyState>}
       {!!list.data?.length && (
         <ul className="card divide-y divide-zinc-200 dark:divide-zinc-800">
           {list.data.map((m) => (
@@ -58,17 +56,17 @@ export function QuarantinePage() {
               <div className="min-w-0 flex-1">
                 <p className="font-medium break-words">
                   <Link className="hover:underline" to={`/addresses/${m.address_id}?message=${m.id}`}>
-                    {m.subject ?? "(no subject)"}
+                    {m.subject ?? tc.noSubject}
                   </Link>
                 </p>
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  From {m.from_name ? `${m.from_name} <${m.from}>` : (m.from ?? "?")} to {m.address} ({m.site_name})
+                  {t.fromTo(m.from_name ? `${m.from_name} <${m.from}>` : (m.from ?? "?"), m.address, m.site_name)}
                 </p>
                 <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                  <span title={fullDate(m.quarantined_at)}>Held {timeAgo(m.quarantined_at)}</span>
+                  <span title={fullDate(m.quarantined_at)}>{t.held(timeAgo(m.quarantined_at))}</span>
                   {m.matched_rules.map((r) => (
                     <Badge key={r.id} value="paused">
-                      rule: {r.name}
+                      {t.rule(r.name)}
                     </Badge>
                   ))}
                   {(["spf", "dkim", "dmarc"] as const)
@@ -81,21 +79,18 @@ export function QuarantinePage() {
                 </p>
               </div>
               <button className="btn-primary" disabled={release.isPending} onClick={() => release.mutate({ m, forward: true })}>
-                Release &amp; forward
+                {t.releaseForward}
               </button>
               <button
                 className="btn-secondary"
                 disabled={release.isPending}
                 onClick={() => release.mutate({ m, forward: false })}
-                title="Keep it in the inbox without forwarding it"
+                title={t.releaseOnlyTitle}
               >
-                Release only
+                {t.releaseOnly}
               </button>
-              <button
-                className="btn-ghost text-red-600"
-                onClick={() => confirmAction("Delete this mail? This cannot be undone.") && remove.mutate(m)}
-              >
-                Delete
+              <button className="btn-ghost text-red-600" onClick={() => confirmAction(t.confirmDelete) && remove.mutate(m)}>
+                {tc.delete}
               </button>
             </li>
           ))}

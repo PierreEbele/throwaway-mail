@@ -7,13 +7,15 @@ import { Badge, EmptyState, ErrorText, PageHeader, Spinner, useToast } from "../
 import { invalidate } from "../../queries";
 import { fullDate, timeAgo } from "../../util";
 import { useDestinations } from "../Addresses";
-
-const KIND_LABELS = { failed: "Failed", rejected: "Refused", bounced: "Bounced" } as const;
+import { useT } from "../../i18n";
 
 export function DeliveriesPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const dests = useDestinations();
+  const t = useT().rules.deliveries;
+  const tc = useT().common;
+  const KIND_LABELS = t.kinds;
   const [status, setStatus] = useState<"open" | "resolved" | "all">("open");
   const [kind, setKind] = useState("");
   const [destination, setDestination] = useState("");
@@ -27,34 +29,31 @@ export function DeliveriesPage() {
     mutationFn: (f: DeliveryFailure) => post<{ delivered: boolean; failure: DeliveryFailure }>(`/v1/delivery-failures/${f.id}/retry`),
     onSuccess: (r) => {
       inv();
-      toast(r.delivered ? "Delivered" : `Still failing: ${r.failure.reason}`, r.delivered ? "success" : "error");
+      toast(r.delivered ? t.delivered : t.stillFailing(r.failure.reason), r.delivered ? "success" : "error");
     },
     onError: (e) => toast((e as Error).message, "error"),
   });
   const dismiss = useMutation({ mutationFn: (f: DeliveryFailure) => post(`/v1/delivery-failures/${f.id}/dismiss`), onSuccess: inv });
   return (
     <>
-      <PageHeader
-        title="Failed deliveries"
-        subtitle="Forwards that did not reach your mailbox, and why. The mail itself is always kept here, in the app."
-      />
-      <div className="card mb-4 flex flex-wrap items-end gap-3 p-3" role="group" aria-label="Filters">
+      <PageHeader title={t.title} subtitle={t.subtitle} />
+      <div className="card mb-4 flex flex-wrap items-end gap-3 p-3" role="group" aria-label={t.filters}>
         <div>
           <label htmlFor="f-status" className="label">
-            Show
+            {t.show}
           </label>
           <select id="f-status" className="input w-auto" value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
-            <option value="open">Needs attention</option>
-            <option value="resolved">Resolved or dismissed</option>
-            <option value="all">Everything</option>
+            <option value="open">{t.open}</option>
+            <option value="resolved">{t.resolved}</option>
+            <option value="all">{t.all}</option>
           </select>
         </div>
         <div>
           <label htmlFor="f-kind" className="label">
-            Kind
+            {t.kind}
           </label>
           <select id="f-kind" className="input w-auto" value={kind} onChange={(e) => setKind(e.target.value)}>
-            <option value="">Any</option>
+            <option value="">{t.any}</option>
             {Object.entries(KIND_LABELS).map(([k, v]) => (
               <option key={k} value={k}>
                 {v}
@@ -64,10 +63,10 @@ export function DeliveriesPage() {
         </div>
         <div>
           <label htmlFor="f-dest" className="label">
-            Mailbox
+            {t.mailbox}
           </label>
           <select id="f-dest" className="input w-auto" value={destination} onChange={(e) => setDestination(e.target.value)}>
-            <option value="">Any</option>
+            <option value="">{t.any}</option>
             {dests.data?.map((d) => (
               <option key={d.id} value={d.email}>
                 {d.email}
@@ -78,7 +77,7 @@ export function DeliveriesPage() {
       </div>
       {list.isLoading && <Spinner />}
       <ErrorText error={list.error} />
-      {list.data?.length === 0 && <EmptyState title="No failed deliveries">Every forward reached its mailbox.</EmptyState>}
+      {list.data?.length === 0 && <EmptyState title={t.emptyTitle}>{t.emptyBody}</EmptyState>}
       {!!list.data?.length && (
         <ul className="card divide-y divide-zinc-200 dark:divide-zinc-800">
           {list.data.map((f) => (
@@ -87,27 +86,25 @@ export function DeliveriesPage() {
                 <p className="flex flex-wrap items-center gap-2">
                   <Badge value={f.kind === "failed" ? "pending" : "error"}>{KIND_LABELS[f.kind]}</Badge>
                   <span className="font-mono text-sm">{f.destination}</span>
-                  {f.resolved_at && <Badge value="verified">resolved</Badge>}
+                  {f.resolved_at && <Badge value="verified">{t.resolvedBadge}</Badge>}
                 </p>
                 <p className="mt-1 text-sm">{f.reason}</p>
-                {f.delivered_to && (
-                  <p className="text-sm text-emerald-700 dark:text-emerald-400">Delivered to the fallback {f.delivered_to} instead.</p>
-                )}
+                {f.delivered_to && <p className="text-sm text-emerald-700 dark:text-emerald-400">{t.fallback(f.delivered_to)}</p>}
                 <p className="text-xs text-zinc-500">
                   {f.message_id && f.address_id ? (
                     <Link className="hover:underline" to={`/addresses/${f.address_id}?message=${f.message_id}`}>
-                      {f.subject ?? "(no subject)"}
+                      {f.subject ?? tc.noSubject}
                     </Link>
                   ) : (
-                    "(message deleted)"
+                    t.messageDeleted
                   )}{" "}
                   · {f.from ?? "?"} → {f.address ?? "?"} · <span title={fullDate(f.created_at)}>{timeAgo(f.created_at)}</span> ·{" "}
-                  {f.transport === "cloudflare" ? "via Cloudflare" : "via SMTP"}
-                  {f.retry_count > 0 && ` · retried ${f.retry_count}×`}
+                  {f.transport === "cloudflare" ? t.viaCf : t.viaSmtp}
+                  {f.retry_count > 0 && t.retried(f.retry_count)}
                 </p>
                 {f.detail && (
                   <details className="mt-1 text-xs text-zinc-500">
-                    <summary className="cursor-pointer">Technical details</summary>
+                    <summary className="cursor-pointer">{t.technical}</summary>
                     <code className="break-all">{f.detail}</code>
                   </details>
                 )}
@@ -117,17 +114,13 @@ export function DeliveriesPage() {
                   <button
                     className="btn-secondary"
                     disabled={!f.can_retry || retry.isPending}
-                    title={
-                      f.can_retry
-                        ? "Send it again to this mailbox"
-                        : "A retry needs the original (kept 3 days) and an outgoing SMTP server (IMAP domain or SMTP_RELAY_URL)"
-                    }
+                    title={f.can_retry ? t.retryTitle : t.retryUnavailable}
                     onClick={() => retry.mutate(f)}
                   >
-                    Retry
+                    {t.retry}
                   </button>
                   <button className="btn-ghost" onClick={() => dismiss.mutate(f)}>
-                    Dismiss
+                    {t.dismiss}
                   </button>
                 </>
               )}

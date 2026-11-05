@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { get } from "../../api";
 import type { AuditEntry, User } from "../../types";
 import { ErrorText, PageHeader, Spinner } from "../../components/ui";
-import { fullDate } from "../../util";
+import { formatNumber, fullDate } from "../../util";
+import { useT } from "../../i18n";
 
 const AUDIT_PAGE = 50;
 const AUDIT_GROUPS = ["auth.", "user.", "invite.", "domain.", "destination."];
@@ -12,6 +13,7 @@ export function AuditPage() {
   const [action, setAction] = useState("");
   const [userId, setUserId] = useState("");
   const [offset, setOffset] = useState(0);
+  const t = useT().admin.audit;
   const usersQ = useQuery({ queryKey: ["admin-users"], queryFn: () => get<{ users: User[] }>("/v1/admin/users").then((r) => r.users) });
   const params = new URLSearchParams({ limit: String(AUDIT_PAGE), offset: String(offset) });
   if (action) params.set("action", action);
@@ -25,26 +27,26 @@ export function AuditPage() {
   const known = log.data?.actions ?? [];
   return (
     <>
-      <PageHeader title="Audit log" subtitle="Sign-ins, account, two-factor, invite, domain and destination changes." />
+      <PageHeader title={t.title} subtitle={t.subtitle} />
       <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
         <select
           className="input w-auto"
-          aria-label="Filter by action"
+          aria-label={t.filterAction}
           value={action}
           onChange={(e) => {
             setAction(e.target.value);
             setOffset(0);
           }}
         >
-          <option value="">All actions</option>
-          <optgroup label="Groups">
+          <option value="">{t.allActions}</option>
+          <optgroup label={t.groups}>
             {AUDIT_GROUPS.map((g) => (
               <option key={g} value={g}>
                 {g}*
               </option>
             ))}
           </optgroup>
-          <optgroup label="Actions">
+          <optgroup label={t.actions}>
             {known.map((a) => (
               <option key={a} value={a}>
                 {a}
@@ -54,14 +56,14 @@ export function AuditPage() {
         </select>
         <select
           className="input w-auto"
-          aria-label="Filter by user"
+          aria-label={t.filterUser}
           value={userId}
           onChange={(e) => {
             setUserId(e.target.value);
             setOffset(0);
           }}
         >
-          <option value="">All users</option>
+          <option value="">{t.allUsers}</option>
           {usersQ.data?.map((u) => (
             <option key={u.id} value={u.id}>
               {u.email}
@@ -69,13 +71,13 @@ export function AuditPage() {
           ))}
         </select>
         <span className="ml-auto text-zinc-500">
-          {total ? `${offset + 1}–${Math.min(offset + AUDIT_PAGE, total)} of ${total}` : "No entries"}
+          {total ? t.range(formatNumber(offset + 1), formatNumber(Math.min(offset + AUDIT_PAGE, total)), formatNumber(total)) : t.none}
         </span>
         <button className="btn-ghost" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - AUDIT_PAGE))}>
-          Newer
+          {t.newer}
         </button>
         <button className="btn-ghost" disabled={offset + AUDIT_PAGE >= total} onClick={() => setOffset(offset + AUDIT_PAGE)}>
-          Older
+          {t.older}
         </button>
       </div>
       {log.isLoading && <Spinner />}
@@ -84,12 +86,12 @@ export function AuditPage() {
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-zinc-500 uppercase">
             <tr>
-              <th className="px-4 py-2">When</th>
-              <th className="px-4 py-2">Action</th>
-              <th className="px-4 py-2">By</th>
-              <th className="px-4 py-2">Target</th>
-              <th className="px-4 py-2">Details</th>
-              <th className="px-4 py-2">IP</th>
+              <th className="px-4 py-2">{t.when}</th>
+              <th className="px-4 py-2">{t.action}</th>
+              <th className="px-4 py-2">{t.by}</th>
+              <th className="px-4 py-2">{t.target}</th>
+              <th className="px-4 py-2">{t.details}</th>
+              <th className="px-4 py-2">{t.ip}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">

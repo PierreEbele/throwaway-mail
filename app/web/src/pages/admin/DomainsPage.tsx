@@ -6,17 +6,19 @@ import { useDomains } from "../Addresses";
 import { AddDomainForm } from "./AddDomainForm";
 import { DomainCard } from "./DomainCard";
 import { SiteRejectionsCard } from "../settings/DomainChoiceCard";
+import { msg, useT } from "../../i18n";
 
 export function DomainsPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const domains = useDomains();
+  const t = useT().admin.domains;
   const usersQ = useQuery({ queryKey: ["admin-users"], queryFn: () => get<{ users: User[] }>("/v1/admin/users").then((r) => r.users) });
   const setOwner = useMutation({
     mutationFn: ({ id, owner }: { id: string; owner: string }) => patch(`/v1/domains/${id}`, { owner_id: owner }),
     onSuccess: () => {
       inv();
-      toast("Owner changed: the domain's To sort box moved with it", "success");
+      toast(t.ownerChanged, "success");
     },
     onError: (e) => toast((e as Error).message, "error"),
   });
@@ -27,7 +29,10 @@ export function DomainsPage() {
     mutationFn: (id: string) => post<{ domain: Domain }>(`/v1/domains/${id}/verify`),
     onSuccess: (r) => {
       inv();
-      toast(`${r.domain.name}: ${r.domain.status}`, r.domain.status === "active" ? "success" : "info");
+      toast(
+        `${r.domain.name}: ${msg().common.status[r.domain.status] ?? r.domain.status}`,
+        r.domain.status === "active" ? "success" : "info",
+      );
     },
     onError: (e) => toast((e as Error).message, "error"),
   });
@@ -48,17 +53,10 @@ export function DomainsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Domains"
-        subtitle="Shared by all users. Mail arrives through Cloudflare Email Routing (catch-all rule → Worker) or is polled from an IMAP catch-all mailbox and forwarded over SMTP."
-      />
+      <PageHeader title={t.title} subtitle={t.subtitle} />
       <AddDomainForm users={usersQ.data} />
       {domains.isLoading && <Spinner />}
-      {domains.data?.length === 0 && (
-        <EmptyState title="No domains yet">
-          Add the first domain above: on Cloudflare, or with any provider offering a catch-all IMAP mailbox.
-        </EmptyState>
-      )}
+      {domains.data?.length === 0 && <EmptyState title={t.emptyTitle}>{t.emptyBody}</EmptyState>}
       <ul className="space-y-3">
         {domains.data?.map((d) => (
           <DomainCard

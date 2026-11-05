@@ -5,6 +5,7 @@ import { get, post } from "../../api";
 import { CopyButton, ErrorText, Spinner, useToast } from "../../components/ui";
 import { fullDate } from "../../util";
 import { Field } from "../auth/AuthCard";
+import { useT } from "../../i18n";
 
 interface Status {
   enabled: boolean;
@@ -14,21 +15,19 @@ interface Status {
 }
 
 export function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void }) {
+  const t = useT().security;
   return (
     <div className="space-y-3">
-      <p>
-        Save these recovery codes somewhere safe (a password manager). Each one signs you in once if you lose your authenticator. They are
-        not shown again.
-      </p>
+      <p>{t.recoveryHelp}</p>
       <ul className="grid grid-cols-2 gap-1 rounded-md bg-zinc-100 p-3 font-mono dark:bg-zinc-900">
         {codes.map((c) => (
           <li key={c}>{c}</li>
         ))}
       </ul>
       <div className="flex gap-2">
-        <CopyButton text={codes.join("\n")} label="Copy codes" />
+        <CopyButton text={codes.join("\n")} label={t.copyCodes} />
         <button className="btn-primary" onClick={onDone}>
-          I saved them
+          {t.savedThem}
         </button>
       </div>
     </div>
@@ -47,6 +46,7 @@ function ConfirmForm({
 }) {
   const [value, setValue] = useState("");
   const [useCode, setUseCode] = useState(false);
+  const t = useT().security;
   const m = useMutation({
     mutationFn: () => post<{ recovery_codes?: string[] }>(`/v1/auth/2fa/${action}`, useCode ? { code: value } : { password: value }),
     onSuccess: (r) => onDone(r.recovery_codes),
@@ -61,7 +61,7 @@ function ConfirmForm({
     >
       <Field
         id={`2fa-confirm-${action}`}
-        label={useCode ? "Code from your app (or a recovery code)" : "Your password"}
+        label={useCode ? t.codeOrRecovery : t.yourPassword}
         type={useCode ? "text" : "password"}
         autoComplete={useCode ? "one-time-code" : "current-password"}
         required
@@ -81,7 +81,7 @@ function ConfirmForm({
             setValue("");
           }}
         >
-          {useCode ? "Confirm with my password" : "Confirm with a code"}
+          {useCode ? t.confirmPassword : t.confirmCode}
         </button>
       </div>
     </form>
@@ -98,6 +98,8 @@ export function TwoFactorCard() {
   const [enrolment, setEnrolment] = useState<{ secret: string; otpauth_uri: string } | null>(null);
   const [codes, setCodes] = useState<string[] | null>(null);
   const [confirming, setConfirming] = useState<"disable" | "recovery-codes" | null>(null);
+  const t = useT().security;
+  const tc = useT().common;
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["2fa"] });
     void qc.invalidateQueries({ queryKey: ["me"] });
@@ -122,7 +124,7 @@ export function TwoFactorCard() {
   const s = status.data;
   return (
     <section className="card mt-4 max-w-xl space-y-3 p-5 text-sm">
-      <h2 className="font-semibold">Two-factor authentication</h2>
+      <h2 className="font-semibold">{t.twoFa}</h2>
       {status.isLoading && <Spinner />}
       <ErrorText error={status.error} />
       {codes ? (
@@ -130,28 +132,28 @@ export function TwoFactorCard() {
       ) : s?.enabled ? (
         <>
           <p>
-            On since {fullDate(s.enabled_at)}: signing in asks for a code from your authenticator app.{" "}
+            {t.onSince(fullDate(s.enabled_at))}{" "}
             <span className={s.recovery_codes_left < 3 ? "text-amber-700 dark:text-amber-300" : "text-zinc-500"}>
-              {s.recovery_codes_left} recovery code{s.recovery_codes_left === 1 ? "" : "s"} left.
+              {t.codesLeft(s.recovery_codes_left)}
             </span>
           </p>
           <div className="flex gap-2">
             <button className="btn-ghost" onClick={() => setConfirming(confirming === "recovery-codes" ? null : "recovery-codes")}>
-              New recovery codes
+              {t.newCodes}
             </button>
             <button className="btn-ghost" onClick={() => setConfirming(confirming === "disable" ? null : "disable")}>
-              Turn off
+              {t.turnOff}
             </button>
           </div>
           {confirming && (
             <ConfirmForm
               key={confirming}
               action={confirming}
-              label={confirming === "disable" ? "Turn off two-factor authentication" : "Replace recovery codes"}
+              label={confirming === "disable" ? t.turnOff2fa : t.replaceCodes}
               onDone={(newCodes) => {
                 setConfirming(null);
                 if (newCodes) setCodes(newCodes);
-                else toast("Two-factor authentication is off", "success");
+                else toast(t.isOff, "success");
                 refresh();
               }}
             />
@@ -165,19 +167,18 @@ export function TwoFactorCard() {
             enable.mutate();
           }}
         >
-          <p>Scan this QR code with an authenticator app (Aegis, 2FAS, Google Authenticator, a password manager…).</p>
+          <p>{t.scan}</p>
           <img
             className="h-48 w-48 rounded-md bg-white p-2"
-            alt="QR code for your authenticator app"
+            alt={t.qrAlt}
             src={`data:image/svg+xml;utf8,${encodeURIComponent(renderSVG(enrolment.otpauth_uri))}`}
           />
           <p className="text-xs text-zinc-500">
-            Or enter this key by hand: <code className="font-mono break-all">{enrolment.secret}</code>{" "}
-            <CopyButton text={enrolment.secret} label="Copy" />
+            {t.byHand} <code className="font-mono break-all">{enrolment.secret}</code> <CopyButton text={enrolment.secret} />
           </p>
           <Field
             id="2fa-enable-code"
-            label="Code shown by the app"
+            label={t.codeShown}
             autoComplete="one-time-code"
             inputMode="numeric"
             required
@@ -187,10 +188,10 @@ export function TwoFactorCard() {
           <ErrorText error={enable.error} />
           <div className="flex gap-2">
             <button className="btn-primary" disabled={enable.isPending}>
-              Turn on
+              {t.turnOn}
             </button>
             <button type="button" className="btn-ghost" onClick={() => setEnrolment(null)}>
-              Cancel
+              {tc.cancel}
             </button>
           </div>
         </form>
@@ -203,13 +204,11 @@ export function TwoFactorCard() {
               setup.mutate();
             }}
           >
-            <p className="text-zinc-500">
-              Optional: ask for a code from an authenticator app after your password. Confirm your password to start.
-            </p>
+            <p className="text-zinc-500">{t.optional}</p>
             <input type="text" hidden readOnly autoComplete="username" />
             <Field
               id="2fa-setup-password"
-              label="Password"
+              label={t.password}
               type="password"
               autoComplete="current-password"
               required
@@ -218,7 +217,7 @@ export function TwoFactorCard() {
             />
             <ErrorText error={setup.error} />
             <button className="btn-primary" disabled={setup.isPending}>
-              Set up two-factor authentication
+              {t.setup2fa}
             </button>
           </form>
         )

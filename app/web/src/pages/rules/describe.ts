@@ -1,34 +1,11 @@
 import type { RuleAction, RuleCondition } from "../../types";
+import { msg } from "../../i18n";
+import { formatNumber } from "../../util";
 
-/** Plain-English labels for the rule builder (kept readable for people who never wrote a filter). */
-export const CONDITION_LABELS: Record<RuleCondition["type"], string> = {
-  sender: "Sender address",
-  sender_domain: "Sender's domain",
-  subject_contains: "Subject contains",
-  recipient_matches: "Alias matches pattern (advanced)",
-  category: "Address is in category",
-  has_attachments: "Has attachments",
-  size_over_kb: "Is larger than (KB)",
-  header_exists: "Has the header",
-  header_equals: "Header equals",
-  auth_failed: "Failed sender checks",
-  is_newsletter: "Is a newsletter or bulk mail",
-  has_code: "Contains a verification code",
-};
-
-export const ACTION_LABELS: Record<RuleAction["type"], string> = {
-  block: "Block it (refuse the mail)",
-  quarantine: "Quarantine it (keep, do not forward)",
-  strip_attachments: "Remove attachments before forwarding",
-  forward_to: "Forward to a specific mailbox",
-  set_category: "Move the address to a category",
-  mark_read: "Mark as read",
-  block_sender: "Block this sender's domain from now on",
-  pause_address: "Pause the address",
-  stop: "Stop: ignore the rules below",
-};
-
-export const AUTH_LABELS = { any: "any check (SPF, DKIM or DMARC)", spf: "SPF", dkim: "DKIM", dmarc: "DMARC" } as const;
+/** Labels for the rule builder (kept readable for people who never wrote a filter), in the current language. */
+export const conditionLabels = (): Record<RuleCondition["type"], string> => msg().rules.conditions;
+export const actionLabels = (): Record<RuleAction["type"], string> => msg().rules.actions;
+export const authLabels = (): Record<"any" | "spf" | "dkim" | "dmarc", string> => msg().rules.auth;
 
 export function defaultCondition(type: RuleCondition["type"]): RuleCondition {
   switch (type) {
@@ -60,37 +37,39 @@ export function defaultAction(type: RuleAction["type"]): RuleAction {
 
 /** One condition as a short sentence. */
 export function describeCondition(c: RuleCondition, names: { category: (id: string) => string }): string {
-  const not = c.negate ? "not " : "";
+  const t = msg().rules.describe;
+  const neg = !!c.negate;
   switch (c.type) {
     case "sender":
-      return `sender ${c.negate ? "does not " : ""}${c.op === "is" ? (c.negate ? "equal" : "is") : c.op === "contains" ? (c.negate ? "contain" : "contains") : c.negate ? "end with" : "ends with"} "${c.value}"`;
+      return t.sender(neg, c.op, c.value);
     case "sender_domain":
-      return `sender's domain is ${not}${c.value}`;
+      return t.senderDomain(neg, c.value);
     case "subject_contains":
-      return `subject ${c.negate ? "does not contain" : "contains"} "${c.value}"`;
+      return t.subject(neg, c.value);
     case "recipient_matches":
-      return `alias ${c.negate ? "does not match" : "matches"} /${c.value}/`;
+      return t.alias(neg, c.value);
     case "category":
-      return `address is ${not}in ${names.category(c.value)}`;
+      return t.category(neg, names.category(c.value));
     case "has_attachments":
-      return c.negate ? "no attachments" : "has attachments";
+      return t.attachments(neg);
     case "size_over_kb":
-      return `${c.negate ? "not " : ""}larger than ${c.value} KB`;
+      return t.size(neg, formatNumber(c.value));
     case "header_exists":
-      return `${c.negate ? "no" : "has a"} ${c.name} header`;
+      return t.headerExists(neg, c.name);
     case "header_equals":
-      return `${c.name} is ${not}"${c.value}"`;
+      return t.headerEquals(neg, c.name, c.value);
     case "auth_failed":
-      return `${c.negate ? "passed" : "failed"} ${AUTH_LABELS[c.value]}`;
+      return t.auth(neg, authLabels()[c.value]);
     case "is_newsletter":
-      return c.negate ? "not a newsletter" : "is a newsletter";
+      return t.newsletter(neg);
     case "has_code":
-      return c.negate ? "no verification code" : "has a verification code";
+      return t.code(neg);
   }
 }
 
 export function describeAction(a: RuleAction, names: { category: (id: string) => string; destination: (id: string) => string }) {
-  if (a.type === "forward_to") return `forward to ${names.destination(a.destination_id)}`;
-  if (a.type === "set_category") return `move the address to ${names.category(a.category_id)}`;
-  return ACTION_LABELS[a.type].replace(/ \(.*\)$/, "").replace(/^./, (x) => x.toLowerCase());
+  const t = msg().rules;
+  if (a.type === "forward_to") return t.describe.forwardTo(names.destination(a.destination_id));
+  if (a.type === "set_category") return t.describe.moveTo(names.category(a.category_id));
+  return (t.actionsShort as Record<RuleAction["type"], string>)[a.type];
 }

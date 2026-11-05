@@ -4,11 +4,13 @@ import { del, get, post } from "../../api";
 import { ErrorText, confirmAction, useToast } from "../../components/ui";
 import { invalidate } from "../../queries";
 import { useDomains } from "../Addresses";
+import { useT } from "../../i18n";
 
 export function DirectoriesCard() {
   const qc = useQueryClient();
   const toast = useToast();
   const domains = useDomains();
+  const t = useT().settings.directories;
   const list = useQuery({
     queryKey: ["directories"],
     queryFn: () => get<{ directories: Array<{ id: string; name: string }> }>("/v1/directories").then((r) => r.directories),
@@ -19,20 +21,19 @@ export function DirectoriesCard() {
     onSuccess: () => {
       invalidate(qc, ["directories"]);
       setName("");
-      toast("Directory reserved", "success");
+      toast(t.reserved, "success");
     },
   });
-  const domain = domains.data?.find((d) => d.status === "active")?.name ?? "your-domain";
+  const domain = domains.data?.find((d) => d.status === "active")?.name ?? t.domain;
   return (
     <div className="card mt-4 max-w-xl space-y-2 p-5 text-sm">
-      <h2 className="font-semibold">On-the-fly addresses</h2>
+      <h2 className="font-semibold">{t.title}</h2>
       <p className="text-zinc-500">
-        Reserve a name, then give out{" "}
+        {t.help1}{" "}
         <code className="font-mono">
-          {list.data?.[0]?.name ?? "name"}.anysite@{domain}
+          {list.data?.[0]?.name ?? t.name}.anysite@{domain}
         </code>{" "}
-        anywhere, even from a phone or a paper form: the address is created when its first mail arrives (sorted with your category
-        keywords).
+        {t.help2}
       </p>
       {(list.data ?? []).map((x) => (
         <div key={x.id} className="flex items-center gap-2">
@@ -42,11 +43,10 @@ export function DirectoriesCard() {
           <button
             className="btn-ghost ml-auto px-2 py-0.5 text-xs text-red-600"
             onClick={() =>
-              confirmAction(`Release ${x.name}? Existing addresses are kept.`) &&
-              del(`/v1/directories/${x.id}`).then(() => invalidate(qc, ["directories"]))
+              confirmAction(t.confirmRelease(x.name)) && del(`/v1/directories/${x.id}`).then(() => invalidate(qc, ["directories"]))
             }
           >
-            Release
+            {t.release}
           </button>
         </div>
       ))}
@@ -58,19 +58,19 @@ export function DirectoriesCard() {
         }}
       >
         <label className="sr-only" htmlFor="dir-name">
-          Directory name
+          {t.label}
         </label>
         <input
           id="dir-name"
           className="input"
-          placeholder="e.g. alex"
+          placeholder={t.placeholder}
           pattern="[a-z0-9]{3,32}"
           value={name}
           onChange={(e) => setName(e.target.value.toLowerCase())}
           required
         />
         <button className="btn-primary shrink-0" disabled={add.isPending}>
-          Reserve
+          {t.reserve}
         </button>
       </form>
       <ErrorText error={add.error} />

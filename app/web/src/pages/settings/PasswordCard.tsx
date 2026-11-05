@@ -3,10 +3,12 @@ import { useMutation } from "@tanstack/react-query";
 import { post } from "../../api";
 import { ErrorText, useToast } from "../../components/ui";
 import { Field, PASSWORD_MIN } from "../auth/AuthCard";
+import { useT } from "../../i18n";
 
 /** Password change for local accounts; the server signs out every other session. */
 export function PasswordCard() {
   const toast = useToast();
+  const t = useT().settings.password;
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const change = useMutation({
@@ -14,7 +16,7 @@ export function PasswordCard() {
     onSuccess: () => {
       setCurrent("");
       setNext("");
-      toast("Password changed; your other sessions were signed out", "success");
+      toast(t.changed, "success");
     },
   });
   return (
@@ -25,11 +27,11 @@ export function PasswordCard() {
         change.mutate();
       }}
     >
-      <h2 className="font-semibold">Change password</h2>
+      <h2 className="font-semibold">{t.title}</h2>
       <input type="text" hidden readOnly autoComplete="username" />
       <Field
         id="pw-current"
-        label="Current password"
+        label={t.current}
         type="password"
         autoComplete="current-password"
         required
@@ -38,18 +40,18 @@ export function PasswordCard() {
       />
       <Field
         id="pw-new"
-        label="New password"
+        label={t.next}
         type="password"
         autoComplete="new-password"
         required
         minLength={PASSWORD_MIN}
-        hint={`At least ${PASSWORD_MIN} characters. Other devices are signed out.`}
+        hint={t.hint(PASSWORD_MIN)}
         value={next}
         onChange={(e) => setNext(e.target.value)}
       />
       <ErrorText error={change.error} />
       <button className="btn-primary" disabled={change.isPending}>
-        Change password
+        {t.title}
       </button>
     </form>
   );

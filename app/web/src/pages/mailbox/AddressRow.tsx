@@ -4,7 +4,8 @@ import { patch } from "../../api";
 import type { Address, Category } from "../../types";
 import { PinIcon } from "../../components/icons";
 import { invalidate } from "../../queries";
-import { timeAgo } from "../../util";
+import { fullDate, timeAgo } from "../../util";
+import { useT } from "../../i18n";
 import { SiteAvatar } from "./SiteAvatar";
 import { ADDRESS_DRAG_TYPE, DOT } from "./shared";
 
@@ -35,6 +36,8 @@ export function AddressRow({
     },
   });
   const unread = a.unread_count > 0;
+  const t = useT().mailbox;
+  const tc = useT().common;
   return (
     <li className="group relative">
       <Link
@@ -60,7 +63,7 @@ export function AddressRow({
           const r = e.currentTarget.getBoundingClientRect();
           onMenu(a, e.clientX || r.left + 48, e.clientY || r.top + r.height / 2);
         }}
-        aria-label={`${a.site_name}, ${a.email}${unread ? `, ${a.unread_count} unread` : ""}`}
+        aria-label={t.rowLabel(a.site_name, a.email, a.unread_count)}
         className={`flex gap-3 border-l-2 px-4 py-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-zinc-100 ${
           selected
             ? "border-blue-600 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/40"
@@ -92,14 +95,18 @@ export function AddressRow({
             )}
             {a.status !== "active" && (
               <span className="rounded border border-zinc-300 px-1 dark:border-zinc-700">
-                {a.burned?.reason === "expired" ? "expired" : a.burned?.reason === "max_messages" ? "quota reached" : a.status}
+                {a.burned?.reason === "expired"
+                  ? t.expired
+                  : a.burned?.reason === "max_messages"
+                    ? t.quota
+                    : (tc.status[a.status] ?? a.status)}
               </span>
             )}
             {a.status === "active" && (a.expires_at || a.max_messages) && (
               <span
                 title={[
-                  a.expires_at ? `Expires ${new Date(a.expires_at).toLocaleString()}` : "",
-                  a.max_messages ? `${a.message_count}/${a.max_messages} mail(s)` : "",
+                  a.expires_at ? t.expires(fullDate(a.expires_at)) : "",
+                  a.max_messages ? t.mailsOf(a.message_count, a.max_messages) : "",
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -107,24 +114,18 @@ export function AddressRow({
                 ⏳{a.max_messages ? ` ${a.message_count}/${a.max_messages}` : ""}
               </span>
             )}
-            {a.forward_enabled && <span title="Forwarded">↪</span>}
+            {a.forward_enabled && <span title={t.forwarded}>↪</span>}
             {a.leak && (
-              <span
-                className="rounded bg-red-100 px-1 text-red-700 dark:bg-red-950 dark:text-red-300"
-                title={`Mail from ${a.leak.sender}: this address may have leaked`}
-              >
-                leak?
+              <span className="rounded bg-red-100 px-1 text-red-700 dark:bg-red-950 dark:text-red-300" title={t.leakTitle(a.leak.sender)}>
+                {t.leak}
               </span>
             )}
             {a.no_mail_warning ? (
-              <span
-                className="rounded bg-amber-100 px-1 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                title="Did the site send the code? It may reject this domain."
-              >
-                no mail yet?
+              <span className="rounded bg-amber-100 px-1 text-amber-800 dark:bg-amber-950 dark:text-amber-300" title={t.noMailTitle}>
+                {t.noMailQ}
               </span>
             ) : (
-              !a.message_count && <span>no mail yet</span>
+              !a.message_count && <span>{t.noMail}</span>
             )}
           </span>
         </span>
@@ -132,7 +133,7 @@ export function AddressRow({
       <button
         type="button"
         onClick={() => pin.mutate()}
-        aria-label={a.pinned ? `Unpin ${a.site_name}` : `Pin ${a.site_name}`}
+        aria-label={a.pinned ? t.unpinLabel(a.site_name) : t.pinLabel(a.site_name)}
         aria-pressed={a.pinned}
         className={`absolute top-9 right-3 rounded p-1 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-900 focus-visible:opacity-100 dark:hover:bg-zinc-700 dark:hover:text-zinc-100 ${
           a.pinned ? "opacity-100 text-zinc-900 dark:text-zinc-100" : "opacity-0 group-hover:opacity-100"

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { post } from "../../api";
 import type { Address } from "../../types";
 import { confirmAction, useToast } from "../../components/ui";
+import { msg } from "../../i18n";
 import { invalidate } from "../../queries";
 
 export function useSenderAction(id: string) {
@@ -27,21 +28,19 @@ export function useSiteRejected(a: Address) {
   const nav = useNavigate();
   const toast = useToast();
   return () =>
-    confirmAction(
-      `Report that ${a.site_name} rejected ${a.domain}? New addresses for this site will use another domain, and ${a.email} is replaced by one on another domain (when there is one).`,
-    ) &&
+    confirmAction(msg().address.confirmRejected(a.site_name, a.domain, a.email)) &&
     post<{ address: Address | null; other_domains: number }>(`/v1/addresses/${a.id}/rejected`, { replace: true }).then(
       (r) => {
         qc.invalidateQueries();
         if (!r.address) return;
         navigator.clipboard.writeText(r.address.email).catch(() => {});
-        toast(`New address ${r.address.email} copied, try it on the site`, "success");
+        toast(msg().address.newCopiedTry(r.address.email), "success");
         nav(`/addresses/${r.address.id}`);
       },
       (e: Error) =>
         post(`/v1/addresses/${a.id}/rejected`, { replace: false }).then(() => {
           qc.invalidateQueries();
-          toast(`Rejection recorded. ${e.message}`, "error");
+          toast(msg().address.rejectionRecorded(e.message), "error");
         }),
     );
 }
@@ -52,12 +51,12 @@ export function useReplace(a: Address) {
   const nav = useNavigate();
   const toast = useToast();
   return () =>
-    confirmAction(`Create a new address for ${a.site_name} and pause ${a.email}? You will then need to change the e-mail on the site.`) &&
+    confirmAction(msg().address.confirmReplace(a.site_name, a.email)) &&
     post<{ address: Address }>(`/v1/addresses/${a.id}/replace`, {}).then(
       (r) => {
         qc.invalidateQueries();
         navigator.clipboard.writeText(r.address.email).catch(() => {});
-        toast(`New address ${r.address.email} copied, update it on the site`, "success");
+        toast(msg().address.newCopiedUpdate(r.address.email), "success");
         if (a.site_url) window.open(a.site_url, "_blank", "noopener,noreferrer");
         nav(`/addresses/${r.address.id}`);
       },

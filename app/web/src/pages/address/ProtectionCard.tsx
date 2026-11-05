@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { post } from "../../api";
 import type { Address } from "../../types";
 import { CopyButton, Toggle } from "../../components/ui";
+import { useT } from "../../i18n";
 import { hostOf } from "../../util";
 import { useReplace } from "./hooks";
 
@@ -11,23 +12,22 @@ function FeedRow({ a }: { a: Address }) {
   const set = (enabled: boolean) =>
     post<{ address: Address }>(`/v1/addresses/${a.id}/feed`, { enabled }).then((r) => qc.setQueryData(["address", a.id], r.address));
   const base = `${location.origin}/feeds/${a.feed_token}`;
+  const t = useT().addressCards.protection;
   return (
     <div className="space-y-1 text-sm">
       <div className="flex items-center justify-between gap-3">
         <span>
-          Private RSS / JSON feed
-          <span className="block text-xs text-zinc-500">
-            For a feed reader or Home Assistant. Anyone with the link can read this address&apos;s mail.
-          </span>
+          {t.feed}
+          <span className="block text-xs text-zinc-500">{t.feedHelp}</span>
         </span>
-        <Toggle id="feed-toggle" checked={!!a.feed_token} onChange={set} label="Private feed" />
+        <Toggle id="feed-toggle" checked={!!a.feed_token} onChange={set} label={t.feedLabel} />
       </div>
       {a.feed_token && (
         <div className="flex flex-wrap items-center gap-1 text-xs">
-          <CopyButton text={`${base}.rss`} label="Copy RSS URL" />
-          <CopyButton text={`${base}.json`} label="Copy JSON URL" />
-          <button className="btn-ghost px-2 py-0.5 text-xs" onClick={() => set(true)} title="Invalidate the old URLs">
-            Rotate
+          <CopyButton text={`${base}.rss`} label={t.copyRss} />
+          <CopyButton text={`${base}.json`} label={t.copyJson} />
+          <button className="btn-ghost px-2 py-0.5 text-xs" onClick={() => set(true)} title={t.rotateTitle}>
+            {t.rotate}
           </button>
         </div>
       )}
@@ -38,33 +38,26 @@ function FeedRow({ a }: { a: Address }) {
 export function ProtectionCard({ a, onChange }: { a: Address; onChange: (b: Record<string, unknown>) => void }) {
   const [max, setMax] = useState(a.max_messages ? String(a.max_messages) : "");
   const replace = useReplace(a);
+  const t = useT().addressCards.protection;
+  const tc = useT().common;
   return (
     <section className="card space-y-3 p-5" aria-labelledby="protection">
       <h2 id="protection" className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">
-        Protection
+        {t.title}
       </h2>
       <div className="flex items-center justify-between gap-3">
         <label htmlFor="lock-toggle" className="text-sm">
-          Only accept mail from {hostOf(a.site_url) ?? "the site"}
-          <span className="block text-xs text-zinc-500">
-            {a.site_url ? "Other senders are rejected and logged as leaks." : "Set the site URL first."}
-          </span>
+          {t.onlyFrom(hostOf(a.site_url) ?? t.theSite)}
+          <span className="block text-xs text-zinc-500">{a.site_url ? t.lockHelp : t.setUrl}</span>
         </label>
-        <Toggle id="lock-toggle" checked={a.site_lock} onChange={(v) => onChange({ site_lock: v })} label="Lock to the site" />
+        <Toggle id="lock-toggle" checked={a.site_lock} onChange={(v) => onChange({ site_lock: v })} label={t.lockLabel} />
       </div>
       <div className="flex items-center justify-between gap-3">
         <label htmlFor="burn-code" className="text-sm">
-          Burn after the first code
-          <span className="block text-xs text-zinc-500">
-            For one-shot sign-ups: the address stops accepting mail once its code arrived.
-          </span>
+          {t.burnCode}
+          <span className="block text-xs text-zinc-500">{t.burnCodeHelp}</span>
         </label>
-        <Toggle
-          id="burn-code"
-          checked={a.burn_after_code}
-          onChange={(v) => onChange({ burn_after_code: v })}
-          label="Burn after the first code"
-        />
+        <Toggle id="burn-code" checked={a.burn_after_code} onChange={(v) => onChange({ burn_after_code: v })} label={t.burnCode} />
       </div>
       <form
         className="flex items-end gap-2"
@@ -75,23 +68,23 @@ export function ProtectionCard({ a, onChange }: { a: Address; onChange: (b: Reco
       >
         <div className="flex-1">
           <label htmlFor="max-msg" className="label">
-            Burn after N mails
+            {t.burnN}
           </label>
           <input
             id="max-msg"
             type="number"
             min={1}
             className="input py-1"
-            placeholder="Unlimited"
+            placeholder={t.unlimited}
             value={max}
             onChange={(e) => setMax(e.target.value)}
           />
         </div>
-        <button className="btn-secondary">Save</button>
+        <button className="btn-secondary">{tc.save}</button>
       </form>
       <FeedRow a={a} />
       <button className="btn-secondary w-full" onClick={replace}>
-        Replace with a fresh address…
+        {t.replace}
       </button>
     </section>
   );

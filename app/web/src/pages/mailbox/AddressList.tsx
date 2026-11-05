@@ -12,6 +12,7 @@ import { AddressRow } from "./AddressRow";
 import { SelectionBar } from "./SelectionBar";
 import { StaleDialog } from "./StaleDialog";
 import { QUICK_FILTERS, STALE_DAYS, useCategories, useSavedSearches, useStale } from "./shared";
+import { useT } from "../../i18n";
 
 /** Middle pane: the addresses of a folder. */
 export function AddressList({ folder, activeId }: { folder: string; activeId?: string }) {
@@ -35,6 +36,8 @@ export function AddressList({ folder, activeId }: { folder: string; activeId?: s
   const nav = useNavigate();
   const toast = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const t = useT().mailbox;
+  const tn = useT().common.nav;
   const anchor = useRef<string | null>(null);
   useEffect(() => {
     setSelected(new Set());
@@ -42,7 +45,7 @@ export function AddressList({ folder, activeId }: { folder: string; activeId?: s
   }, [folder]);
   const saveSearch = () => {
     const name = window.prompt(
-      "Name of the smart folder",
+      t.smartName,
       Object.keys(filters)
         .map((k) => QUICK_FILTERS.find((f) => f.key === k)?.label ?? k)
         .join(" + ") || debounced,
@@ -55,14 +58,14 @@ export function AddressList({ folder, activeId }: { folder: string; activeId?: s
     post("/v1/saved-searches", { name, params }).then(
       () => {
         invalidate(qc, ["saved-searches"]);
-        toast(`Smart folder ${name} saved`, "success");
+        toast(t.smartSaved(name), "success");
       },
       (e: Error) => toast(e.message, "error"),
     );
   };
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(q), 200);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setDebounced(q), 200);
+    return () => clearTimeout(timer);
   }, [q]);
   const params = useMemo(() => {
     const p = new URLSearchParams();
@@ -85,16 +88,16 @@ export function AddressList({ folder, activeId }: { folder: string; activeId?: s
   const byId = useMemo(() => new Map((categories.data ?? []).map((c) => [c.id, c])), [categories.data]);
   const title =
     folder === "inbox"
-      ? "Inbox"
+      ? tn.inbox
       : folder === "pinned"
-        ? "Pinned"
+        ? tn.pinned
         : folder === "archived"
-          ? "Archived"
+          ? tn.archived
           : folder === "none"
-            ? "No category"
+            ? tn.noCategory
             : smart
               ? smart.name
-              : (byId.get(folder)?.name ?? "Category");
+              : (byId.get(folder)?.name ?? t.category);
 
   const pinned = (list.data ?? []).filter((a) => a.pinned && folder !== "pinned");
   const rest = (list.data ?? []).filter((a) => !a.pinned || folder === "pinned");
@@ -106,11 +109,11 @@ export function AddressList({ folder, activeId }: { folder: string; activeId?: s
       post<{ affected: number }>("/v1/addresses/bulk", { ids, action, ...extra }).then(
         (r) => {
           refresh();
-          toast(done ?? `${r.affected} address${r.affected > 1 ? "es" : ""} updated`, "success");
+          toast(done ?? t.updated(r.affected), "success");
         },
         (e: Error) => toast(e.message, "error"),
       ),
-    [refresh, toast],
+    [refresh, toast, t],
   );
   const onSelect = useCallback(
     (a: Address, range: boolean) => {
@@ -150,25 +153,25 @@ export function AddressList({ folder, activeId }: { folder: string; activeId?: s
       else if (/^[0-9]$/.test(e.key) && targets.length) {
         const cat = e.key === "0" ? null : cats[Number(e.key) - 1];
         if (cat === undefined) return;
-        void bulk(targets, "move", { category_id: cat?.id ?? null }, cat ? `Moved to ${cat.name}` : "Removed from category");
+        void bulk(targets, "move", { category_id: cat?.id ?? null }, cat ? t.movedTo(cat.name) : t.removedFromCategory);
       } else if (e.key === "p" && targets.length) {
         const pin = !(current && targets.length === 1 && current.pinned);
-        void bulk(targets, pin ? "pin" : "unpin", {}, pin ? "Pinned" : "Unpinned");
+        void bulk(targets, pin ? "pin" : "unpin", {}, pin ? t.pinned : t.unpinned);
       } else if (e.key === "a" && targets.length) {
-        void bulk(targets, folder === "archived" ? "unarchive" : "archive", {}, folder === "archived" ? "Restored" : "Archived");
+        void bulk(targets, folder === "archived" ? "unarchive" : "archive", {}, folder === "archived" ? t.restored : t.archived);
         setSelected(new Set());
       } else if (e.key === "h" && byId.has(folder)) {
         const c = byId.get(folder)!;
         patch(`/v1/categories/${c.id}`, { hidden: !c.hidden }).then(() => {
           refresh();
-          toast(c.hidden ? `${c.name} shown in the Inbox` : `${c.name} hidden from the Inbox`, "success");
+          toast(c.hidden ? t.shownInInbox(c.name) : t.hiddenFromInbox(c.name), "success");
         });
       } else return;
       e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selected, activeId, ordered, categories.data, nav, sp, onSelect, bulk, folder, byId, refresh, toast]);
+  }, [selected, activeId, ordered, categories.data, nav, sp, onSelect, bulk, folder, byId, refresh, toast, t]);
   const search = sp.toString() ? `?${sp.toString()}` : "";
   const staleCount = stale.data?.length ?? 0;
 
@@ -177,27 +180,27 @@ export function AddressList({ folder, activeId }: { folder: string; activeId?: s
       <div className="space-y-2 border-b border-zinc-200 px-4 pt-4 pb-3 dark:border-zinc-800">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
-          <button className="btn-primary px-2.5 py-1 text-xs" onClick={() => setCreating(true)} title="Shortcut: n">
-            + New
+          <button className="btn-primary px-2.5 py-1 text-xs" onClick={() => setCreating(true)} title={t.shortcutN}>
+            {t.newBtn}
           </button>
         </div>
         <div className="flex gap-2">
           <label className="sr-only" htmlFor="addr-search">
-            Search addresses
+            {t.searchLabel}
           </label>
           <input
             id="addr-search"
             type="search"
             className="input py-1"
-            placeholder="Search…  ( / )"
+            placeholder={t.searchPlaceholder}
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
           <label className="sr-only" htmlFor="addr-domain">
-            Filter by domain
+            {t.filterDomain}
           </label>
           <select id="addr-domain" className="input w-auto py-1 text-xs" value={domain} onChange={(e) => setDomain(e.target.value)}>
-            <option value="">All domains</option>
+            <option value="">{t.allDomains}</option>
             {(domains.data ?? []).map((d) => (
               <option key={d.id} value={d.name}>
                 {d.name}
@@ -205,7 +208,7 @@ export function AddressList({ folder, activeId }: { folder: string; activeId?: s
             ))}
           </select>
         </div>
-        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Quick filters">
+        <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t.quickFilters}>
           {QUICK_FILTERS.map((f) => {
             const on = filters[f.key] === f.value;
             return (
@@ -228,18 +231,16 @@ export function AddressList({ folder, activeId }: { folder: string; activeId?: s
           })}
           {(Object.keys(filters).length > 0 || debounced) && !smart && (
             <button className="ml-auto text-xs text-zinc-500 underline hover:text-zinc-900 dark:hover:text-zinc-100" onClick={saveSearch}>
-              Save as smart folder
+              {t.saveSmart}
             </button>
           )}
         </div>
       </div>
       {folder === "inbox" && staleCount > 0 && (
         <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
-          <span className="flex-1">
-            {staleCount} address{staleCount > 1 ? "es" : ""} never received mail in {STALE_DAYS} days.
-          </span>
+          <span className="flex-1">{t.staleBanner(staleCount, STALE_DAYS)}</span>
           <button className="font-semibold underline" onClick={() => setReviewStale(true)}>
-            Review
+            {t.review}
           </button>
         </div>
       )}
@@ -250,7 +251,7 @@ export function AddressList({ folder, activeId }: { folder: string; activeId?: s
           archived={folder === "archived"}
           onClear={() => setSelected(new Set())}
           onAction={(action, extra) => {
-            if (action === "delete" && !confirmAction(`Delete ${selected.size} address(es) and all their mail?`)) return;
+            if (action === "delete" && !confirmAction(t.confirmBulkDelete(selected.size))) return;
             void bulk([...selected], action, extra);
             if (action !== "move" && action !== "pin" && action !== "unpin" && action !== "read") setSelected(new Set());
           }}
@@ -261,17 +262,13 @@ export function AddressList({ folder, activeId }: { folder: string; activeId?: s
         <ErrorText error={list.error} />
         {list.data?.length === 0 && (
           <div className="px-6 py-12 text-center text-sm text-zinc-500">
-            {debounced || domain
-              ? "No matching addresses."
-              : folder === "inbox"
-                ? "No addresses yet. Press n to create one."
-                : "Nothing here."}
+            {debounced || domain ? t.noMatch : folder === "inbox" ? t.noAddresses : t.nothing}
           </div>
         )}
         {pinned.length > 0 && (
           <>
-            <p className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Pinned</p>
-            <ul aria-label="Pinned addresses">
+            <p className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">{tn.pinned}</p>
+            <ul aria-label={t.pinnedAddresses}>
               {pinned.map((a) => (
                 <AddressRow
                   key={a.id}
@@ -286,10 +283,12 @@ export function AddressList({ folder, activeId }: { folder: string; activeId?: s
                 />
               ))}
             </ul>
-            {rest.length > 0 && <p className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Others</p>}
+            {rest.length > 0 && (
+              <p className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">{t.others}</p>
+            )}
           </>
         )}
-        <ul aria-label="Addresses">
+        <ul aria-label={t.addresses}>
           {rest.map((a) => (
             <AddressRow
               key={a.id}

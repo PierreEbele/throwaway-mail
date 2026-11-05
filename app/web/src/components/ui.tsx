@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { copyText } from "../util";
+import { useT } from "../i18n";
 
 // Toasts
 interface Toast {
@@ -55,6 +56,7 @@ export function Modal({
   wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const t = useT();
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
@@ -80,7 +82,7 @@ export function Modal({
             <h2 id="modal-title" className="text-lg font-semibold">
               {title}
             </h2>
-            <button className="btn-ghost -mt-1 -mr-2 px-2" onClick={onClose} aria-label="Close dialog">
+            <button className="btn-ghost -mt-1 -mr-2 px-2" onClick={onClose} aria-label={t.common.closeDialog}>
               ✕
             </button>
           </div>
@@ -94,7 +96,7 @@ export function Modal({
 // Small pieces
 export function CopyButton({
   text,
-  label = "Copy",
+  label,
   className = "btn-secondary",
   big,
 }: {
@@ -104,6 +106,8 @@ export function CopyButton({
   big?: boolean;
 }) {
   const [done, setDone] = useState(false);
+  const t = useT();
+  label ??= t.common.copy;
   return (
     <button
       type="button"
@@ -116,16 +120,17 @@ export function CopyButton({
       }}
       aria-label={`${label}: ${text}`}
     >
-      {done ? "Copied ✓" : label}
+      {done ? t.common.copied : label}
     </button>
   );
 }
 
-export function Spinner({ label = "Loading" }: { label?: string }) {
+export function Spinner({ label }: { label?: string }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-2 p-4 text-sm text-zinc-500" role="status">
       <span className="size-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900 dark:border-t-zinc-100" aria-hidden />
-      {label}…
+      {label ?? t.common.loading}…
     </div>
   );
 }
@@ -154,7 +159,8 @@ const STATUS_STYLES: Record<string, string> = {
   disabled: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
 };
 export function Badge({ value, children }: { value: string; children?: ReactNode }) {
-  return <span className={`badge ${STATUS_STYLES[value] ?? STATUS_STYLES.archived}`}>{children ?? value}</span>;
+  const t = useT();
+  return <span className={`badge ${STATUS_STYLES[value] ?? STATUS_STYLES.archived}`}>{children ?? t.common.status[value] ?? value}</span>;
 }
 
 export function Toggle({

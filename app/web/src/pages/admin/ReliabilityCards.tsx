@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { post, put } from "../../api";
 import { Toggle, useToast } from "../../components/ui";
 import { fullDate, timeAgo } from "../../util";
+import { getLang, useT } from "../../i18n";
 
 export interface BackupHealth {
   last_run_at: number | null;
@@ -37,37 +38,34 @@ const refresh = (qc: ReturnType<typeof useQueryClient>) => qc.invalidateQueries(
 export function BackupCard({ b }: { b: BackupHealth }) {
   const qc = useQueryClient();
   const toast = useToast();
+  const t = useT().ops.backup;
+  const tc = useT().common;
   const run = useMutation({
     mutationFn: () => post("/v1/admin/backup/run"),
-    onSuccess: () => toast("Backup done", "success"),
+    onSuccess: () => toast(t.done, "success"),
     onError: (e) => toast((e as Error).message, "error"),
     onSettled: () => refresh(qc),
   });
   return (
     <section className="card p-5">
       <div className="flex items-center justify-between gap-2">
-        <h2 className={title}>Backups</h2>
+        <h2 className={title}>{t.title}</h2>
         <button className="btn-secondary" disabled={run.isPending} onClick={() => run.mutate()}>
-          {run.isPending ? "Backing up…" : "Back up now"}
+          {run.isPending ? t.running : t.run}
         </button>
       </div>
       <ul className="mt-2 space-y-1 text-sm">
         <li>
-          Schedule:{" "}
-          {b.scheduled_every_hours
-            ? `every ${b.scheduled_every_hours} h`
-            : "off (BACKUP_INTERVAL_HOURS; host cron may run scripts/backup.sh)"}
+          {t.schedule}: {b.scheduled_every_hours ? t.every(b.scheduled_every_hours) : t.scheduleOff}
         </li>
-        <li>Off-site copy: {b.offsite ? "on, encrypted (BACKUP_S3_*)" : "off"}</li>
+        <li>
+          {t.offsite}: {b.offsite ? t.offsiteOn : tc.off}
+        </li>
         <li title={b.last_success_at ? fullDate(b.last_success_at) : undefined}>
-          Last success: {b.last_success_at ? timeAgo(b.last_success_at) : "never"}
+          {t.lastSuccess}: {timeAgo(b.last_success_at)}
           {b.last_file && <span className="ml-1 font-mono text-xs text-zinc-500">{b.last_remote_key ?? b.last_file}</span>}
         </li>
-        {b.last_ok === false && (
-          <li className="text-red-600">
-            Last run failed {timeAgo(b.last_run_at)}: {b.last_error}
-          </li>
-        )}
+        {b.last_ok === false && <li className="text-red-600">{t.lastFailed(timeAgo(b.last_run_at), b.last_error ?? "")}</li>}
       </ul>
     </section>
   );
@@ -76,6 +74,9 @@ export function BackupCard({ b }: { b: BackupHealth }) {
 export function ProbeCard({ p }: { p: ProbeHealth }) {
   const qc = useQueryClient();
   const toast = useToast();
+  const t = useT().ops.probe;
+  const tb = useT().ops.backup;
+  const tc = useT().common;
   const [form, setForm] = useState({
     enabled: p.enabled,
     address: p.address,
@@ -87,41 +88,45 @@ export function ProbeCard({ p }: { p: ProbeHealth }) {
   }, [p.enabled, p.address, p.interval_minutes, p.timeout_minutes]);
   const save = useMutation({
     mutationFn: () => put("/v1/admin/probe", form),
-    onSuccess: () => toast("Probe saved", "success"),
+    onSuccess: () => toast(t.saved, "success"),
     onError: (e) => toast((e as Error).message, "error"),
     onSettled: () => refresh(qc),
   });
   const run = useMutation({
     mutationFn: () => post("/v1/admin/probe/run"),
-    onSuccess: () => toast("Probe mail sent", "success"),
+    onSuccess: () => toast(t.sent, "success"),
     onError: (e) => toast((e as Error).message, "error"),
     onSettled: () => refresh(qc),
   });
   return (
     <section className="card p-5">
       <div className="flex items-center justify-between gap-2">
-        <h2 className={title}>Delivery probe</h2>
+        <h2 className={title}>{t.title}</h2>
         {p.enabled && (
           <button className="btn-secondary" disabled={run.isPending || !!p.pending} onClick={() => run.mutate()}>
-            Run now
+            {t.run}
           </button>
         )}
       </div>
       {!p.transport_configured ? (
-        <p className="mt-2 text-sm text-zinc-500">Set PROBE_SMTP_URL to send a test mail to one of your addresses periodically.</p>
+        <p className="mt-2 text-sm text-zinc-500">{t.unconfigured}</p>
       ) : (
         <>
           <ul className="mt-2 space-y-1 text-sm">
-            {p.pending && <li>Waiting for the probe sent {timeAgo(p.pending.sent_at)}…</li>}
+            {p.pending && <li>{t.waiting(timeAgo(p.pending.sent_at))}</li>}
             <li>
-              Last success: {p.last_success_at ? timeAgo(p.last_success_at) : "never"}
-              {p.last_latency_ms !== null && <span className="text-zinc-500"> · took {Math.round(p.last_latency_ms / 1000)} s</span>}
+              {tb.lastSuccess}: {timeAgo(p.last_success_at)}
+              {p.last_latency_ms !== null && (
+                <span className="text-zinc-500">
+                  {t.took(
+                    new Intl.NumberFormat(getLang(), { style: "unit", unit: "second", maximumFractionDigits: 0 }).format(
+                      p.last_latency_ms / 1000,
+                    ),
+                  )}
+                </span>
+              )}
             </li>
-            {p.last_ok === false && (
-              <li className="text-red-600">
-                Failing ({p.consecutive_failures}×): {p.last_error}
-              </li>
-            )}
+            {p.last_ok === false && <li className="text-red-600">{t.failing(p.consecutive_failures, p.last_error ?? "")}</li>}
           </ul>
           <form
             className="mt-3 grid gap-2 text-sm sm:grid-cols-2"
@@ -131,7 +136,7 @@ export function ProbeCard({ p }: { p: ProbeHealth }) {
             }}
           >
             <label className="sm:col-span-2">
-              Probe address (an address of this instance that stores mail)
+              {t.address}
               <input
                 className="input mt-1"
                 type="email"
@@ -141,7 +146,7 @@ export function ProbeCard({ p }: { p: ProbeHealth }) {
               />
             </label>
             <label>
-              Every (minutes)
+              {t.every}
               <input
                 className="input mt-1"
                 type="number"
@@ -151,7 +156,7 @@ export function ProbeCard({ p }: { p: ProbeHealth }) {
               />
             </label>
             <label>
-              Timeout (minutes)
+              {t.timeout}
               <input
                 className="input mt-1"
                 type="number"
@@ -162,11 +167,11 @@ export function ProbeCard({ p }: { p: ProbeHealth }) {
             </label>
             <div className="flex items-center justify-between gap-2 sm:col-span-2">
               <span className="flex items-center gap-2">
-                <Toggle checked={form.enabled} onChange={(v) => setForm({ ...form, enabled: v })} label="Probe enabled" />
-                Enabled
+                <Toggle checked={form.enabled} onChange={(v) => setForm({ ...form, enabled: v })} label={t.enabledLabel} />
+                {t.enabled}
               </span>
               <button className="btn-primary" disabled={save.isPending}>
-                Save
+                {tc.save}
               </button>
             </div>
           </form>

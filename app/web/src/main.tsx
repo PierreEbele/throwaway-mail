@@ -24,6 +24,7 @@ import { RulesPage } from "./pages/rules/RulesPage";
 import { QuarantinePage } from "./pages/rules/QuarantinePage";
 import { DeliveriesPage } from "./pages/rules/DeliveriesPage";
 import { ApiError } from "./api";
+import { I18nProvider } from "./i18n";
 
 const qc = new QueryClient({
   defaultOptions: {
@@ -194,16 +195,18 @@ function App() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <QueryClientProvider client={qc}>
-      <ToastProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            <LiveEvents />
-            <App />
-          </BrowserRouter>
-        </AuthProvider>
-      </ToastProvider>
-    </QueryClientProvider>
+    <I18nProvider>
+      <QueryClientProvider client={qc}>
+        <ToastProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <LiveEvents />
+              <App />
+            </BrowserRouter>
+          </AuthProvider>
+        </ToastProvider>
+      </QueryClientProvider>
+    </I18nProvider>
   </StrictMode>,
 );
 

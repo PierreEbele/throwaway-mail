@@ -6,6 +6,7 @@ import type { Address, Category } from "../../types";
 import { confirmAction, useToast } from "../../components/ui";
 import { invalidateAddress } from "../../queries";
 import { DOT } from "./shared";
+import { useT } from "../../i18n";
 
 type MenuItem = { label: string; onSelect: () => void; danger?: boolean; checked?: boolean; dot?: string } | "sep" | { heading: string };
 
@@ -30,6 +31,7 @@ export function AddressMenu({
   const [sp] = useSearchParams();
   const toast = useToast();
   const ref = useRef<HTMLDivElement>(null);
+  const t = useT().menus.menu;
   const [pos, setPos] = useState({ left: x, top: y });
   const refresh = () => invalidateAddress(qc, a.id);
   const run = (fn: () => Promise<unknown>, done?: string) => {
@@ -47,51 +49,51 @@ export function AddressMenu({
 
   const items: MenuItem[] = [
     {
-      label: "Open",
+      label: t.open,
       onSelect: () => {
         onClose();
         nav(`/addresses/${a.id}${search}`);
       },
     },
-    { label: "Copy address", onSelect: () => run(() => navigator.clipboard.writeText(a.email), "Address copied") },
+    { label: t.copy, onSelect: () => run(() => navigator.clipboard.writeText(a.email), t.copied) },
     ...(a.unread_count > 0
       ? [
           {
-            label: "Mark all as read",
+            label: t.markAllRead,
             onSelect: () => run(() => post(`/v1/addresses/${a.id}/messages/bulk`, { action: "read", scope: "inbox" })),
           },
         ]
       : []),
-    { label: a.pinned ? "Unpin" : "Pin", onSelect: () => update({ pinned: !a.pinned }) },
+    { label: a.pinned ? t.unpin : t.pin, onSelect: () => update({ pinned: !a.pinned }) },
     {
-      label: "Edit site…",
+      label: t.editSite,
       onSelect: () => {
         onClose();
         onEdit();
       },
     },
     "sep",
-    { heading: "Move to" },
+    { heading: t.moveTo },
     ...categories.map((c) => ({
       label: c.name,
       dot: DOT[c.color],
       checked: a.category_id === c.id,
-      onSelect: () => update({ category_id: c.id }, `Moved to ${c.name}`),
+      onSelect: () => update({ category_id: c.id }, t.movedTo(c.name)),
     })),
-    { label: "No category", checked: !a.category_id, onSelect: () => update({ category_id: null }) },
+    { label: t.noCategory, checked: !a.category_id, onSelect: () => update({ category_id: null }) },
     "sep",
     a.status === "paused"
-      ? { label: "Resume (accept mail)", onSelect: () => update({ status: "active" }) }
-      : { label: "Pause (reject mail)", onSelect: () => update({ status: "paused" }) },
+      ? { label: t.resume, onSelect: () => update({ status: "active" }) }
+      : { label: t.pause, onSelect: () => update({ status: "paused" }) },
     a.status === "archived"
-      ? { label: "Unarchive", onSelect: () => update({ status: "active" }, "Address restored") }
-      : { label: "Archive", onSelect: () => update({ status: "archived" }, "Address archived") },
+      ? { label: t.unarchive, onSelect: () => update({ status: "active" }, t.restored) }
+      : { label: t.archive, onSelect: () => update({ status: "archived" }, t.archived) },
     {
-      label: "Delete…",
+      label: t.delete,
       danger: true,
       onSelect: () => {
-        if (!confirmAction(`Delete ${a.email} and all its messages? This cannot be undone.`)) return onClose();
-        run(() => del(`/v1/addresses/${a.id}`), "Address deleted");
+        if (!confirmAction(t.confirmDelete(a.email))) return onClose();
+        run(() => del(`/v1/addresses/${a.id}`), t.deleted);
         if (location.pathname.includes(a.id)) nav(`/${search}`);
       },
     },
@@ -143,7 +145,7 @@ export function AddressMenu({
     <div
       ref={ref}
       role="menu"
-      aria-label={`Actions for ${a.site_name}`}
+      aria-label={t.actionsFor(a.site_name)}
       onKeyDown={onKey}
       onContextMenu={(e) => e.preventDefault()}
       style={pos}

@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { post } from "../../api";
 import { useAuth } from "../../auth";
-import { AuthCard, Field, PASSWORD_MIN, useAfterSignIn } from "./AuthCard";
+import { AuthCard, Field, PASSWORD_MIN, useAfterSignIn, useT } from "./AuthCard";
 
 /** First run with local accounts: create the first admin. */
 export function SetupPage() {
@@ -12,13 +12,14 @@ export function SetupPage() {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const afterSignIn = useAfterSignIn();
+  const t = useT().auth;
   const setup = useMutation({
     mutationFn: () => post("/v1/auth/setup", { email, name: name || undefined, password }),
     onSuccess: () => afterSignIn(),
   });
   if (!setupRequired && !setup.isSuccess) return <Navigate to="/login" replace />;
   return (
-    <AuthCard subtitle="Create the first admin account" error={setup.error}>
+    <AuthCard subtitle={t.setupSubtitle} error={setup.error}>
       <form
         className="space-y-3"
         onSubmit={(e: FormEvent) => {
@@ -28,7 +29,7 @@ export function SetupPage() {
       >
         <Field
           id="setup-email"
-          label="E-mail"
+          label={t.email}
           type="email"
           autoComplete="username"
           required
@@ -36,20 +37,20 @@ export function SetupPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <Field id="setup-name" label="Name (optional)" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
+        <Field id="setup-name" label={t.nameOptional} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
         <Field
           id="setup-password"
-          label="Password"
+          label={t.password}
           type="password"
           autoComplete="new-password"
           required
           minLength={PASSWORD_MIN}
-          hint={`At least ${PASSWORD_MIN} characters.`}
+          hint={t.minChars(PASSWORD_MIN)}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
         <button className="btn-primary w-full py-2 text-base" disabled={setup.isPending}>
-          Create admin account
+          {t.createAdmin}
         </button>
       </form>
     </AuthCard>

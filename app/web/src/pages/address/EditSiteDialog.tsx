@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { patch } from "../../api";
 import type { Address } from "../../types";
 import { ErrorText, Modal } from "../../components/ui";
+import { useT } from "../../i18n";
 import { invalidate } from "../../queries";
 
 export function EditSiteDialog({ address, open, onClose }: { address: Address; open: boolean; onClose: () => void }) {
@@ -10,6 +11,8 @@ export function EditSiteDialog({ address, open, onClose }: { address: Address; o
   const [siteName, setSiteName] = useState(address.site_name);
   const [siteUrl, setSiteUrl] = useState(address.site_url ?? "");
   const [label, setLabel] = useState(address.label ?? "");
+  const t = useT().address;
+  const tc = useT().common;
   useEffect(() => {
     if (open) {
       setSiteName(address.site_name);
@@ -25,7 +28,7 @@ export function EditSiteDialog({ address, open, onClose }: { address: Address; o
     },
   });
   return (
-    <Modal open={open} onClose={onClose} title="Edit site">
+    <Modal open={open} onClose={onClose} title={t.editSite}>
       <form
         className="space-y-4"
         onSubmit={(e: FormEvent) => {
@@ -35,29 +38,29 @@ export function EditSiteDialog({ address, open, onClose }: { address: Address; o
       >
         <div>
           <label htmlFor="es-name" className="label">
-            Site name
+            {t.siteName}
           </label>
           <input id="es-name" className="input" required value={siteName} onChange={(e) => setSiteName(e.target.value)} autoFocus />
         </div>
         <div>
           <label htmlFor="es-url" className="label">
-            Site URL
+            {t.siteUrl}
           </label>
           <input id="es-url" className="input" value={siteUrl} onChange={(e) => setSiteUrl(e.target.value)} placeholder="example.com" />
         </div>
         <div>
           <label htmlFor="es-label" className="label">
-            Label / note
+            {t.label}
           </label>
           <input id="es-label" className="input" value={label} onChange={(e) => setLabel(e.target.value)} />
         </div>
         <ErrorText error={save.error} />
         <div className="flex justify-end gap-2">
           <button type="button" className="btn-secondary" onClick={onClose}>
-            Cancel
+            {tc.cancel}
           </button>
           <button className="btn-primary" disabled={save.isPending}>
-            Save
+            {tc.save}
           </button>
         </div>
       </form>

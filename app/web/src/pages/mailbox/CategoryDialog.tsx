@@ -6,6 +6,7 @@ import type { Category, CategoryColor } from "../../types";
 import { ErrorText, Modal, confirmAction, useToast } from "../../components/ui";
 import { invalidate } from "../../queries";
 import { COLORS, DOT } from "./shared";
+import { useT } from "../../i18n";
 
 export function CategoryDialog({ open, onClose, category }: { open: boolean; onClose: () => void; category?: Category | null }) {
   const qc = useQueryClient();
@@ -17,6 +18,8 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
   const [autoMatch, setAutoMatch] = useState("");
   const [retention, setRetention] = useState("");
   const [pinned, setPinned] = useState(false);
+  const t = useT().menus.category;
+  const tc = useT().common;
   useEffect(() => {
     if (open) {
       setName(category?.name ?? "");
@@ -42,13 +45,13 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
   const remove = useMutation({
     mutationFn: () => del(`/v1/categories/${category!.id}`),
     onSuccess: () => {
-      toast(`Category ${category!.name} deleted`, "success");
+      toast(t.deleted(category!.name), "success");
       nav("/");
       done();
     },
   });
   return (
-    <Modal open={open} onClose={onClose} title={category ? "Edit category" : "New category"}>
+    <Modal open={open} onClose={onClose} title={category ? t.edit : t.create}>
       <form
         className="space-y-4"
         onSubmit={(e: FormEvent) => {
@@ -58,26 +61,26 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
       >
         <div>
           <label htmlFor="cat-name" className="label">
-            Name
+            {t.name}
           </label>
           <input
             id="cat-name"
             className="input"
             required
             maxLength={40}
-            placeholder="e.g. Shopping"
+            placeholder={t.namePlaceholder}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </div>
         <fieldset>
-          <legend className="label">Colour</legend>
+          <legend className="label">{t.colour}</legend>
           <div className="flex flex-wrap gap-2">
             {COLORS.map((c) => (
               <button
                 key={c}
                 type="button"
-                aria-label={c}
+                aria-label={t.colours[c] ?? c}
                 aria-pressed={color === c}
                 onClick={() => setColor(c)}
                 className={`size-7 rounded-full ${DOT[c]} ring-offset-2 ring-offset-white dark:ring-offset-zinc-900 ${color === c ? "ring-2 ring-zinc-900 dark:ring-zinc-100" : ""}`}
@@ -86,27 +89,25 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
           </div>
         </fieldset>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} /> Pin to the top of the sidebar
+          <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} /> {t.pinTop}
         </label>
         <div>
           <label htmlFor="cat-auto" className="label">
-            Auto-sort keywords
+            {t.autoSort}
           </label>
           <input
             id="cat-auto"
             className="input"
             maxLength={500}
-            placeholder="e.g. shop, store, amazon"
+            placeholder={t.autoPlaceholder}
             value={autoMatch}
             onChange={(e) => setAutoMatch(e.target.value)}
           />
-          <p className="mt-1 text-xs text-zinc-500">
-            New addresses whose site name or URL contains one of these words go into this category.
-          </p>
+          <p className="mt-1 text-xs text-zinc-500">{t.autoHelp}</p>
         </div>
         <div>
           <label htmlFor="cat-ret" className="label">
-            Delete mail after (days)
+            {t.retention}
           </label>
           <input
             id="cat-ret"
@@ -114,15 +115,15 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
             type="number"
             min={1}
             max={3650}
-            placeholder="Server default"
+            placeholder={t.serverDefault}
             value={retention}
             onChange={(e) => setRetention(e.target.value)}
           />
-          <p className="mt-1 text-xs text-zinc-500">Only shortens the server-wide retention; leave empty to keep the default.</p>
+          <p className="mt-1 text-xs text-zinc-500">{t.retentionHelp}</p>
         </div>
         {category && (
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} /> Hide its addresses from the Inbox
+            <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} /> {t.hide}
           </label>
         )}
         <ErrorText error={save.error ?? remove.error} />
@@ -131,13 +132,9 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
             <button
               type="button"
               className="btn-ghost text-red-600"
-              onClick={() =>
-                confirmAction(
-                  `Delete the category ${category.name}? Its ${category.address_count} address(es) are kept, without a category.`,
-                ) && remove.mutate()
-              }
+              onClick={() => confirmAction(t.confirmDelete(category.name, category.address_count)) && remove.mutate()}
             >
-              Delete
+              {tc.delete}
             </button>
           ) : (
             <span />
@@ -147,23 +144,23 @@ export function CategoryDialog({ open, onClose, category }: { open: boolean; onC
               type="button"
               className="btn-ghost text-xs"
               onClick={() =>
-                confirmAction(`Pause every active address in ${category.name}? (Undo from Account → Panic button)`) &&
+                confirmAction(t.confirmPause(category.name)) &&
                 post<{ affected: number }>("/v1/panic", { category_id: category.id }).then((r) => {
                   qc.invalidateQueries();
-                  toast(`${r.affected} address(es) paused`, "success");
+                  toast(t.paused(r.affected), "success");
                   onClose();
                 })
               }
             >
-              Pause all
+              {t.pauseAll}
             </button>
           )}
           <div className="flex gap-2">
             <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancel
+              {tc.cancel}
             </button>
             <button className="btn-primary" disabled={save.isPending}>
-              {category ? "Save" : "Create"}
+              {category ? tc.save : t.createBtn}
             </button>
           </div>
         </div>

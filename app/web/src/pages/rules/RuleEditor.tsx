@@ -7,7 +7,8 @@ import { invalidate } from "../../queries";
 import { timeAgo } from "../../util";
 import { useDestinations } from "../Addresses";
 import { useCategories } from "../mailbox/shared";
-import { ACTION_LABELS, defaultAction, defaultCondition } from "./describe";
+import { actionLabels, defaultAction, defaultCondition } from "./describe";
+import { useT } from "../../i18n";
 import { ConditionRow } from "./ConditionRow";
 import { useAddresses, type Draft } from "./shared";
 
@@ -18,6 +19,8 @@ export function RuleEditor({ draft, onDone }: { draft: Draft; onDone: () => void
   const dests = useDestinations();
   const addrs = useAddresses();
   const [d, setD] = useState<Draft>(draft);
+  const t = useT().rules.editor;
+  const tc = useT().common;
   const [preview, setPreview] = useState<RuleTestResult | null>(null);
   const set = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }));
   const setCond = (i: number, c: RuleCondition) => set({ conditions: d.conditions.map((x, j) => (j === i ? c : x)) });
@@ -35,7 +38,7 @@ export function RuleEditor({ draft, onDone }: { draft: Draft; onDone: () => void
     mutationFn: () => (d.id ? patch(`/v1/rules/${d.id}`, body()) : post("/v1/rules", body())),
     onSuccess: () => {
       invalidate(qc, ["rules"]);
-      toast(d.id ? "Rule saved" : "Rule created", "success");
+      toast(d.id ? t.saved : t.created, "success");
       onDone();
     },
   });
@@ -54,7 +57,7 @@ export function RuleEditor({ draft, onDone }: { draft: Draft; onDone: () => void
   return (
     <form
       className="card mb-6 space-y-5 p-5"
-      aria-label={d.id ? "Edit rule" : "New rule"}
+      aria-label={d.id ? t.editLabel : t.newLabel}
       onSubmit={(e) => {
         e.preventDefault();
         save.mutate();
@@ -63,21 +66,21 @@ export function RuleEditor({ draft, onDone }: { draft: Draft; onDone: () => void
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label htmlFor="rule-name" className="label">
-            Name
+            {t.name}
           </label>
           <input
             id="rule-name"
             className="input"
             required
             maxLength={100}
-            placeholder="Quarantine forged mail"
+            placeholder={t.namePlaceholder}
             value={d.name}
             onChange={(e) => set({ name: e.target.value })}
           />
         </div>
         <div>
           <label htmlFor="rule-scope" className="label">
-            Applies to
+            {t.appliesTo}
           </label>
           <select
             id="rule-scope"
@@ -88,9 +91,9 @@ export function RuleEditor({ draft, onDone }: { draft: Draft; onDone: () => void
               set({ address_id: v.startsWith("a:") ? v.slice(2) : null, category_id: v.startsWith("c:") ? v.slice(2) : null });
             }}
           >
-            <option value="">All my addresses</option>
+            <option value="">{t.allAddresses}</option>
             {!!cats.data?.length && (
-              <optgroup label="Addresses in a category">
+              <optgroup label={t.inCategory}>
                 {cats.data.map((c) => (
                   <option key={c.id} value={`c:${c.id}`}>
                     {c.name}
@@ -99,7 +102,7 @@ export function RuleEditor({ draft, onDone }: { draft: Draft; onDone: () => void
               </optgroup>
             )}
             {!!addrs.data?.length && (
-              <optgroup label="One address">
+              <optgroup label={t.oneAddress}>
                 {addrs.data.map((a) => (
                   <option key={a.id} value={`a:${a.id}`}>
                     {a.site_name} ({a.email})
@@ -113,15 +116,15 @@ export function RuleEditor({ draft, onDone }: { draft: Draft; onDone: () => void
 
       <fieldset className="space-y-2">
         <legend className="mb-1 text-sm font-medium">
-          When{" "}
+          {t.when}{" "}
           <select
-            aria-label="How conditions combine"
+            aria-label={t.combine}
             className="input inline-block w-auto py-0.5"
             value={d.match}
             onChange={(e) => set({ match: e.target.value as "all" | "any" })}
           >
-            <option value="all">all of these are true</option>
-            <option value="any">any of these is true</option>
+            <option value="all">{t.all}</option>
+            <option value="any">{t.any}</option>
           </select>
         </legend>
         {d.conditions.map((c, i) => (
@@ -139,21 +142,21 @@ export function RuleEditor({ draft, onDone }: { draft: Draft; onDone: () => void
           disabled={d.conditions.length >= 20}
           onClick={() => set({ conditions: [...d.conditions, defaultCondition("subject_contains")] })}
         >
-          + Add a condition
+          {t.addCondition}
         </button>
       </fieldset>
 
       <fieldset className="space-y-2">
-        <legend className="mb-1 text-sm font-medium">Then</legend>
+        <legend className="mb-1 text-sm font-medium">{t.then}</legend>
         {d.actions.map((a, i) => (
           <div key={i} className="flex flex-wrap items-center gap-2">
             <select
-              aria-label="Action"
+              aria-label={t.action}
               className="input w-auto"
               value={a.type}
               onChange={(e) => setAct(i, defaultAction(e.target.value as RuleAction["type"]))}
             >
-              {Object.entries(ACTION_LABELS).map(([k, v]) => (
+              {Object.entries(actionLabels()).map(([k, v]) => (
                 <option key={k} value={k}>
                   {v}
                 </option>
@@ -161,30 +164,30 @@ export function RuleEditor({ draft, onDone }: { draft: Draft; onDone: () => void
             </select>
             {a.type === "forward_to" && (
               <select
-                aria-label="Mailbox"
+                aria-label={t.mailbox}
                 className="input w-auto"
                 required
                 value={a.destination_id}
                 onChange={(e) => setAct(i, { type: "forward_to", destination_id: e.target.value })}
               >
-                <option value="">Choose a mailbox…</option>
+                <option value="">{t.chooseMailbox}</option>
                 {dests.data?.map((x) => (
                   <option key={x.id} value={x.id} disabled={!x.verified}>
                     {x.email}
-                    {x.verified ? "" : " (not verified)"}
+                    {x.verified ? "" : t.notVerified}
                   </option>
                 ))}
               </select>
             )}
             {a.type === "set_category" && (
               <select
-                aria-label="Category"
+                aria-label={t.category}
                 className="input w-auto"
                 required
                 value={a.category_id}
                 onChange={(e) => setAct(i, { type: "set_category", category_id: e.target.value })}
               >
-                <option value="">Choose a category…</option>
+                <option value="">{t.chooseCategory}</option>
                 {cats.data?.map((x) => (
                   <option key={x.id} value={x.id}>
                     {x.name}
@@ -196,7 +199,7 @@ export function RuleEditor({ draft, onDone }: { draft: Draft; onDone: () => void
               <button
                 type="button"
                 className="btn-ghost text-sm"
-                aria-label="Remove this action"
+                aria-label={t.removeAction}
                 onClick={() => set({ actions: d.actions.filter((_, j) => j !== i) })}
               >
                 ×
@@ -210,40 +213,34 @@ export function RuleEditor({ draft, onDone }: { draft: Draft; onDone: () => void
           disabled={d.actions.length >= 10}
           onClick={() => set({ actions: [...d.actions, defaultAction("mark_read")] })}
         >
-          + Add an action
+          {t.addAction}
         </button>
       </fieldset>
 
       <div className="flex flex-wrap items-center gap-2">
         <button className="btn-primary" disabled={save.isPending}>
-          {d.id ? "Save rule" : "Create rule"}
+          {d.id ? t.save : t.create}
         </button>
         <button type="button" className="btn-secondary" disabled={test.isPending} onClick={() => test.mutate()}>
-          Test against the last 20 messages
+          {t.test}
         </button>
         <button type="button" className="btn-ghost" onClick={onDone}>
-          Cancel
+          {tc.cancel}
         </button>
       </div>
       <ErrorText error={save.error ?? test.error} />
       {preview && (
         <div aria-live="polite" className="rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
-          <p className="mb-2 font-medium">
-            {preview.tested === 0
-              ? "No mail to test against yet."
-              : `This rule would match ${preview.matched} of the last ${preview.tested} message(s).`}
-          </p>
+          <p className="mb-2 font-medium">{preview.tested === 0 ? t.noMail : t.wouldMatch(preview.matched, preview.tested)}</p>
           <ul className="space-y-1">
             {preview.results.map((r) => (
               <li key={r.message_id} className={r.matched ? "" : "text-zinc-500"}>
-                <span aria-label={r.matched ? "matches" : "does not match"}>{r.matched ? "✓" : "·"}</span> {r.subject ?? "(no subject)"}{" "}
-                <span className="text-xs text-zinc-500">
-                  from {r.from ?? "?"}, {timeAgo(r.received_at)}
-                </span>
+                <span aria-label={r.matched ? t.matches : t.noMatch}>{r.matched ? "✓" : "·"}</span> {r.subject ?? tc.noSubject}{" "}
+                <span className="text-xs text-zinc-500">{t.from(r.from ?? "?", timeAgo(r.received_at))}</span>
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-xs text-zinc-500">The preview only checks the conditions; nothing is changed. It is not saved yet.</p>
+          <p className="mt-2 text-xs text-zinc-500">{t.previewNote}</p>
         </div>
       )}
     </form>

@@ -2,7 +2,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, patch } from "../../api";
 import { useAuth } from "../../auth";
 import { useToast } from "../../components/ui";
-import { timeAgo } from "../../util";
+import { formatNumber, timeAgo } from "../../util";
+import { useT } from "../../i18n";
 
 interface Rejection {
   id: string;
@@ -16,6 +17,8 @@ export function DomainChoiceCard() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
+  const t = useT().addressPrefs.domains;
+  const tc = useT().common;
   const rejections = useQuery({
     queryKey: ["site-rejections"],
     queryFn: () => get<{ rejections: Rejection[] }>("/v1/site-rejections").then((r) => r.rejections),
@@ -24,7 +27,7 @@ export function DomainChoiceCard() {
     patch("/v1/auth/me/preferences", body).then(
       () => {
         qc.invalidateQueries({ queryKey: ["me"] });
-        toast("Saved", "success");
+        toast(tc.saved, "success");
       },
       (e: Error) => toast(e.message, "error"),
     );
@@ -36,10 +39,10 @@ export function DomainChoiceCard() {
   if (!user) return null;
   return (
     <div className="card mt-4 max-w-xl space-y-3 p-5 text-sm">
-      <h2 className="font-semibold">Domains of new addresses</h2>
+      <h2 className="font-semibold">{t.title}</h2>
       <div>
         <label htmlFor="pref-domain-choice" className="label">
-          When no domain is chosen
+          {t.whenNone}
         </label>
         <select
           id="pref-domain-choice"
@@ -47,15 +50,15 @@ export function DomainChoiceCard() {
           value={user.domain_choice}
           onChange={(e) => save({ domain_choice: e.target.value })}
         >
-          <option value="first">Use the first domain</option>
-          <option value="random">Pick a random domain</option>
-          <option value="rotate">Rotate through the domains</option>
+          <option value="first">{t.first}</option>
+          <option value="random">{t.random}</option>
+          <option value="rotate">{t.rotate}</option>
         </select>
-        <p className="mt-1 text-xs text-zinc-500">Domains a site is known to reject are always skipped.</p>
+        <p className="mt-1 text-xs text-zinc-500">{t.skipped}</p>
       </div>
       <div>
         <label htmlFor="pref-no-mail" className="label">
-          Warn when a new address received nothing after (minutes, 0 = never)
+          {t.noMail}
         </label>
         <input
           id="pref-no-mail"
@@ -68,19 +71,19 @@ export function DomainChoiceCard() {
         />
       </div>
       <div>
-        <h3 className="font-medium">Sites that rejected a domain</h3>
+        <h3 className="font-medium">{t.rejectedTitle}</h3>
         {!rejections.data?.length ? (
-          <p className="text-zinc-500">None reported. Use "Site rejected it" on an address when a site refuses it.</p>
+          <p className="text-zinc-500">{t.noneReported}</p>
         ) : (
           <ul className="mt-1 divide-y divide-zinc-200 dark:divide-zinc-800">
             {rejections.data.map((r) => (
               <li key={r.id} className="flex items-center gap-2 py-1">
                 <span className="flex-1">
-                  <strong>{r.site}</strong> rejected <code className="font-mono">@{r.domain}</code>{" "}
+                  <strong>{r.site}</strong> {t.rejected} <code className="font-mono">@{r.domain}</code>{" "}
                   <span className="text-zinc-500">{timeAgo(r.created_at)}</span>
                 </span>
                 <button className="btn-secondary px-2 py-0.5 text-xs" onClick={() => forget(r.id)}>
-                  Forget
+                  {t.forget}
                 </button>
               </li>
             ))}
@@ -100,20 +103,21 @@ export function SiteRejectionsCard() {
         (r) => r.rejections,
       ),
   });
+  const t = useT().addressPrefs.domains;
   return (
     <div className="card mt-6 p-5 text-sm" data-testid="site-rejections">
-      <h2 className="font-semibold">Sites rejecting a domain</h2>
-      <p className="text-zinc-500">Reported by users with "Site rejected it". New addresses for these sites skip the domain.</p>
+      <h2 className="font-semibold">{t.adminTitle}</h2>
+      <p className="text-zinc-500">{t.adminHelp}</p>
       {!q.data?.length ? (
-        <p className="mt-2 text-zinc-500">No report yet.</p>
+        <p className="mt-2 text-zinc-500">{t.noReport}</p>
       ) : (
         <table className="mt-2 w-full text-left">
           <thead className="text-xs text-zinc-500">
             <tr>
-              <th className="py-1">Site</th>
-              <th>Domain</th>
-              <th>Reports</th>
-              <th>Last</th>
+              <th className="py-1">{t.site}</th>
+              <th>{t.domain}</th>
+              <th>{t.reports}</th>
+              <th>{t.last}</th>
             </tr>
           </thead>
           <tbody>
@@ -121,7 +125,7 @@ export function SiteRejectionsCard() {
               <tr key={`${r.site}|${r.domain}`} className="border-t border-zinc-200 dark:border-zinc-800">
                 <td className="py-1">{r.site}</td>
                 <td className="font-mono">@{r.domain}</td>
-                <td>{r.reports}</td>
+                <td>{formatNumber(r.reports)}</td>
                 <td className="text-zinc-500">{timeAgo(r.last_at)}</td>
               </tr>
             ))}
