@@ -1,5 +1,5 @@
 import { decodeEntities } from "../parser/html.js";
-import { checkOutboundUrl, type Resolver } from "../lib/outbound.js";
+import { readCapped, safeFetch, siteOf, type Resolver } from "../lib/outbound.js";
 
 /** Pages confirming the unsubscription, English and French. */
 const SUCCESS_RE =
@@ -9,6 +9,7 @@ const FORM_RE = /unsub|opt[-_ ]?out|d[ée]sabonn|d[ée]sinscri|confirm/i;
 
 const MAX_REDIRECTS = 5;
 const MAX_BODY = 512 * 1024;
+const TOTAL_TIMEOUT_MS = 20_000;
 const UA = "Mozilla/5.0 (compatible; ThrowawayMail unsubscribe)";
 
 export interface VisitDeps {
@@ -28,35 +29,52 @@ interface Page {
   html: string;
 }
 
-class Jar {
-  private cookies = new Map<string, string>();
-  add(res: Response) {
+/**
+ * Session cookies of the visit, kept per host: a cookie set by one host is only ever sent back to that host, so a
+ * redirect to another site never carries it. Never seeded with anything of the user's.
+ */
+export class Jar {
+  private cookies = new Map<string, Map<string, string>>();
+  add(host: string, res: Response) {
     for (const c of res.headers.getSetCookie?.() ?? []) {
       const [pair] = c.split(";");
       const i = pair!.indexOf("=");
-      if (i > 0) this.cookies.set(pair!.slice(0, i).trim(), pair!.slice(i + 1).trim());
+      if (i <= 0) continue;
+      const name = pair!.slice(0, i).trim();
+      const value = pair!.slice(i + 1).trim();
+      if (!/^[!#-'*+\-.^-z|~0-9A-Za-z]+$/.test(name) || /[\r\n;]/.test(value)) continue;
+      const jar = this.cookies.get(host.toLowerCase()) ?? new Map<string, string>();
+      jar.set(name, value);
+      this.cookies.set(host.toLowerCase(), jar);
     }
   }
-  header() {
-    return [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; ");
+  header(host: string) {
+    return [...(this.cookies.get(host.toLowerCase()) ?? [])].map(([k, v]) => `${k}=${v}`).join("; ");
   }
 }
 
-/** Fetches `url` following redirects by hand so that every hop goes through the outbound URL check. */
-async function load(deps: VisitDeps, jar: Jar, url: string, init: { method: "GET" | "POST"; body?: string }): Promise<Page> {
+/** Fetches `url` following redirects by hand so that every hop goes through the outbound URL check and is pinned. */
+async function load(
+  deps: VisitDeps,
+  jar: Jar,
+  url: string,
+  init: { method: "GET" | "POST"; body?: string },
+  signal: AbortSignal,
+): Promise<Page> {
   let current = url;
   let method = init.method;
   let body = init.body;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const u = await checkOutboundUrl(current, { resolve: deps.resolve, httpsOnly: true });
+    const host = new URL(current).hostname;
     const headers: Record<string, string> = { "user-agent": UA, accept: "text/html,*/*;q=0.5" };
-    const cookie = jar.header();
+    const cookie = jar.header(host);
     if (cookie) headers.cookie = cookie;
     if (body !== undefined) headers["content-type"] = "application/x-www-form-urlencoded";
-    const res = await deps.fetch(u.toString(), { method, headers, body, redirect: "manual", signal: AbortSignal.timeout(10_000) });
-    jar.add(res);
+    const { res, url: u } = await safeFetch(deps, current, { method, headers, body, signal }, { httpsOnly: true });
+    jar.add(u.hostname, res);
     const loc = res.headers.get("location");
     if (res.status >= 300 && res.status < 400 && loc) {
+      await res.body?.cancel().catch(() => {});
       current = new URL(loc, u).toString();
       if (res.status !== 307 && res.status !== 308) {
         method = "GET";
@@ -64,10 +82,22 @@ async function load(deps: VisitDeps, jar: Jar, url: string, init: { method: "GET
       }
       continue;
     }
-    const text = (await res.text()).slice(0, MAX_BODY);
-    return { url: u, status: res.status, html: text };
+    return { url: u, status: res.status, html: await readCapped(res, MAX_BODY) };
   }
   throw new Error("Too many redirects");
+}
+
+/** A confirmation form may only be sent to the site of the page that shows it (or of the original link). */
+export function formTargetAllowed(target: string, page: URL, origin: URL): boolean {
+  let t: URL;
+  try {
+    t = new URL(target);
+  } catch {
+    return false;
+  }
+  if (t.protocol !== "https:" || t.username || t.password) return false;
+  const site = siteOf(t.hostname);
+  return site === siteOf(page.hostname) || site === siteOf(origin.hostname);
 }
 
 const attr = (tag: string, name: string) => {
@@ -146,13 +176,17 @@ export function confirmationForm(html: string, base: URL): { url: string; method
  */
 export async function visitUnsubscribe(deps: VisitDeps, url: string): Promise<VisitResult> {
   const jar = new Jar();
+  // One deadline for the whole visit, redirects and form submission included.
+  const signal = AbortSignal.timeout(TOTAL_TIMEOUT_MS);
   try {
-    let page = await load(deps, jar, url, { method: "GET" });
+    const origin = new URL(url);
+    let page = await load(deps, jar, url, { method: "GET" }, signal);
     if (page.status >= 400) return { done: false, error: `HTTP ${page.status}` };
     if (isUnsubscribeSuccess(page.html)) return { done: true, error: null };
     const form = confirmationForm(page.html, page.url);
     if (!form) return { done: false, error: "The page needs a manual confirmation" };
-    page = await load(deps, jar, form.url, form.method === "POST" ? { method: "POST", body: form.body } : { method: "GET" });
+    if (!formTargetAllowed(form.url, page.url, origin)) return { done: false, error: "The confirmation form points to another site" };
+    page = await load(deps, jar, form.url, form.method === "POST" ? { method: "POST", body: form.body } : { method: "GET" }, signal);
     if (page.status >= 400) return { done: false, error: `HTTP ${page.status}` };
     return isUnsubscribeSuccess(page.html)
       ? { done: true, error: null }

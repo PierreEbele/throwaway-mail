@@ -2,7 +2,7 @@ import { and, asc, eq, inArray, lt, lte, sql } from "drizzle-orm";
 import type { Deps } from "../context.js";
 import { notifyTargets, users, webhookDeliveries, type NotifyTarget, type WebhookDelivery } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
-import { checkOutboundUrl } from "../lib/outbound.js";
+import { safeFetchNoRedirect } from "../lib/outbound.js";
 import { metrics } from "./metrics.js";
 import { webhookSignature, type NotifyEvent } from "./notify.js";
 
@@ -85,22 +85,25 @@ export async function attempt(deps: Deps, id: string): Promise<{ ok: boolean; er
   try {
     // Re-checked at every attempt: the target's DNS may have changed since it was saved.
     const owner = deps.db.select({ role: users.role }).from(users).where(eq(users.id, t.userId)).get();
-    await checkOutboundUrl(t.url!, { resolve: deps.resolve, allowPrivate: owner?.role === "admin" });
-    const res = await deps.fetch(t.url!, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "user-agent": "ThrowawayMail-Webhook/1",
-        "x-tm-event": d.eventType,
-        "x-tm-event-id": d.eventId,
-        "x-tm-delivery": d.id,
-        "x-tm-timestamp": ts,
-        ...(t.secret ? { "x-tm-signature": webhookSignature(t.secret, ts, d.payload) } : {}),
+    const res = await safeFetchNoRedirect(
+      deps,
+      t.url!,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "user-agent": "ThrowawayMail-Webhook/1",
+          "x-tm-event": d.eventType,
+          "x-tm-event-id": d.eventId,
+          "x-tm-delivery": d.id,
+          "x-tm-timestamp": ts,
+          ...(t.secret ? { "x-tm-signature": webhookSignature(t.secret, ts, d.payload) } : {}),
+        },
+        body: d.payload,
       },
-      body: d.payload,
-      signal: AbortSignal.timeout(8000),
-      redirect: "error",
-    });
+      { allowPrivate: owner?.role === "admin", timeoutMs: 8000 },
+    );
+    await res.body?.cancel().catch(() => {});
     status = res.status;
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   } catch (err) {

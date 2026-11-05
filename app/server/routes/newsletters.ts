@@ -3,7 +3,8 @@ import { z } from "zod";
 import type { ApiRouter } from "../lib/http.js";
 import { addresses, messages } from "../db/schema.js";
 import { badRequest, notFound } from "../lib/errors.js";
-import { checkOutboundUrl } from "../lib/outbound.js";
+import { safeFetchNoRedirect } from "../lib/outbound.js";
+import { safeMailto } from "../lib/listheaders.js";
 import { ownedAddress } from "../services/addresses.js";
 import { pickUnsubscribe, type UnsubscribeCandidate } from "../parser/unsubscribe.js";
 import { candidatesOf } from "../services/unsubscribe.js";
@@ -34,7 +35,7 @@ export function registerNewsletters(r: ApiRouter) {
       if (!m) throw notFound("Message");
       const target = m.unsubscribeUrl || m.unsubscribeMailto ? null : (candidatesOf(m)[0] ?? null);
       const url = target ? target.url : m.unsubscribeUrl;
-      const mailto = target ? target.mailto : m.unsubscribeMailto;
+      const mailto = safeMailto(target ? target.mailto : m.unsubscribeMailto);
       if (!url && !mailto) throw badRequest("This message has no unsubscribe link");
       if (body.block)
         d.db
@@ -47,14 +48,18 @@ export function registerNewsletters(r: ApiRouter) {
       if (m.unsubscribeOneClick && m.unsubscribeUrl) {
         try {
           // The URL comes from the sender: https only, never towards the server's own network.
-          await checkOutboundUrl(m.unsubscribeUrl, { resolve: d.resolve, httpsOnly: true });
-          const res = await d.fetch(m.unsubscribeUrl, {
-            method: "POST",
-            headers: { "content-type": "application/x-www-form-urlencoded" },
-            body: "List-Unsubscribe=One-Click",
-            redirect: "error",
-            signal: AbortSignal.timeout(10_000),
-          });
+          // Pinned to the checked IP; RFC 8058 senders answer directly, so a redirect is a failure.
+          const res = await safeFetchNoRedirect(
+            d,
+            m.unsubscribeUrl,
+            {
+              method: "POST",
+              headers: { "content-type": "application/x-www-form-urlencoded" },
+              body: "List-Unsubscribe=One-Click",
+            },
+            { httpsOnly: true, timeoutMs: 10_000 },
+          );
+          await res.body?.cancel().catch(() => {});
           done = res.ok;
           if (!res.ok) error = `HTTP ${res.status}`;
         } catch (e) {

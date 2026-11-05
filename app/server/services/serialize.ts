@@ -1,6 +1,7 @@
 import { addressFallbackIds } from "./ingest/forwarding.js";
 import { parseList } from "../lib/senders.js";
 import { candidatesOf } from "./unsubscribe.js";
+import { safeMailto } from "../lib/listheaders.js";
 import type { Address, Destination, Domain, ExtractedItem, Message, User } from "../db/schema.js";
 
 export function userOut(u: User) {
@@ -156,7 +157,7 @@ export function messageOut(m: Message, items: ExtractedItem[]) {
 /** Stored List-Unsubscribe target, or one found in the body (mail received before body detection existed). */
 function unsubscribeOut(m: Message) {
   if (m.unsubscribeUrl || m.unsubscribeMailto)
-    return { url: m.unsubscribeUrl, mailto: m.unsubscribeMailto, one_click: m.unsubscribeOneClick, done_at: m.unsubscribedAt };
+    return { url: m.unsubscribeUrl, mailto: safeMailto(m.unsubscribeMailto), one_click: m.unsubscribeOneClick, done_at: m.unsubscribedAt };
   const best = candidatesOf(m)[0];
   return best ? { url: best.url, mailto: best.mailto, one_click: false, done_at: m.unsubscribedAt } : null;
 }
