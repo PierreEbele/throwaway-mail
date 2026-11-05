@@ -9,10 +9,21 @@ export interface ListInfo {
   bulk: boolean;
 }
 
+/** Targets of a List-Unsubscribe value: `<url>, <mailto:...>`, or bare comma-separated URLs (non-compliant but sent by e.g. Slack). */
+export function listUnsubscribeTargets(value: string | null): string[] {
+  const v = value ?? "";
+  const bracketed = [...v.matchAll(/<([^>]+)>/g)].map((m) => m[1]!.replace(/\s+/g, ""));
+  if (bracketed.length) return bracketed;
+  return v
+    .split(",")
+    .map((t) => t.replace(/\s+/g, ""))
+    .filter((t) => /^(?:https?:\/\/|mailto:)/i.test(t));
+}
+
 export function listInfo(headers: Array<{ key: string; value: string }>): ListInfo {
   const get = (k: string) => headers.find((h) => h.key === k)?.value ?? null;
   const lu = get("list-unsubscribe");
-  const targets = [...(lu ?? "").matchAll(/<([^>]+)>/g)].map((m) => m[1]!.trim());
+  const targets = listUnsubscribeTargets(lu);
   const url = targets.find((t) => /^https:\/\//i.test(t)) ?? null;
   const mailto = targets.find((t) => /^mailto:/i.test(t)) ?? null;
   const oneClick = !!url && /list-unsubscribe=one-click/i.test(get("list-unsubscribe-post") ?? "");

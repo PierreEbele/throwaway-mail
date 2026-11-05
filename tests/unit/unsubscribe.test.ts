@@ -21,6 +21,15 @@ describe("List-Unsubscribe headers", () => {
   });
   it("detects a plain https target without the Post header", () =>
     expect(best({ headers: h({ "list-unsubscribe": "<https://list.io/u/abc>" }) })?.kind).toBe("https"));
+  it("accepts a bare URL without angle brackets (Slack)", () =>
+    expect(
+      best({
+        headers: h({
+          "list-unsubscribe": "https://team.slack.com/unsub/U0-abc",
+          "list-unsubscribe-post": "List-Unsubscribe=One-Click",
+        }),
+      }),
+    ).toMatchObject({ kind: "one_click", url: "https://team.slack.com/unsub/U0-abc" }));
   it("detects a mailto-only target", () =>
     expect(best({ headers: h({ "list-unsubscribe": "<mailto:leave@list.io>" }) })).toMatchObject({
       kind: "mailto",

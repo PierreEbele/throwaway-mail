@@ -1,3 +1,4 @@
+import { listUnsubscribeTargets } from "../lib/listheaders.js";
 import { decodeEntities, stripHidden } from "./html.js";
 import { unwrapRedirect } from "./links.js";
 
@@ -25,7 +26,7 @@ export function isUnsubscribeText(s: string): boolean {
 function headerTargets(headers: Array<{ key: string; value: string }>) {
   const get = (k: string) => headers.find((h) => h.key.toLowerCase() === k)?.value ?? null;
   const lu = get("list-unsubscribe");
-  const targets = [...(lu ?? "").matchAll(/<([^>]+)>/g)].map((m) => m[1]!.replace(/\s+/g, ""));
+  const targets = listUnsubscribeTargets(lu);
   const url = targets.find((t) => /^https:\/\//i.test(t)) ?? null;
   const mailto = targets.find((t) => /^mailto:/i.test(t)) ?? null;
   const oneClick = !!url && /list-unsubscribe\s*=\s*one-click/i.test(get("list-unsubscribe-post") ?? "");
