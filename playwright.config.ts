@@ -5,8 +5,11 @@ const DATA = `./data/e2e-${Date.now()}`;
 
 export default defineConfig({
   testDir: "tests/e2e",
+  globalSetup: "./tests/e2e/global-setup.ts",
   timeout: 60_000,
   retries: 0,
+  // Every spec shares one server (and its domains): run them one after the other.
+  workers: 1,
   use: { baseURL: `http://localhost:${PORT}`, trace: "retain-on-failure" },
   webServer: [
     {
@@ -30,6 +33,10 @@ export default defineConfig({
         OIDC_ALLOW_INSECURE: "1",
         INGEST_SECRET: "e2e-ingest-secret-0123456789",
         LOG_LEVEL: "warn",
+        // Local accounts next to SSO (two-factor-login.spec.ts) and an outgoing relay run by send-from-alias.spec.ts.
+        LOCAL_LOGIN: "true",
+        LOGIN_RATE_LIMIT_PER_MINUTE: "1000",
+        SMTP_RELAY_URL: "smtp://127.0.0.1:3297?tls=none",
       },
     },
   ],
