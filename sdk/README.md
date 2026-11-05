@@ -2,8 +2,14 @@
 
 Typed client for the Throwaway Mail API. No dependencies; Node.js 18+ (uses the built-in `fetch`), ESM only.
 
+The package is not published to npm yet. Build it from a clone of this repository and install the tarball:
+
 ```bash
-npm install @throwaway-mail/sdk
+pnpm install && cd sdk && ../node_modules/.bin/tsc -p tsconfig.json && npm pack
+```
+
+```bash
+npm install /path/to/throwaway-mail/sdk/throwaway-mail-sdk-0.1.0.tgz
 ```
 
 ## Example
