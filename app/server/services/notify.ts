@@ -7,7 +7,7 @@ import { checkOutboundUrl } from "../lib/outbound.js";
 import { parseList } from "../lib/senders.js";
 import { metrics } from "./metrics.js";
 import { enqueueWebhooks } from "./webhooks.js";
-import { webPushRequest } from "./webpush.js";
+import { pushPayload, webPushRequest } from "./webpush.js";
 
 export const NOTIFY_EVENTS = [
   "message.received",
@@ -71,12 +71,7 @@ function request(deps: Deps, t: NotifyTarget, e: NotifyEvent): { url: string; in
         disable_web_page_preview: true,
       });
     case "webpush":
-      return webPushRequest(
-        deps,
-        t,
-        { title: e.title, body: e.body, url: e.url, tag: e.type === "code.received" ? "code" : undefined },
-        e.type === "code.received" || e.type === "leak.detected" || e.type === "system.alert",
-      );
+      return webPushRequest(deps, t, pushPayload(e), e.type === "code.received" || e.type === "leak.detected" || e.type === "system.alert");
     case "webhook":
       throw new Error("webhooks go through the outbox (services/webhooks.ts)");
   }

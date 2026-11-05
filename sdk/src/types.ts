@@ -275,7 +275,22 @@ export interface ApiKey {
   created_at: number;
   last_used_at: number | null;
   revoked_at: number | null;
+  /** `full` or `read` (GET only). */
+  scope?: ApiKeyScope;
+  /** Addresses the key is restricted to; null means every address. */
+  address_ids?: string[] | null;
+  /** Epoch ms after which the key stops working; null means never. */
+  expires_at?: number | null;
   [key: string]: unknown;
+}
+
+export type ApiKeyScope = "full" | "read";
+
+export interface CreateApiKeyOptions {
+  scope?: ApiKeyScope;
+  address_ids?: string[] | null;
+  expires_at?: number | null;
+  expires_in_days?: number;
 }
 
 // --- Server-sent events ---------------------------------------------------------------------

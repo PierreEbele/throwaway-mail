@@ -36,6 +36,9 @@ function caller(c: Context<AppEnv>) {
   const raw = c.req.header("authentication") ?? /^Bearer\s+(\S+)$/i.exec(c.req.header("authorization") ?? "")?.[1];
   const r = raw ? resolveApiKey(c.get("deps"), raw.trim()) : null;
   if (!r) throw new HttpError(401, "invalid_api_key", "Invalid or revoked API key");
+  // Every compat endpoint creates an address: read-only and address-restricted keys cannot use it.
+  if (r.scope.readOnly || r.scope.addressIds)
+    throw new HttpError(403, "insufficient_scope", "This API key cannot create addresses (read-only or restricted to some addresses)");
   return r;
 }
 

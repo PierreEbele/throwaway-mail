@@ -192,6 +192,9 @@ export interface ApiKey {
   created_at: number;
   last_used_at: number | null;
   revoked_at: number | null;
+  scope: "full" | "read";
+  address_ids: string[] | null;
+  expires_at: number | null;
 }
 export interface AuditEntry {
   id: string;

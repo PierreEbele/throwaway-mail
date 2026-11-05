@@ -147,7 +147,16 @@ describe("Web Push", () => {
       privateKey: b.ecdh,
       authSecret: b.authSecret,
     });
-    expect(JSON.parse(plain.toString())).toMatchObject({ title: "Code 482913", tag: "code" });
+    expect(JSON.parse(plain.toString())).toMatchObject({
+      title: "Code 482913",
+      tag: "code",
+      code: "482913",
+      url: expect.stringContaining(`/addresses/${a.id}`),
+      actions: [
+        { action: "copy", title: "Copy code" },
+        { action: "open", title: "Open" },
+      ],
+    });
   });
 
   it("disables a subscription the push service reports as gone", async () => {

@@ -103,10 +103,34 @@ async function notify(e: { address_id: string; subject: string | null; has_code:
 }
 
 /** Subscribes to /v1/events and invalidates cached queries on server-side changes. */
+/** Copies a code handed over by the service worker ("Copy code" notification action). */
+function useCopyCodeFromNotification(toast: ReturnType<typeof useToast>) {
+  useEffect(() => {
+    const copy = (code: string) =>
+      navigator.clipboard
+        .writeText(code)
+        .then(() => toast(`Code ${code} copied`, "success"))
+        .catch(() => toast(`Code ${code} (copy it manually)`, "success"));
+    const m = /^#copy-code=([^&]+)$/.exec(location.hash);
+    if (m) {
+      history.replaceState(null, "", location.pathname + location.search);
+      void copy(decodeURIComponent(m[1]!));
+    }
+    if (!("serviceWorker" in navigator)) return;
+    const onMessage = (ev: MessageEvent) => {
+      const d = ev.data as { type?: string; code?: unknown } | null;
+      if (d?.type === "copy-code" && typeof d.code === "string") void copy(d.code);
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, [toast]);
+}
+
 export function LiveEvents() {
   const qc = useQueryClient();
   const toast = useToast();
   const { user } = useAuth();
+  useCopyCodeFromNotification(toast);
   useEffect(() => {
     if (!user) return;
     const es = new EventSource("/v1/events");

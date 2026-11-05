@@ -16,6 +16,24 @@ always up-to-date reference is generated from the code: `https://APP_DOMAIN/docs
 
 Create a key under **API keys**. It is shown once. Full reference: `https://APP_DOMAIN/docs` (OpenAPI JSON at `/openapi.json`).
 
+### Key scopes and expiry
+
+Keys (`POST /v1/keys`) can be narrowed; read-only and address-restricted keys cannot create or revoke keys:
+
+| Field                            | Effect                                                                                                                                                                                                                                        |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scope: "full"` (default)        | Everything the user can do.                                                                                                                                                                                                                   |
+| `scope: "read"`                  | GET only. Any other method answers `403 insufficient_scope`, including the compatibility endpoints.                                                                                                                                           |
+| `address_ids: [...]`             | Only those addresses: `GET /v1/addresses` lists only them, `/v1/events` only streams their events, `/v1/addresses/:id/…` and `/v1/messages/:id/…` work only for them (others answer 404). Every other route answers `403 insufficient_scope`. |
+| `expires_at` / `expires_in_days` | The key answers `401 invalid_api_key` after that time.                                                                                                                                                                                        |
+
+Keys created before scopes existed are `full`, without restriction or expiry.
+
+```bash
+curl -s -b cookies -H "X-CSRF-Token: $CSRF" -H "Content-Type: application/json" \
+  -d '{"name":"ci","scope":"read","address_ids":["adr_…"],"expires_in_days":30}' $TM/v1/keys
+```
+
 ```bash
 export TM=https://mail-app.example.com
 export KEY=tm_xxxxxxxx_...
