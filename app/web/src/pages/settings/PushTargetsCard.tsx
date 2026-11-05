@@ -5,30 +5,7 @@ import type { NotifyKind, NotifyTarget, WebhookDelivery } from "../../types";
 import { Badge, CopyButton, ErrorText, confirmAction, useToast } from "../../components/ui";
 import { invalidate } from "../../queries";
 import { timeAgo } from "../../util";
-
-const EVENT_LABELS: Record<string, string> = {
-  "code.received": "Verification codes",
-  "message.received": "Every mail",
-  "leak.detected": "Possible leaks",
-  "address.expiring": "Address about to expire",
-  "address.burned": "Address burned automatically",
-  "system.alert": "Instance alerts: failed backup or probe (admins only)",
-  "address.created": "Address created",
-  "address.deleted": "Address deleted",
-  "address.expired": "Address expired",
-  "address.rotated": "Address rotated",
-  "message.blocked": "Mail blocked",
-  "message.sent": "Mail sent from an alias",
-  "forward.failed": "Forward failed",
-};
-
-const KIND_HELP: Record<NotifyKind, string> = {
-  ntfy: "Full topic URL, e.g. https://ntfy.sh/my-secret-topic. Token optional (access token).",
-  gotify: "Server URL and an application token.",
-  telegram: "Bot token from @BotFather and your chat id.",
-  webhook: "Any URL (n8n, Home Assistant, Zapier...). JSON body signed with HMAC-SHA256 (x-tm-signature).",
-  webpush: "Use “Enable on this device” above.",
-};
+import { msg, useT } from "../../i18n";
 
 const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 
@@ -40,10 +17,9 @@ function urlBase64ToBytes(b64: string) {
 
 /** Subscribes this browser to Web Push and registers it as a "webpush" notification target. */
 async function subscribeThisDevice(events: string[]) {
-  if (!pushSupported())
-    throw new Error("This browser does not support push notifications (on iPhone/iPad: add the app to the Home Screen first).");
+  if (!pushSupported()) throw new Error(msg().push.unsupported);
   const perm = await Notification.requestPermission();
-  if (perm !== "granted") throw new Error("Notifications are blocked for this site in the browser settings.");
+  if (perm !== "granted") throw new Error(msg().push.blocked);
   const reg = (await navigator.serviceWorker.getRegistration()) ?? (await navigator.serviceWorker.register("/sw.js"));
   await navigator.serviceWorker.ready;
   const { public_key } = await get<{ public_key: string }>("/v1/push/vapid-key");
@@ -72,13 +48,16 @@ async function subscribeThisDevice(events: string[]) {
             ? "Chrome"
             : /Safari/.test(ua)
               ? "Safari"
-              : "This browser";
+              : msg().push.thisBrowser;
   return post("/v1/push/subscriptions", { endpoint: json.endpoint, keys: json.keys, name, events });
 }
 
 export function PushTargetsCard() {
   const qc = useQueryClient();
   const toast = useToast();
+  const tr = useT().push;
+  const EVENT_LABELS = tr.events;
+  const KIND_HELP: Record<NotifyKind, string> = tr.kindHelp;
   const list = useQuery({
     queryKey: ["notify-targets"],
     queryFn: () => get<{ targets: NotifyTarget[] }>("/v1/notify-targets").then((r) => r.targets),
@@ -112,35 +91,30 @@ export function PushTargetsCard() {
       setUrl("");
       setToken("");
       setChat("");
-      toast("Target added", "success");
+      toast(tr.added, "success");
     },
   });
   const enablePush = useMutation({
     mutationFn: () => subscribeThisDevice(["code.received", "leak.detected", "address.expiring", "address.burned", "address.rotated"]),
     onSuccess: () => {
       refresh();
-      toast("Notifications enabled on this device", "success");
+      toast(tr.enabled, "success");
     },
   });
   const test = (t: NotifyTarget) =>
     post<{ ok: boolean; error?: string }>(`/v1/notify-targets/${t.id}/test`).then((r) => {
       refresh();
-      toast(r.ok ? "Test sent" : `Failed: ${r.error}`, r.ok ? "success" : "error");
+      toast(r.ok ? tr.testSent : tr.failed(r.error ?? ""), r.ok ? "success" : "error");
     });
   return (
     <div className="card mt-4 max-w-xl space-y-3 p-5 text-sm">
-      <h2 className="font-semibold">Push notifications &amp; webhooks</h2>
-      <p className="text-zinc-500">
-        Works even when the app is closed: get codes and leak alerts on your phone (this browser, ntfy, Gotify, Telegram) or feed
-        automations.
-      </p>
+      <h2 className="font-semibold">{tr.title}</h2>
+      <p className="text-zinc-500">{tr.help}</p>
       <div className="flex flex-wrap items-center gap-2">
         <button className="btn-secondary" onClick={() => enablePush.mutate()} disabled={enablePush.isPending}>
-          Enable on this device
+          {tr.enableDevice}
         </button>
-        <span className="text-xs text-zinc-500">
-          Web Push: “Code 123456” right on this phone or computer. On iPhone/iPad, add the app to the Home Screen first.
-        </span>
+        <span className="text-xs text-zinc-500">{tr.webPushHelp}</span>
       </div>
       <ErrorText error={enablePush.error} />
       {(list.data ?? []).map((t) => (
@@ -150,43 +124,43 @@ export function PushTargetsCard() {
             {!t.enabled && <Badge value="paused" />}
             {t.paused_at && (
               <span className="text-xs text-red-600">
-                paused after {t.consecutive_failures} failed deliveries{" "}
+                {tr.pausedAfter(t.consecutive_failures)}{" "}
                 <button className="btn-ghost px-1 py-0 text-xs" onClick={() => post(`/v1/notify-targets/${t.id}/resume`).then(refresh)}>
-                  Resume
+                  {tr.resume}
                 </button>
               </span>
             )}
             <span className="ml-auto flex gap-1">
               <button className="btn-ghost px-2 py-0.5 text-xs" onClick={() => test(t)}>
-                Test
+                {tr.test}
               </button>
               <button
                 className="btn-ghost px-2 py-0.5 text-xs"
                 onClick={() => patch(`/v1/notify-targets/${t.id}`, { enabled: !t.enabled }).then(refresh)}
               >
-                {t.enabled ? "Pause" : "Enable"}
+                {t.enabled ? tr.pause : tr.enable}
               </button>
               <button
                 className="btn-ghost px-2 py-0.5 text-xs text-red-600"
-                onClick={() => confirmAction(`Remove ${t.name}?`) && del(`/v1/notify-targets/${t.id}`).then(refresh)}
+                onClick={() => confirmAction(tr.confirmRemove(t.name)) && del(`/v1/notify-targets/${t.id}`).then(refresh)}
               >
-                Remove
+                {tr.remove}
               </button>
             </span>
           </div>
           <p className="mt-1 text-xs text-zinc-500">
             {t.events.map((e) => EVENT_LABELS[e] ?? e).join(", ")}
             {t.last_error ? (
-              <span className="text-red-600"> · last error: {t.last_error}</span>
+              <span className="text-red-600">{tr.lastError(t.last_error)}</span>
             ) : t.last_ok_at ? (
-              <> · last sent {timeAgo(t.last_ok_at)}</>
+              <>{tr.lastSent(timeAgo(t.last_ok_at))}</>
             ) : null}
           </p>
           {t.kind === "webhook" && <Deliveries target={t} />}
-          {t.kind === "webpush" && t.url && <p className="mt-1 truncate text-xs text-zinc-500">Push service: {new URL(t.url).host}</p>}
+          {t.kind === "webpush" && t.url && <p className="mt-1 truncate text-xs text-zinc-500">{tr.pushService(new URL(t.url).host)}</p>}
           {t.secret && (
             <p className="mt-1 flex items-center gap-1 text-xs text-zinc-500">
-              Signing secret: <code className="font-mono">{t.secret}</code> <CopyButton text={t.secret} />
+              {tr.secret} <code className="font-mono">{t.secret}</code> <CopyButton text={t.secret} />
             </p>
           )}
         </div>
@@ -200,7 +174,7 @@ export function PushTargetsCard() {
       >
         <div className="flex gap-2">
           <label className="sr-only" htmlFor="nt-kind">
-            Service
+            {tr.service}
           </label>
           <select id="nt-kind" className="input w-auto" value={kind} onChange={(e) => setKind(e.target.value as NotifyKind)}>
             <option value="ntfy">ntfy</option>
@@ -209,9 +183,9 @@ export function PushTargetsCard() {
             <option value="webhook">Webhook</option>
           </select>
           <label className="sr-only" htmlFor="nt-name">
-            Name
+            {tr.name}
           </label>
-          <input id="nt-name" className="input" placeholder="Name (e.g. My phone)" value={name} onChange={(e) => setName(e.target.value)} />
+          <input id="nt-name" className="input" placeholder={tr.namePlaceholder} value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <p className="text-xs text-zinc-500">{KIND_HELP[kind]}</p>
         {kind !== "telegram" && (
@@ -219,10 +193,10 @@ export function PushTargetsCard() {
         )}
         {kind !== "webhook" && (
           <input
-            aria-label="Token"
+            aria-label={tr.token}
             className="input"
             type="password"
-            placeholder={kind === "ntfy" ? "Token (optional)" : "Token"}
+            placeholder={kind === "ntfy" ? tr.tokenOptional : tr.token}
             value={token}
             onChange={(e) => setToken(e.target.value)}
             required={kind !== "ntfy"}
@@ -230,16 +204,16 @@ export function PushTargetsCard() {
         )}
         {kind === "telegram" && (
           <input
-            aria-label="Chat id"
+            aria-label={tr.chatId}
             className="input"
-            placeholder="Chat id"
+            placeholder={tr.chatId}
             value={chat}
             onChange={(e) => setChat(e.target.value)}
             required
           />
         )}
         <fieldset className="flex flex-wrap gap-x-4 gap-y-1">
-          <legend className="sr-only">Events</legend>
+          <legend className="sr-only">{tr.eventsLegend}</legend>
           {Object.entries(EVENT_LABELS).map(([k, label]) => (
             <label key={k} className="flex items-center gap-1.5 text-xs">
               <input
@@ -253,7 +227,7 @@ export function PushTargetsCard() {
         </fieldset>
         <ErrorText error={add.error} />
         <button className="btn-primary" disabled={add.isPending || !events.length}>
-          Add
+          {tr.add}
         </button>
       </form>
     </div>
@@ -264,6 +238,7 @@ export function PushTargetsCard() {
 function Deliveries({ target }: { target: NotifyTarget }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
+  const tr = useT().push;
   const list = useQuery({
     queryKey: ["deliveries", target.id],
     enabled: open,
@@ -273,33 +248,35 @@ function Deliveries({ target }: { target: NotifyTarget }) {
   const resend = (d: WebhookDelivery) =>
     post<{ ok: boolean; error?: string }>(`/v1/notify-targets/${target.id}/deliveries/${d.id}/resend`).then((r) => {
       void list.refetch();
-      toast(r.ok ? "Delivered" : `Failed: ${r.error}`, r.ok ? "success" : "error");
+      toast(r.ok ? tr.delivered : tr.failed(r.error ?? ""), r.ok ? "success" : "error");
     });
   return (
     <div className="mt-1 text-xs">
       <button className="btn-ghost px-1 py-0 text-xs" aria-expanded={open} onClick={() => setOpen(!open)}>
-        {open ? "Hide deliveries" : "Recent deliveries"}
+        {open ? tr.hideDeliveries : tr.recentDeliveries}
       </button>
       {open && (
         <ul className="mt-1 divide-y divide-zinc-200 dark:divide-zinc-800">
-          {list.data?.length === 0 && <li className="py-1 text-zinc-500">No deliveries yet.</li>}
+          {list.data?.length === 0 && <li className="py-1 text-zinc-500">{tr.noDeliveries}</li>}
           {(list.data ?? []).map((d) => (
             <li key={d.id} className="py-1">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge value={d.status === "delivered" ? "active" : d.status === "failed" ? "archived" : "paused"}>{d.status}</Badge>
+                <Badge value={d.status === "delivered" ? "active" : d.status === "failed" ? "archived" : "paused"}>
+                  {tr.deliveryStatus[d.status] ?? d.status}
+                </Badge>
                 <span className="font-mono">{d.event_type}</span>
                 <span className="text-zinc-500">
-                  {timeAgo(d.created_at)} · {d.attempts} attempt{d.attempts === 1 ? "" : "s"}
+                  {timeAgo(d.created_at)} · {tr.attempts(d.attempts)}
                   {d.last_status ? ` · HTTP ${d.last_status}` : ""}
                   {d.last_error && d.status !== "delivered" ? ` · ${d.last_error}` : ""}
-                  {d.next_attempt_at ? ` · next try ${timeAgo(d.next_attempt_at)}` : ""}
+                  {d.next_attempt_at ? tr.nextTry(timeAgo(d.next_attempt_at)) : ""}
                 </span>
                 <span className="ml-auto flex gap-1">
                   <button className="btn-ghost px-1 py-0 text-xs" onClick={() => setShown(shown === d.id ? null : d.id)}>
-                    Payload
+                    {tr.payload}
                   </button>
                   <button className="btn-ghost px-1 py-0 text-xs" onClick={() => resend(d)}>
-                    Resend
+                    {tr.resend}
                   </button>
                 </span>
               </div>

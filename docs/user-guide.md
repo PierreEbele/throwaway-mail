@@ -253,6 +253,9 @@ expiring soon, new addresses, addresses silent for 30 days, and the leak history
 
 ## Account tools
 
+- **Language**: the interface is available in English and French. It follows your browser language at first visit;
+  _Account → Language_ changes it, and the choice is remembered in this browser. Dates and numbers follow the chosen
+  language. Messages coming from the server (API errors, setup check details) stay in English.
 - **Export / import** JSON of addresses and categories (no mail). _Export encrypted_ protects the file with a
   passphrase (PBKDF2 + AES-256-GCM, done in the browser). Import skips existing addresses and unknown domains.
 - **Import from SimpleLogin or addy.io**: upload their alias export, preview, then import onto one of your domains;

@@ -13,7 +13,10 @@ import { MailboxPage } from "./pages/mailbox/MailboxPage";
 import { AccountPage } from "./pages/settings/AccountPage";
 import { DestinationsPage } from "./pages/settings/DestinationsPage";
 import { KeysPage } from "./pages/settings/KeysPage";
-import { AuditPage, DomainsPage, UsersPage, HealthPage } from "./pages/Admin";
+import { DomainsPage } from "./pages/admin/DomainsPage";
+import { UsersPage } from "./pages/admin/UsersPage";
+import { AuditPage } from "./pages/admin/AuditPage";
+import { HealthPage } from "./pages/admin/HealthPage";
 import { SetupCheckPage } from "./pages/admin/SetupCheck";
 import { ReviewPage } from "./pages/Review";
 import { DigestPage } from "./pages/Digest";
@@ -21,6 +24,7 @@ import { RulesPage } from "./pages/rules/RulesPage";
 import { QuarantinePage } from "./pages/rules/QuarantinePage";
 import { DeliveriesPage } from "./pages/rules/DeliveriesPage";
 import { ApiError } from "./api";
+import { I18nProvider } from "./i18n";
 
 const qc = new QueryClient({
   defaultOptions: {
@@ -191,16 +195,18 @@ function App() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <QueryClientProvider client={qc}>
-      <ToastProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            <LiveEvents />
-            <App />
-          </BrowserRouter>
-        </AuthProvider>
-      </ToastProvider>
-    </QueryClientProvider>
+    <I18nProvider>
+      <QueryClientProvider client={qc}>
+        <ToastProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <LiveEvents />
+              <App />
+            </BrowserRouter>
+          </AuthProvider>
+        </ToastProvider>
+      </QueryClientProvider>
+    </I18nProvider>
   </StrictMode>,
 );
 

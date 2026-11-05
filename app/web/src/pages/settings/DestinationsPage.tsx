@@ -10,12 +10,15 @@ import { timeAgo } from "../../util";
 import { useDestinations } from "../Addresses";
 import { useAuth } from "../../auth";
 import { FallbackCard, HeaderAllowlistCard } from "./ForwardingOptionsCard";
+import { useT } from "../../i18n";
 
 export function DestinationsPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const dests = useDestinations();
   const { cloudflareMode } = useAuth();
+  const t = useT().destinations;
+  const tc = useT().common;
   const [params] = useSearchParams();
   const linkResult = params.get("verified");
   const [email, setEmail] = useState("");
@@ -28,13 +31,7 @@ export function DestinationsPage() {
     onSuccess: (r) => {
       setEmail("");
       inv();
-      if (!r.destination.last_error)
-        toast(
-          r.destination.verification === "app"
-            ? "Verification e-mail sent to that address"
-            : "Cloudflare sent a verification e-mail to that address",
-          "success",
-        );
+      if (!r.destination.last_error) toast(r.destination.verification === "app" ? t.sentApp : t.sentCf, "success");
     },
   });
   const action = useMutation({
@@ -42,23 +39,18 @@ export function DestinationsPage() {
       op === "delete" ? del(`/v1/destinations/${id}`) : post(`/v1/destinations/${id}/${op}`),
     onSuccess: (_r, v) => {
       inv();
-      if (v.op === "resend") toast("Verification e-mail sent again", "success");
+      if (v.op === "resend") toast(t.resent, "success");
     },
     onError: (e) => toast((e as Error).message, "error"),
   });
   return (
     <>
-      <PageHeader
-        title="Destinations"
-        subtitle={`Personal mailboxes that sites can forward to. Each one must be verified: click the link in the e-mail ${appOnly ? "the app sends (valid 48 hours)" : "Cloudflare sends"}.`}
-      />
+      <PageHeader title={t.title} subtitle={t.subtitle(appOnly)} />
       {linkResult && (
         <p
           className={`card mb-4 p-3 text-sm ${linkResult === "1" ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
         >
-          {linkResult === "1"
-            ? "Destination verified: mail can now be forwarded to it."
-            : "This verification link is invalid, already used or expired (48 hours). Press Resend to get a new one."}
+          {linkResult === "1" ? t.linkOk : t.linkBad}
         </p>
       )}
       <form
@@ -70,7 +62,7 @@ export function DestinationsPage() {
       >
         <div className="min-w-64 flex-1">
           <label htmlFor="dest-email" className="label">
-            Add a mailbox
+            {t.addMailbox}
           </label>
           <input
             id="dest-email"
@@ -83,12 +75,12 @@ export function DestinationsPage() {
           />
         </div>
         <button className="btn-primary" disabled={add.isPending}>
-          Add &amp; send verification
+          {t.addSend}
         </button>
         {!appOnly && (
           <label className="flex w-full items-center gap-2 text-xs text-zinc-500">
             <input type="checkbox" checked={byApp} onChange={(e) => setByApp(e.target.checked)} />
-            Send the verification link from this app (through an IMAP domain's SMTP server) instead of Cloudflare
+            {t.byApp}
           </label>
         )}
         <div className="w-full">
@@ -96,7 +88,7 @@ export function DestinationsPage() {
         </div>
       </form>
       {dests.isLoading && <Spinner />}
-      {dests.data?.length === 0 && <EmptyState title="No destinations yet" />}
+      {dests.data?.length === 0 && <EmptyState title={t.empty} />}
       {!!dests.data?.length && (
         <ul className="card divide-y divide-zinc-200 dark:divide-zinc-800">
           {dests.data.map((d) => (
@@ -108,12 +100,12 @@ export function DestinationsPage() {
                 </div>
                 <p className="text-xs text-zinc-500">
                   {d.verified
-                    ? `Verified ${timeAgo(d.verified_at)}`
+                    ? t.verified(timeAgo(d.verified_at))
                     : d.verification === "app"
                       ? d.verify_sent_at
-                        ? `Link sent ${timeAgo(d.verify_sent_at)}: click it within 48 hours`
-                        : "No verification link sent yet"
-                      : "Waiting for you to click the Cloudflare verification link"}
+                        ? t.linkSent(timeAgo(d.verify_sent_at))
+                        : t.noLink
+                      : t.waitingCf}
                 </p>
                 {d.last_error && <p className="text-xs text-red-600">{d.last_error}</p>}
                 <PgpRow d={d} />
@@ -122,19 +114,19 @@ export function DestinationsPage() {
                 <>
                   {d.verification === "cloudflare" && (
                     <button className="btn-secondary" onClick={() => action.mutate({ id: d.id, op: "refresh" })}>
-                      Check status
+                      {t.checkStatus}
                     </button>
                   )}
                   <button className="btn-secondary" onClick={() => action.mutate({ id: d.id, op: "resend" })}>
-                    Resend
+                    {t.resend}
                   </button>
                 </>
               )}
               <button
                 className="btn-ghost text-red-600"
-                onClick={() => confirmAction(`Remove ${d.email}?`) && action.mutate({ id: d.id, op: "delete" })}
+                onClick={() => confirmAction(t.confirmRemove(d.email)) && action.mutate({ id: d.id, op: "delete" })}
               >
-                Remove
+                {tc.remove}
               </button>
             </li>
           ))}
@@ -151,6 +143,7 @@ function PgpRow({ d }: { d: Destination }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");
+  const t = useT().destinations;
   const save = (body: Record<string, unknown>) =>
     patch(`/v1/destinations/${d.id}`, body).then(
       () => {
@@ -164,7 +157,7 @@ function PgpRow({ d }: { d: Destination }) {
     <div className="mt-1 text-xs">
       {d.pgp ? (
         <p className="flex flex-wrap items-center gap-2 text-zinc-500">
-          <LockIcon /> Encrypted with{" "}
+          <LockIcon /> {t.encryptedWith}{" "}
           <code className="font-mono" title={d.pgp.fingerprint}>
             {d.pgp.fingerprint
               .slice(-16)
@@ -172,19 +165,19 @@ function PgpRow({ d }: { d: Destination }) {
               .trim()}
           </code>
           <label className="flex items-center gap-1">
-            <input type="checkbox" checked={d.pgp.hide_subject} onChange={(e) => save({ pgp_hide_subject: e.target.checked })} /> hide
-            subject
+            <input type="checkbox" checked={d.pgp.hide_subject} onChange={(e) => save({ pgp_hide_subject: e.target.checked })} />{" "}
+            {t.hideSubject}
           </label>
           <button className="underline" onClick={() => setOpen(!open)}>
-            change
+            {t.change}
           </button>
-          <button className="underline" onClick={() => confirmAction("Forward in clear again?") && save({ pgp_public_key: null })}>
-            remove
+          <button className="underline" onClick={() => confirmAction(t.confirmClear) && save({ pgp_public_key: null })}>
+            {t.remove}
           </button>
         </p>
       ) : (
         <button className="text-zinc-500 underline" onClick={() => setOpen(!open)}>
-          Encrypt forwarded mail with PGP…
+          {t.encrypt}
         </button>
       )}
       {open && (
@@ -194,14 +187,11 @@ function PgpRow({ d }: { d: Destination }) {
             placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----"
             value={key}
             onChange={(e) => setKey(e.target.value)}
-            aria-label="OpenPGP public key"
+            aria-label={t.pgpKey}
           />
-          <p className="text-zinc-500">
-            An encrypted PGP/MIME copy is sent instead of the plain forward (by the Worker's SEND_EMAIL binding, or over SMTP for IMAP
-            domains; see docs/installation.md).
-          </p>
+          <p className="text-zinc-500">{t.pgpHelp}</p>
           <button className="btn-primary px-2 py-1 text-xs" disabled={!key.trim()} onClick={() => save({ pgp_public_key: key })}>
-            Save key
+            {t.saveKey}
           </button>
         </div>
       )}

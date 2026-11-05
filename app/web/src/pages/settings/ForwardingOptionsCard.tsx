@@ -4,12 +4,14 @@ import { get, put } from "../../api";
 import type { Destination } from "../../types";
 import { ErrorText, useToast } from "../../components/ui";
 import { invalidate } from "../../queries";
+import { useT } from "../../i18n";
 
 /** The user's fallback chain: mailboxes tried in order when forwarding to the usual one fails. */
 export function FallbackCard({ dests }: { dests: Destination[] }) {
   const qc = useQueryClient();
   const toast = useToast();
   const verified = dests.filter((d) => d.verified);
+  const t = useT().destinations;
   const chain = dests
     .filter((d) => d.fallback_position !== null)
     .sort((a, b) => a.fallback_position! - b.fallback_position!)
@@ -18,7 +20,7 @@ export function FallbackCard({ dests }: { dests: Destination[] }) {
     mutationFn: (ids: string[]) => put("/v1/forwarding/fallbacks", { destination_ids: ids }),
     onSuccess: () => {
       invalidate(qc, ["destinations"]);
-      toast("Fallback order saved", "success");
+      toast(t.fallbackSaved, "success");
     },
     onError: (e) => toast((e as Error).message, "error"),
   });
@@ -30,12 +32,9 @@ export function FallbackCard({ dests }: { dests: Destination[] }) {
   return (
     <section className="card mt-6 space-y-3 p-5" aria-labelledby="fallbacks">
       <h2 id="fallbacks" className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">
-        Fallback mailboxes
+        {t.fallbackTitle}
       </h2>
-      <p className="text-sm text-zinc-500">
-        When a mailbox refuses a forward (full, deleted, not verified…), the mail goes to the first fallback that accepts it. An address can
-        also have its own fallbacks (on its page).
-      </p>
+      <p className="text-sm text-zinc-500">{t.fallbackHelp}</p>
       {chain.length > 0 && (
         <ol className="space-y-1">
           {chain.map((id, i) => {
@@ -48,7 +47,7 @@ export function FallbackCard({ dests }: { dests: Destination[] }) {
                   className="btn-ghost px-1 py-0 text-xs"
                   disabled={i === 0}
                   onClick={() => move(i, -1)}
-                  aria-label={`Move ${d.email} up`}
+                  aria-label={t.moveUp(d.email)}
                 >
                   ▲
                 </button>
@@ -56,12 +55,12 @@ export function FallbackCard({ dests }: { dests: Destination[] }) {
                   className="btn-ghost px-1 py-0 text-xs"
                   disabled={i === chain.length - 1}
                   onClick={() => move(i, 1)}
-                  aria-label={`Move ${d.email} down`}
+                  aria-label={t.moveDown(d.email)}
                 >
                   ▼
                 </button>
                 <button className="btn-ghost px-1 py-0 text-xs" onClick={() => save.mutate(chain.filter((x) => x !== id))}>
-                  remove
+                  {t.remove}
                 </button>
               </li>
             );
@@ -70,12 +69,12 @@ export function FallbackCard({ dests }: { dests: Destination[] }) {
       )}
       {verified.some((d) => !chain.includes(d.id)) && (
         <select
-          aria-label="Add a fallback mailbox"
+          aria-label={t.addFallback}
           className="input w-auto"
           value=""
           onChange={(e) => e.target.value && save.mutate([...chain, e.target.value])}
         >
-          <option value="">Add a fallback mailbox…</option>
+          <option value="">{t.addFallbackOption}</option>
           {verified
             .filter((d) => !chain.includes(d.id))
             .map((d) => (
@@ -85,7 +84,7 @@ export function FallbackCard({ dests }: { dests: Destination[] }) {
             ))}
         </select>
       )}
-      {!verified.length && <p className="text-sm text-zinc-500">Verify a mailbox first.</p>}
+      {!verified.length && <p className="text-sm text-zinc-500">{t.verifyFirst}</p>}
     </section>
   );
 }
@@ -94,6 +93,8 @@ export function FallbackCard({ dests }: { dests: Destination[] }) {
 export function HeaderAllowlistCard() {
   const qc = useQueryClient();
   const toast = useToast();
+  const t = useT().destinations;
+  const tc = useT().common;
   const q = useQuery({
     queryKey: ["forward-headers"],
     queryFn: () => get<{ allowlist: string[] | null; always_kept: string[] }>("/v1/forwarding/headers"),
@@ -106,7 +107,7 @@ export function HeaderAllowlistCard() {
     mutationFn: (allowlist: string[] | null) => put("/v1/forwarding/headers", { allowlist }),
     onSuccess: () => {
       invalidate(qc, ["forward-headers"]);
-      toast("Saved", "success");
+      toast(tc.saved, "success");
     },
   });
   const on = !!q.data?.allowlist;
@@ -118,15 +119,12 @@ export function HeaderAllowlistCard() {
   return (
     <section className="card mt-6 space-y-3 p-5" aria-labelledby="hdr-allow">
       <h2 id="hdr-allow" className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">
-        Original headers in forwarded mail
+        {t.headersTitle}
       </h2>
-      <p className="text-sm text-zinc-500">
-        By default forwarded mail keeps every original header (tracking and mailing-list headers included). You can keep only the ones
-        needed to read the mail, plus a few you choose. The full original headers always stay visible here, on each message.
-      </p>
+      <p className="text-sm text-zinc-500">{t.headersHelp}</p>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={on} onChange={(e) => save.mutate(e.target.checked ? list() : null)} disabled={!q.data} />
-        Remove original headers, except the ones listed below
+        {t.headersToggle}
       </label>
       {on && (
         <form
@@ -137,7 +135,7 @@ export function HeaderAllowlistCard() {
           }}
         >
           <label htmlFor="hdr-list" className="label">
-            Also keep (comma-separated)
+            {t.alsoKeep}
           </label>
           <input
             id="hdr-list"
@@ -146,12 +144,10 @@ export function HeaderAllowlistCard() {
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
-          <p className="text-xs text-zinc-500">Always kept: {q.data?.always_kept.join(", ")}.</p>
-          <p className="text-xs text-zinc-500">
-            Such copies are sent as new messages from the alias (the Worker needs its SEND_EMAIL binding), with the sender in Reply-To.
-          </p>
+          <p className="text-xs text-zinc-500">{t.alwaysKept(q.data?.always_kept.join(", ") ?? "")}</p>
+          <p className="text-xs text-zinc-500">{t.headersNote}</p>
           <button className="btn-primary" disabled={save.isPending}>
-            Save
+            {tc.save}
           </button>
           <ErrorText error={save.error} />
         </form>

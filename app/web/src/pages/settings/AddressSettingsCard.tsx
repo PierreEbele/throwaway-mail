@@ -4,19 +4,16 @@ import { post, put } from "../../api";
 import type { AddressSettings, AddressSettingsResponse, AliasFormat, RotationMode } from "../../types";
 import { ErrorText, Spinner, useToast } from "../../components/ui";
 import { useAddressSettings } from "../Addresses";
-
-const FORMATS: Record<AliasFormat, string> = {
-  words: "Readable words and digits (amber-otter-4821)",
-  random: "Random characters",
-  "word.word": "Two words (amber.otter)",
-  template: "Custom template",
-};
+import { useT } from "../../i18n";
 
 /** Format of random local parts and defaults applied to new addresses (UI, API, SDK, extension, Bitwarden). */
 export function AddressSettingsCard() {
   const qc = useQueryClient();
   const toast = useToast();
   const q = useAddressSettings();
+  const t = useT().addressPrefs.settings;
+  const tc = useT().common;
+  const FORMATS: Record<AliasFormat, string> = t.formats;
   const [s, setS] = useState<AddressSettings | null>(null);
   const [examples, setExamples] = useState<string[]>([]);
   useEffect(() => {
@@ -34,15 +31,15 @@ export function AddressSettingsCard() {
     onSuccess: (r) => {
       qc.setQueryData(["address-settings"], r);
       setExamples(r.examples);
-      toast("Settings saved", "success");
+      toast(t.saved, "success");
     },
   });
   // Live examples while editing (debounced).
   useEffect(() => {
     if (!s) return;
     if (s.format === "template" && !s.template) return;
-    const t = setTimeout(() => preview.mutate(s), 400);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => preview.mutate(s), 400);
+    return () => clearTimeout(timer);
   }, [s?.format, s?.length, s?.template]);
   if (!s) return <div className="card mt-4 max-w-xl p-5">{q.error ? <ErrorText error={q.error} /> : <Spinner />}</div>;
   const set = (patch: Partial<AddressSettings>) => setS({ ...s, ...patch });
@@ -55,14 +52,11 @@ export function AddressSettingsCard() {
         save.mutate();
       }}
     >
-      <h2 className="font-semibold">New addresses</h2>
-      <p className="text-zinc-500">
-        How random addresses look, and the defaults used whenever an address is created without saying (this app, the API and SDK, the
-        browser extension, Bitwarden).
-      </p>
+      <h2 className="font-semibold">{t.title}</h2>
+      <p className="text-zinc-500">{t.help}</p>
       <div>
         <label htmlFor="as-format" className="label">
-          Random address format
+          {t.format}
         </label>
         <select id="as-format" className="input" value={s.format} onChange={(e) => set({ format: e.target.value as AliasFormat })}>
           {Object.entries(FORMATS).map(([k, label]) => (
@@ -75,7 +69,7 @@ export function AddressSettingsCard() {
       {s.format === "random" && (
         <div>
           <label htmlFor="as-length" className="label">
-            Length
+            {t.length}
           </label>
           <input
             id="as-length"
@@ -91,7 +85,7 @@ export function AddressSettingsCard() {
       {s.format === "template" && (
         <div>
           <label htmlFor="as-template" className="label">
-            Template
+            {t.template}
           </label>
           <input
             id="as-template"
@@ -101,13 +95,13 @@ export function AddressSettingsCard() {
             onChange={(e) => set({ template: e.target.value.toLowerCase() })}
           />
           <p className="mt-1 text-xs text-zinc-500">
-            <code>{"{word}"}</code> a word, <code>{"{rand6}"}</code> 6 random letters/digits, <code>{"{digits4}"}</code> 4 digits,{" "}
-            <code>{"{site}"}</code> the site name. Must be random enough to avoid collisions (e.g. a word and 4 digits).
+            <code>{"{word}"}</code> {t.tWord} <code>{"{rand6}"}</code> {t.tRand} <code>{"{digits4}"}</code> {t.tDigits}{" "}
+            <code>{"{site}"}</code> {t.tSite}
           </p>
         </div>
       )}
       <p className="text-xs text-zinc-500">
-        Examples:{" "}
+        {t.examples}{" "}
         {preview.error ? (
           <span className="text-red-600">{preview.error.message}</span>
         ) : (
@@ -121,7 +115,7 @@ export function AddressSettingsCard() {
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label htmlFor="as-expiry" className="label">
-            Default expiry <span className="font-normal text-zinc-400">(days, blank = never)</span>
+            {t.expiry} <span className="font-normal text-zinc-400">{t.expiryHint}</span>
           </label>
           <input
             id="as-expiry"
@@ -135,7 +129,7 @@ export function AddressSettingsCard() {
         </div>
         <div>
           <label htmlFor="as-max" className="label">
-            Default max mails <span className="font-normal text-zinc-400">(blank = unlimited)</span>
+            {t.max} <span className="font-normal text-zinc-400">{t.maxHint}</span>
           </label>
           <input
             id="as-max"
@@ -199,7 +193,7 @@ export function AddressSettingsCard() {
       </p>
       <ErrorText error={save.error} />
       <button className="btn-primary" disabled={save.isPending}>
-        Save
+        {tc.save}
       </button>
     </form>
   );

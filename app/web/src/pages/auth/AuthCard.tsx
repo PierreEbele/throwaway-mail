@@ -28,6 +28,8 @@ export function AuthCard({ subtitle, error, children }: { subtitle: string; erro
   );
 }
 
+export { useT } from "../../i18n";
+
 export function Field({ id, label, hint, ...input }: { id: string; label: string; hint?: string } & InputHTMLAttributes<HTMLInputElement>) {
   return (
     <div>

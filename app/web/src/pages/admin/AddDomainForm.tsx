@@ -5,22 +5,17 @@ import type { Domain, User } from "../../types";
 import { ErrorText, useToast } from "../../components/ui";
 import { useAuth } from "../../auth";
 import { MailboxFields, mailboxDraft, mailboxPayload } from "./MailboxFields";
+import { msg, useT } from "../../i18n";
 
-export const POLICY_HELP: Record<Domain["unknown_policy"], string> = {
-  reject: "Reject mail for addresses that do not exist",
-  inbox: "Keep it in your “Unassigned” inbox",
-  auto_create: "Create the address automatically (catch-all style)",
-};
-
-const TRANSPORTS: Record<Domain["transport"], string> = {
-  cloudflare: "Cloudflare Email Routing",
-  imap: "IMAP + SMTP mailbox",
-};
+export const POLICIES: Domain["unknown_policy"][] = ["reject", "inbox", "auto_create"];
 
 export function AddDomainForm({ users }: { users: User[] | undefined }) {
   const qc = useQueryClient();
   const toast = useToast();
   const { cloudflareMode } = useAuth();
+  const t = useT().domainSetup;
+  const POLICY_HELP = t.policyHelp;
+  const TRANSPORTS = t.transports;
   const [name, setName] = useState("");
   const [policy, setPolicy] = useState<Domain["unknown_policy"]>("reject");
   const [ownerId, setOwnerId] = useState("");
@@ -39,7 +34,10 @@ export function AddDomainForm({ users }: { users: User[] | undefined }) {
       setName("");
       setMailbox(mailboxDraft());
       qc.invalidateQueries({ queryKey: ["domains"] });
-      toast(`${r.domain.name}: ${r.domain.status}`, r.domain.status === "active" ? "success" : "info");
+      toast(
+        `${r.domain.name}: ${msg().common.status[r.domain.status] ?? r.domain.status}`,
+        r.domain.status === "active" ? "success" : "info",
+      );
     },
   });
   return (
@@ -50,19 +48,19 @@ export function AddDomainForm({ users }: { users: User[] | undefined }) {
         add.mutate();
       }}
     >
-      <div role="radiogroup" aria-label="How mail reaches the app" className="flex flex-wrap gap-4 text-sm">
+      <div role="radiogroup" aria-label={t.howMail} className="flex flex-wrap gap-4 text-sm">
         {(Object.keys(TRANSPORTS) as Domain["transport"][]).map((k) => (
           <label key={k} className="flex items-center gap-2">
             <input type="radio" name="transport" checked={transport === k} onChange={() => setTransport(k)} />
             {TRANSPORTS[k]}
-            {k === "cloudflare" && cloudflareMode === "unconfigured" && <span className="text-xs text-zinc-500">(not configured)</span>}
+            {k === "cloudflare" && cloudflareMode === "unconfigured" && <span className="text-xs text-zinc-500">{t.notConfigured}</span>}
           </label>
         ))}
       </div>
       <div className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr] sm:items-end">
         <div>
           <label htmlFor="dom-name" className="label">
-            Domain name
+            {t.domainName}
           </label>
           <input
             id="dom-name"
@@ -75,10 +73,10 @@ export function AddDomainForm({ users }: { users: User[] | undefined }) {
         </div>
         <div>
           <label htmlFor="dom-policy" className="label">
-            Unknown addresses
+            {t.unknownAddresses}
           </label>
           <select id="dom-policy" className="input" value={policy} onChange={(e) => setPolicy(e.target.value as Domain["unknown_policy"])}>
-            {Object.keys(POLICY_HELP).map((k) => (
+            {POLICIES.map((k) => (
               <option key={k} value={k}>
                 {k}
               </option>
@@ -87,10 +85,10 @@ export function AddDomainForm({ users }: { users: User[] | undefined }) {
         </div>
         <div>
           <label htmlFor="dom-owner" className="label">
-            Owner
+            {t.owner}
           </label>
           <select id="dom-owner" className="input" value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
-            <option value="">Me</option>
+            <option value="">{t.me}</option>
             {users?.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name ?? u.email}
@@ -101,13 +99,10 @@ export function AddDomainForm({ users }: { users: User[] | undefined }) {
       </div>
       {transport === "imap" && <MailboxFields value={mailbox} onChange={setMailbox} />}
       <p className="text-xs text-zinc-500">
-        Unknown addresses: {POLICY_HELP[policy]}. The owner receives the domain's “To sort” box.{" "}
-        {transport === "imap"
-          ? "The mailbox must receive all mail of the domain (catch-all or alias); the connection is tested before the domain becomes active."
-          : "Its DNS must be on Cloudflare: Email Routing is enabled and its catch-all rule pointed at the Worker."}
+        {t.help(POLICY_HELP[policy])} {transport === "imap" ? t.helpImap : t.helpCf}
       </p>
       <button className="btn-primary" disabled={add.isPending}>
-        {add.isPending ? (transport === "imap" ? "Testing connection…" : "Configuring Cloudflare…") : "Add domain"}
+        {add.isPending ? (transport === "imap" ? t.testing : t.configuring) : t.add}
       </button>
       <ErrorText error={add.error} />
     </form>

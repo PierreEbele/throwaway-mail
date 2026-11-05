@@ -6,12 +6,14 @@ import { ErrorText, Modal, confirmAction, useToast } from "../../components/ui";
 import { invalidate } from "../../queries";
 import { timeAgo } from "../../util";
 import { STALE_DAYS } from "./shared";
+import { useT } from "../../i18n";
 
 /** Addresses that never received mail. */
 export function StaleDialog({ open, onClose, items }: { open: boolean; onClose: () => void; items: Address[] }) {
   const qc = useQueryClient();
   const toast = useToast();
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const t = useT().mailbox;
   useEffect(() => {
     if (open) setChecked(new Set(items.map((a) => a.id)));
   }, [open, items]);
@@ -20,7 +22,7 @@ export function StaleDialog({ open, onClose, items }: { open: boolean; onClose: 
       post<{ affected: number }>("/v1/stale-addresses", { action, ids: [...checked], days: STALE_DAYS }).then((r) => ({ ...r, action })),
     onSuccess: (r) => {
       invalidate(qc, ["stale"], ["addresses"], ["categories"]);
-      toast(`${r.affected} address(es) ${r.action === "keep" ? "kept" : r.action === "archive" ? "archived" : "deleted"}`, "success");
+      toast(t.staleDone(r.affected, r.action), "success");
       onClose();
     },
   });
@@ -32,11 +34,8 @@ export function StaleDialog({ open, onClose, items }: { open: boolean; onClose: 
       return n;
     });
   return (
-    <Modal open={open} onClose={onClose} title="Addresses that never received mail" wide>
-      <p className="mb-3 text-sm text-zinc-500">
-        Created more than {STALE_DAYS} days ago and still empty. Archiving rejects future mail but keeps the address; deleting frees it.
-        Pinned addresses are never listed.
-      </p>
+    <Modal open={open} onClose={onClose} title={t.staleTitle} wide>
+      <p className="mb-3 text-sm text-zinc-500">{t.staleHelp(STALE_DAYS)}</p>
       <ul className="max-h-80 divide-y divide-zinc-200 overflow-auto rounded-md border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
         {items.map((a) => (
           <li key={a.id}>
@@ -46,30 +45,25 @@ export function StaleDialog({ open, onClose, items }: { open: boolean; onClose: 
                 <span className="block truncate text-sm font-medium">{a.site_name}</span>
                 <span className="block truncate font-mono text-xs text-zinc-500">{a.email}</span>
               </span>
-              <span className="shrink-0 text-xs text-zinc-500">created {timeAgo(a.created_at)}</span>
+              <span className="shrink-0 text-xs text-zinc-500">{t.created(timeAgo(a.created_at))}</span>
             </label>
           </li>
         ))}
       </ul>
       <ErrorText error={act.error} />
       <div className="mt-4 flex flex-wrap justify-end gap-2">
-        <button
-          className="btn-ghost"
-          disabled={!checked.size || act.isPending}
-          onClick={() => act.mutate("keep")}
-          title="Stop suggesting these"
-        >
-          Keep them
+        <button className="btn-ghost" disabled={!checked.size || act.isPending} onClick={() => act.mutate("keep")} title={t.keepTitle}>
+          {t.keep}
         </button>
         <button className="btn-secondary" disabled={!checked.size || act.isPending} onClick={() => act.mutate("archive")}>
-          Archive {checked.size}
+          {t.archiveN(checked.size)}
         </button>
         <button
           className="btn-danger"
           disabled={!checked.size || act.isPending}
-          onClick={() => confirmAction(`Delete ${checked.size} address(es)? This cannot be undone.`) && act.mutate("delete")}
+          onClick={() => confirmAction(t.confirmDeleteN(checked.size)) && act.mutate("delete")}
         >
-          Delete {checked.size}
+          {t.deleteN(checked.size)}
         </button>
       </div>
     </Modal>

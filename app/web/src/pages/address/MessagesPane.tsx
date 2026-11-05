@@ -7,6 +7,7 @@ import { EmptyState, Spinner, confirmAction, useToast } from "../../components/u
 import { PaperclipIcon } from "../../components/icons";
 import { invalidate } from "../../queries";
 import { timeAgo } from "../../util";
+import { useT } from "../../i18n";
 import { MessageView } from "./MessageView";
 
 export type Box = "inbox" | "archive";
@@ -28,11 +29,13 @@ export function MessagesPane({
   // ?message=<id> (links from the Quarantine and Failed deliveries pages) opens that message.
   const [params] = useSearchParams();
   const [selected, setSelected] = useState<string | null>(params.get("message"));
+  const t = useT().messages.list;
+  const tc = useT().common;
   const bulk = useMutation({
     mutationFn: (b: { action: string; scope: string }) => post<{ affected: number }>(`/v1/addresses/${a.id}/messages/bulk`, b),
     onSuccess: (r) => {
       invalidate(qc, ["messages", a.id], ["address", a.id], ["addresses"]);
-      toast(`${r.affected} message(s) updated`, "success");
+      toast(t.updated(r.affected), "success");
       setSelected(null);
     },
     onError: (e) => toast((e as Error).message, "error"),
@@ -41,10 +44,10 @@ export function MessagesPane({
     <section aria-labelledby="inbox" className="grid gap-4 xl:grid-cols-5">
       <div className="xl:col-span-2">
         <h2 id="inbox" className="sr-only">
-          Messages
+          {t.messages}
         </h2>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div role="tablist" aria-label="Mailbox" className="flex gap-1">
+          <div role="tablist" aria-label={t.mailbox} className="flex gap-1">
             {(["inbox", "archive"] as const).map((b) => (
               <button
                 key={b}
@@ -56,7 +59,7 @@ export function MessagesPane({
                   setSelected(null);
                 }}
               >
-                {b === "inbox" ? "Inbox" : "Archive"}
+                {b === "inbox" ? t.inbox : t.archive}
               </button>
             ))}
           </div>
@@ -65,21 +68,20 @@ export function MessagesPane({
               {box === "inbox" ? (
                 <>
                   <button className="btn-ghost px-2 text-xs" onClick={() => bulk.mutate({ action: "read", scope: "inbox" })}>
-                    Mark all read
+                    {t.markAllRead}
                   </button>
                   <button className="btn-ghost px-2 text-xs" onClick={() => bulk.mutate({ action: "archive", scope: "inbox" })}>
-                    Archive all
+                    {t.archiveAll}
                   </button>
                 </>
               ) : (
                 <button
                   className="btn-ghost px-2 text-xs text-red-600"
                   onClick={() =>
-                    confirmAction(`Delete the ${messages.data!.length} archived message(s)? This cannot be undone.`) &&
-                    bulk.mutate({ action: "delete", scope: "archived" })
+                    confirmAction(t.confirmDeleteArchived(messages.data!.length)) && bulk.mutate({ action: "delete", scope: "archived" })
                   }
                 >
-                  Delete all archived
+                  {t.deleteArchived}
                 </button>
               )}
             </div>
@@ -88,17 +90,18 @@ export function MessagesPane({
         {messages.isLoading && <Spinner />}
         {messages.data?.length === 0 &&
           (box === "inbox" ? (
-            <EmptyState title={a.message_count ? "Inbox empty" : "No mail yet"}>
+            <EmptyState title={a.message_count ? t.inboxEmpty : t.noMail}>
               {a.message_count ? (
-                "Archived mail is under Archive."
+                t.archivedHint
               ) : (
                 <>
-                  Use <span className="font-mono">{a.email}</span> on {a.site_name}.
+                  {t.use} <span className="font-mono">{a.email}</span>
+                  {t.on(a.site_name)}
                 </>
               )}
             </EmptyState>
           ) : (
-            <EmptyState title="Archive empty" />
+            <EmptyState title={t.archiveEmpty} />
           ))}
         <ul className="card max-h-[70vh] divide-y divide-zinc-200 overflow-auto dark:divide-zinc-800">
           {messages.data?.map((m) => (
@@ -113,7 +116,7 @@ export function MessagesPane({
                   <span className="shrink-0 text-xs text-zinc-500">{timeAgo(m.received_at)}</span>
                 </div>
                 <div className={`truncate text-sm ${m.read_at ? "text-zinc-600 dark:text-zinc-400" : "font-medium"}`}>
-                  {m.subject ?? "(no subject)"}
+                  {m.subject ?? tc.noSubject}
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 text-xs text-zinc-500">
                   {m.code && (
@@ -121,26 +124,26 @@ export function MessagesPane({
                       {m.code}
                     </code>
                   )}
-                  {m.forwarded && <span>↪ forwarded</span>}
+                  {m.forwarded && <span>{t.forwarded}</span>}
                   {m.quarantined_at && (
                     <span
                       className="rounded bg-amber-100 px-1 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                      title="Held by a rule: see Quarantine"
+                      title={t.quarantinedTitle}
                     >
-                      quarantined
+                      {t.quarantined}
                     </span>
                   )}
                   {m.attachments.some((x) => !x.inline) && (
-                    <span title="Has attachments (not stored)">
+                    <span title={t.attachmentsTitle}>
                       <PaperclipIcon />
                     </span>
                   )}
                   {m.auth_warning && (
-                    <span className="rounded bg-red-100 px-1 text-red-700 dark:bg-red-950 dark:text-red-300" title="Possible phishing">
-                      phishing?
+                    <span className="rounded bg-red-100 px-1 text-red-700 dark:bg-red-950 dark:text-red-300" title={t.phishingTitle}>
+                      {t.phishing}
                     </span>
                   )}
-                  {m.is_bulk && <span title="Newsletter / bulk mail">newsletter</span>}
+                  {m.is_bulk && <span title={t.bulkTitle}>{t.newsletter}</span>}
                   <span className="truncate">{m.preview}</span>
                 </div>
               </button>
@@ -152,7 +155,7 @@ export function MessagesPane({
         {selected ? (
           <MessageView key={selected} id={selected} onGone={() => setSelected(null)} />
         ) : (
-          <p className="text-sm text-zinc-500">Select a message to read it. Shortcuts: e archive, Delete delete.</p>
+          <p className="text-sm text-zinc-500">{t.selectHint}</p>
         )}
       </div>
     </section>

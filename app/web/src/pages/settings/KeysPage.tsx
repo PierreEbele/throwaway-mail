@@ -5,6 +5,7 @@ import type { Address, ApiKey } from "../../types";
 import { Badge, CopyButton, EmptyState, ErrorText, PageHeader, Spinner, confirmAction } from "../../components/ui";
 import { invalidate } from "../../queries";
 import { fullDate, timeAgo } from "../../util";
+import { useT } from "../../i18n";
 
 export function KeysPage() {
   const qc = useQueryClient();
@@ -15,6 +16,7 @@ export function KeysPage() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
   const [expiryDays, setExpiryDays] = useState("");
+  const t = useT().settings.keys;
   const [created, setCreated] = useState<string | null>(null);
   const addrs = useQuery({
     queryKey: ["addresses", "key-picker"],
@@ -44,7 +46,7 @@ export function KeysPage() {
   const origin = location.origin;
   return (
     <>
-      <PageHeader title="API keys" subtitle="Use a key as a Bearer token. Keys are stored hashed; the full key is shown only once." />
+      <PageHeader title={t.title} subtitle={t.subtitle} />
       <form
         className="card mb-4 flex flex-wrap items-end gap-3 p-4"
         onSubmit={(e: FormEvent) => {
@@ -54,53 +56,53 @@ export function KeysPage() {
       >
         <div className="min-w-64 flex-1">
           <label htmlFor="key-name" className="label">
-            Key name
+            {t.name}
           </label>
           <input
             id="key-name"
             required
             className="input"
-            placeholder="e.g. signup-bot"
+            placeholder={t.placeholder}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </div>
         <div>
           <label htmlFor="key-scope" className="label">
-            Access
+            {t.access}
           </label>
           <select id="key-scope" className="input" value={scope} onChange={(e) => setScope(e.target.value as "full" | "read")}>
-            <option value="full">Full access</option>
-            <option value="read">Read-only</option>
+            <option value="full">{t.scopeFull}</option>
+            <option value="read">{t.scopeRead}</option>
           </select>
         </div>
         <div>
           <label htmlFor="key-expiry" className="label">
-            Expires
+            {t.expires}
           </label>
           <select id="key-expiry" className="input" value={expiryDays} onChange={(e) => setExpiryDays(e.target.value)}>
-            <option value="">Never</option>
-            <option value="1">In 1 day</option>
-            <option value="7">In 7 days</option>
-            <option value="30">In 30 days</option>
-            <option value="90">In 90 days</option>
-            <option value="365">In 1 year</option>
+            <option value="">{t.never}</option>
+            {[1, 7, 30, 90, 365].map((d) => (
+              <option key={d} value={d}>
+                {t.inDays(d)}
+              </option>
+            ))}
           </select>
         </div>
         <button className="btn-primary" disabled={create.isPending || (restrict && picked.size === 0)}>
-          Create key
+          {t.create}
         </button>
         <div className="w-full">
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={restrict} onChange={(e) => setRestrict(e.target.checked)} />
-            Only some addresses (the key cannot create addresses or use account-wide routes)
+            {t.restrict}
           </label>
           {restrict && (
             <div className="mt-2 rounded border border-zinc-200 p-2 dark:border-zinc-800">
               <input
                 className="input mb-2"
-                placeholder="Filter addresses"
-                aria-label="Filter addresses"
+                placeholder={t.filter}
+                aria-label={t.filter}
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
               />
@@ -125,7 +127,7 @@ export function KeysPage() {
                     </label>
                   ))}
               </div>
-              <p className="mt-1 text-xs text-zinc-500">{picked.size} selected</p>
+              <p className="mt-1 text-xs text-zinc-500">{t.selected(picked.size)}</p>
             </div>
           )}
         </div>
@@ -135,14 +137,14 @@ export function KeysPage() {
       </form>
       {created && (
         <div className="card mb-6 border-emerald-300 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950/40" role="alert">
-          <p className="text-sm font-medium">Copy your new key now. It will not be shown again.</p>
+          <p className="text-sm font-medium">{t.copyNow}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <code className="rounded bg-white px-2 py-1 font-mono text-sm break-all dark:bg-zinc-900" data-testid="new-key">
               {created}
             </code>
             <CopyButton text={created} />
             <button className="btn-ghost" onClick={() => setCreated(null)}>
-              Done
+              {t.done}
             </button>
           </div>
           <pre className="mt-3 overflow-auto rounded bg-zinc-900 p-3 text-xs text-zinc-100">{`curl -s -H "Authorization: Bearer ${created}" \\
@@ -151,20 +153,20 @@ export function KeysPage() {
         </div>
       )}
       {keys.isLoading && <Spinner />}
-      {keys.data?.length === 0 && <EmptyState title="No API keys" />}
+      {keys.data?.length === 0 && <EmptyState title={t.empty} />}
       {!!keys.data?.length && (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-zinc-500 uppercase">
               <tr>
-                <th className="px-4 py-2">Name</th>
-                <th className="px-4 py-2">Prefix</th>
-                <th className="px-4 py-2">Scope</th>
-                <th className="px-4 py-2">Expires</th>
-                <th className="px-4 py-2">Created</th>
-                <th className="px-4 py-2">Last used</th>
+                <th className="px-4 py-2">{t.colName}</th>
+                <th className="px-4 py-2">{t.prefix}</th>
+                <th className="px-4 py-2">{t.scope}</th>
+                <th className="px-4 py-2">{t.expires}</th>
+                <th className="px-4 py-2">{t.created}</th>
+                <th className="px-4 py-2">{t.lastUsed}</th>
                 <th className="px-4 py-2">
-                  <span className="sr-only">Actions</span>
+                  <span className="sr-only">{t.actions}</span>
                 </th>
               </tr>
             </thead>
@@ -174,10 +176,10 @@ export function KeysPage() {
                   <td className="px-4 py-2">{k.name}</td>
                   <td className="px-4 py-2 font-mono">{k.prefix}…</td>
                   <td className="px-4 py-2">
-                    {k.scope === "read" ? "Read-only" : "Full"}
+                    {k.scope === "read" ? t.scopeRead : t.scopeFullShort}
                     {k.address_ids && (
                       <span className="block text-xs text-zinc-500" title={k.address_ids.map((id) => addrLabel.get(id) ?? id).join(", ")}>
-                        {k.address_ids.length} address{k.address_ids.length === 1 ? "" : "es"}
+                        {t.addressCount(k.address_ids.length)}
                       </span>
                     )}
                   </td>
@@ -185,20 +187,20 @@ export function KeysPage() {
                     {k.expires_at ? (
                       <span className={k.expires_at < Date.now() ? "text-red-600" : ""}>{fullDate(k.expires_at)}</span>
                     ) : (
-                      "Never"
+                      t.never
                     )}
                   </td>
                   <td className="px-4 py-2">{fullDate(k.created_at)}</td>
                   <td className="px-4 py-2">{timeAgo(k.last_used_at)}</td>
                   <td className="px-4 py-2 text-right">
                     {k.revoked_at ? (
-                      <Badge value="archived">revoked</Badge>
+                      <Badge value="archived">{t.revoked}</Badge>
                     ) : (
                       <button
                         className="btn-ghost text-red-600"
-                        onClick={() => confirmAction(`Revoke "${k.name}"? Programs using it will stop working.`) && revoke.mutate(k.id)}
+                        onClick={() => confirmAction(t.confirmRevoke(k.name)) && revoke.mutate(k.id)}
                       >
-                        Revoke
+                        {t.revoke}
                       </button>
                     )}
                   </td>

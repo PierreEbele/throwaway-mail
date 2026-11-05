@@ -5,6 +5,7 @@ import type { User } from "./types";
 import { useToast } from "./components/ui";
 import { invalidate, invalidateAddress, invalidateNewMail } from "./queries";
 import { NOTIFY_KEY } from "./util";
+import { msg } from "./i18n";
 
 interface AuthState {
   user: User | null;
@@ -90,8 +91,9 @@ async function notify(e: { address_id: string; subject: string | null; has_code:
         .then((r) => r?.code ?? null)
         .catch(() => null)
     : null;
-  const n = new Notification(code ? `Code: ${code}` : "New mail", {
-    body: `${e.subject ?? "(no subject)"}${code ? "\nClick to copy the code" : ""}`,
+  const t = msg();
+  const n = new Notification(code ? t.auth.notifyCode(code) : t.auth.notifyNew, {
+    body: `${e.subject ?? t.common.noSubject}${code ? "\n" + t.auth.notifyCopy : ""}`,
     tag: e.address_id,
   });
   n.onclick = () => {
@@ -137,7 +139,7 @@ export function LiveEvents() {
     const onMessage = (ev: MessageEvent) => {
       const e = JSON.parse(ev.data) as { address_id: string; subject: string | null; has_code: boolean };
       invalidateNewMail(qc, e.address_id);
-      toast(`New mail${e.has_code ? " with a code" : ""}: ${e.subject ?? "(no subject)"}`, "success");
+      toast(msg().auth.toastNew(e.has_code, e.subject ?? msg().common.noSubject), "success");
       void notify(e);
     };
     const onAddress = (ev: MessageEvent) => {

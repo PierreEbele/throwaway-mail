@@ -6,6 +6,7 @@ import type { AddressSettingsResponse, Destination, Domain } from "../types";
 import { ErrorText, Modal, Toggle, useToast } from "../components/ui";
 import { useCategories } from "./mailbox/shared";
 import { invalidate } from "../queries";
+import { useT } from "../i18n";
 
 export function useDomains() {
   return useQuery({ queryKey: ["domains"], queryFn: () => get<{ domains: Domain[] }>("/v1/domains").then((r) => r.domains) });
@@ -30,6 +31,8 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
   const dests = useDestinations();
   const active = (domains.data ?? []).filter((d) => d.status === "active");
   const [domain, setDomain] = useState("");
+  const t = useT().newAddress;
+  const tc = useT().common;
   const [siteName, setSiteName] = useState("");
   const [siteUrl, setSiteUrl] = useState("");
   const [localPart, setLocalPart] = useState("");
@@ -91,7 +94,7 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
       }),
     onSuccess: (r) => {
       invalidate(qc, ["addresses"], ["categories"]);
-      toast(`Created ${r.email}`, "success");
+      toast(t.created(r.email), "success");
       onClose();
       nav(`/addresses/${r.id}`);
     },
@@ -101,37 +104,37 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
     create.mutate();
   };
   return (
-    <Modal open={open} onClose={onClose} title="New address">
+    <Modal open={open} onClose={onClose} title={t.title}>
       {active.length === 0 && !domains.isLoading ? (
         <p className="text-sm">
-          No active domain yet. An admin must add one under <strong>Admin → Domains</strong>.
+          {t.noDomain1} <strong>{t.noDomain2}</strong>.
         </p>
       ) : (
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label htmlFor="na-site" className="label">
-              Site name
+              {t.siteName}
             </label>
             <input
               id="na-site"
               className="input"
               required
               autoFocus
-              placeholder="e.g. GitHub"
+              placeholder={t.siteNamePlaceholder}
               value={siteName}
               onChange={(e) => setSiteName(e.target.value)}
             />
           </div>
           <div>
             <label htmlFor="na-url" className="label">
-              Site URL <span className="font-normal text-zinc-400">(optional)</span>
+              {t.siteUrl} <span className="font-normal text-zinc-400">{t.optional}</span>
             </label>
             <input id="na-url" className="input" placeholder="github.com" value={siteUrl} onChange={(e) => setSiteUrl(e.target.value)} />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="na-local" className="label">
-                Local part <span className="font-normal text-zinc-400">(blank = random)</span>
+                {t.localPart} <span className="font-normal text-zinc-400">{t.blankRandom}</span>
               </label>
               <input
                 id="na-local"
@@ -143,10 +146,13 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
             </div>
             <div>
               <label htmlFor="na-domain" className="label">
-                Domain
+                {t.domain}
               </label>
               <select id="na-domain" className="input" value={domain} onChange={(e) => setDomain(e.target.value)}>
-                <option value="">Automatic{suggestion.data?.domain ? ` (@${suggestion.data.domain})` : ""}</option>
+                <option value="">
+                  {t.automatic}
+                  {suggestion.data?.domain ? ` (@${suggestion.data.domain})` : ""}
+                </option>
                 {active.map((d) => (
                   <option key={d.id} value={d.name}>
                     @{d.name}
@@ -155,8 +161,8 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
               </select>
               {avoided.length > 0 && (
                 <p className={`mt-1 text-xs ${avoided.includes(domain) ? "text-amber-700 dark:text-amber-400" : "text-zinc-500"}`}>
-                  This site rejected {avoided.map((x) => `@${x}`).join(", ")} before
-                  {avoided.includes(domain) ? ": pick another domain or Automatic." : "; Automatic skips it."}
+                  {t.rejectedBefore(avoided.map((x) => `@${x}`).join(", "))}
+                  {avoided.includes(domain) ? t.pickAnother : t.autoSkips}
                 </p>
               )}
             </div>
@@ -164,10 +170,10 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
           {(categories.data?.length ?? 0) > 0 && (
             <div>
               <label htmlFor="na-cat" className="label">
-                Category
+                {t.category}
               </label>
               <select id="na-cat" className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                <option value="">No category</option>
+                <option value="">{t.noCategory}</option>
                 {categories.data!.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -179,23 +185,23 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="na-expires" className="label">
-                Expires
+                {t.expires}
               </label>
               <select id="na-expires" className="input" value={expiresDays} onChange={(e) => setExpiresDays(e.target.value)}>
-                <option value="">Never</option>
-                <option value="1">After 1 day</option>
-                <option value="7">After 7 days</option>
-                <option value="30">After 30 days</option>
-                <option value="90">After 90 days</option>
-                <option value="365">After 1 year</option>
+                <option value="">{t.never}</option>
+                <option value="1">{t.afterDays(1)}</option>
+                <option value="7">{t.afterDays(7)}</option>
+                <option value="30">{t.afterDays(30)}</option>
+                <option value="90">{t.afterDays(90)}</option>
+                <option value="365">{t.afterYear}</option>
                 {expiresDays && !["1", "7", "30", "90", "365"].includes(expiresDays) && (
-                  <option value={expiresDays}>After {expiresDays} days</option>
+                  <option value={expiresDays}>{t.afterDays(Number(expiresDays))}</option>
                 )}
               </select>
             </div>
             <div>
               <label htmlFor="na-max" className="label">
-                Max mails <span className="font-normal text-zinc-400">(blank = unlimited)</span>
+                {t.maxMails} <span className="font-normal text-zinc-400">{t.blankUnlimited}</span>
               </label>
               <input
                 id="na-max"
@@ -203,41 +209,37 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
                 type="number"
                 min={1}
                 max={100000}
-                placeholder="e.g. 3"
+                placeholder={t.maxPlaceholder}
                 value={maxMessages}
                 onChange={(e) => setMaxMessages(e.target.value)}
               />
             </div>
           </div>
-          {(expiresDays || maxMessages) && (
-            <p className="-mt-2 text-xs text-zinc-500">
-              Once expired or full, the address is paused automatically and new mail is rejected.
-            </p>
-          )}
+          {(expiresDays || maxMessages) && <p className="-mt-2 text-xs text-zinc-500">{t.expiredNote}</p>}
           <div className="rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
             <div className="flex items-center justify-between gap-3">
               <label htmlFor="na-forward" className="text-sm font-medium">
-                Also forward mail to my personal mailbox
+                {t.alsoForward}
               </label>
-              <Toggle id="na-forward" checked={forward} onChange={setForward} label="Forward mail for this site" />
+              <Toggle id="na-forward" checked={forward} onChange={setForward} label={t.forwardLabel} />
             </div>
             {forward && (
               <div className="mt-3">
                 {verified.length === 0 ? (
                   <p className="text-sm text-amber-700 dark:text-amber-400">
-                    You have no verified destination yet.{" "}
+                    {t.noVerified}{" "}
                     <Link className="underline" to="/destinations" onClick={onClose}>
-                      Add one
+                      {t.addOne}
                     </Link>
-                    ; mail is stored (not forwarded) until it is verified.
+                    {t.storedUntil}
                   </p>
                 ) : (
                   <>
                     <label htmlFor="na-dest" className="label">
-                      Destination
+                      {t.destination}
                     </label>
                     <select id="na-dest" className="input" value={destinationId} onChange={(e) => setDestinationId(e.target.value)}>
-                      <option value="">Default (first verified)</option>
+                      <option value="">{t.defaultDest}</option>
                       {verified.map((d) => (
                         <option key={d.id} value={d.id}>
                           {d.email}
@@ -252,10 +254,10 @@ export function NewAddressDialog({ open, onClose, defaultCategory }: { open: boo
           <ErrorText error={create.error} />
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancel
+              {tc.cancel}
             </button>
             <button className="btn-primary" disabled={create.isPending}>
-              {create.isPending ? "Creating…" : "Create address"}
+              {create.isPending ? t.creating : t.create}
             </button>
           </div>
         </form>

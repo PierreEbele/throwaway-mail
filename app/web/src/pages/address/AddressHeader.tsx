@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { del } from "../../api";
 import type { Address } from "../../types";
 import { Badge, CopyButton, confirmAction, useToast } from "../../components/ui";
+import { useT } from "../../i18n";
 import { PinIcon } from "../../components/icons";
 import { invalidate } from "../../queries";
 import { hostOf, timeAgo } from "../../util";
@@ -27,18 +28,20 @@ export function AddressHeader({
   const toast = useToast();
   const categories = useCategories();
   const rejected = useSiteRejected(a);
+  const t = useT().addressHeader;
+  const tc = useT().common;
   const remove = useMutation({
     mutationFn: () => del(`/v1/addresses/${a.id}`),
     onSuccess: () => {
       invalidate(qc, ["addresses"]);
-      toast("Address deleted", "success");
+      toast(t.deleted, "success");
       nav(back);
     },
   });
   return (
     <div>
       <Link to={back} className="text-sm text-zinc-500 hover:text-zinc-900 md:hidden dark:hover:text-zinc-100">
-        ← Back
+        {t.back}
       </Link>
       <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
@@ -58,7 +61,7 @@ export function AddressHeader({
           {a.label && <p className="text-sm text-zinc-500">{a.label}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <code className="rounded bg-zinc-100 px-2 py-1 font-mono text-base break-all dark:bg-zinc-800">{a.email}</code>
-            <CopyButton text={a.email} label="Copy address" />
+            <CopyButton text={a.email} label={t.copyAddress} />
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -66,12 +69,12 @@ export function AddressHeader({
             className={`btn-secondary px-2 ${a.pinned ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-500"}`}
             onClick={() => onUpdate({ pinned: !a.pinned })}
             aria-pressed={a.pinned}
-            title={a.pinned ? "Unpin" : "Pin to the top"}
+            title={a.pinned ? t.unpin : t.pinTop}
           >
-            <PinIcon filled={a.pinned} /> {a.pinned ? "Pinned" : "Pin"}
+            <PinIcon filled={a.pinned} /> {a.pinned ? t.pinned : t.pin}
           </button>
           <label className="sr-only" htmlFor="addr-category">
-            Category
+            {t.category}
           </label>
           <span className="relative inline-flex items-center">
             {a.category_id && categories.data?.find((c) => c.id === a.category_id) && (
@@ -85,7 +88,7 @@ export function AddressHeader({
               value={a.category_id ?? ""}
               onChange={(e) => onUpdate({ category_id: e.target.value || null })}
             >
-              <option value="">No category</option>
+              <option value="">{t.noCategory}</option>
               {(categories.data ?? []).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -94,59 +97,50 @@ export function AddressHeader({
             </select>
           </span>
           <button className="btn-secondary" onClick={onEdit}>
-            Edit site
+            {t.editSite}
           </button>
           {a.status === "active" ? (
             <button className="btn-secondary" onClick={() => onUpdate({ status: "paused" })}>
-              Pause
+              {t.pause}
             </button>
           ) : (
             <button className="btn-secondary" onClick={() => onUpdate({ status: "active" })}>
-              {a.status === "archived" ? "Unarchive" : "Resume"}
+              {a.status === "archived" ? t.unarchive : t.resume}
             </button>
           )}
           {!a.site_rejected && (
-            <button className="btn-secondary" onClick={rejected} title="Record it and get an address on another domain">
-              Site rejected it
+            <button className="btn-secondary" onClick={rejected} title={t.rejectedTitle}>
+              {t.rejected}
             </button>
           )}
           {a.status !== "archived" && (
             <button className="btn-secondary" onClick={() => onUpdate({ status: "archived" })}>
-              Archive
+              {t.archive}
             </button>
           )}
-          <button
-            className="btn-danger"
-            onClick={() =>
-              confirmAction(`Delete ${a.email} and its ${a.message_count} message(s)? This cannot be undone.`) && remove.mutate()
-            }
-          >
-            Delete
+          <button className="btn-danger" onClick={() => confirmAction(t.confirmDelete(a.email, a.message_count)) && remove.mutate()}>
+            {t.delete}
           </button>
         </div>
       </div>
       {a.status !== "active" && (
-        <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">This address is {a.status}: new mail is rejected.</p>
+        <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">{t.inactive(tc.status[a.status] ?? a.status)}</p>
       )}
       {a.expires_at && a.status !== "archived" && <ExpiryBanner a={a} />}
       {a.burned && a.status !== "active" && (
         <p className="mt-1 text-sm text-zinc-500">
-          Paused automatically {timeAgo(a.burned.at)}:{" "}
+          {t.burned(timeAgo(a.burned.at))}{" "}
           {a.burned.reason === "after_code"
-            ? "it received its verification code."
+            ? t.burnedCode
             : a.burned.reason === "max_messages"
-              ? `it reached ${a.max_messages} mail(s).`
+              ? t.burnedMax(a.max_messages ?? 0)
               : a.burned.reason === "expired"
-                ? "it expired. Extend it to accept mail again."
-                : "panic button."}
+                ? t.burnedExpired
+                : t.burnedPanic}
         </p>
       )}
       {a.no_mail_warning && !a.site_rejected && <NoMailBanner a={a} />}
-      {a.site_rejected && (
-        <p className="mt-2 text-sm text-zinc-500">
-          You reported that {a.site_name} rejected {a.domain}: new addresses for this site use another domain.
-        </p>
-      )}
+      {a.site_rejected && <p className="mt-2 text-sm text-zinc-500">{t.reported(a.site_name, a.domain)}</p>}
       {a.leak && <LeakBanner a={a} onPause={() => onUpdate({ status: "paused" })} />}
     </div>
   );

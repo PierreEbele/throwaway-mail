@@ -10,6 +10,8 @@ import { CategoryDialog } from "../pages/mailbox/CategoryDialog";
 import { PinIcon } from "./icons";
 import { invalidate } from "../queries";
 import type { Category } from "../types";
+import { useT } from "../i18n";
+import { formatTime } from "../util";
 
 function ThemeToggle() {
   const [pref, setPref] = useState(localStorage.getItem("theme") ?? "system");
@@ -19,11 +21,12 @@ function ThemeToggle() {
     const dark = v === "dark" || (v === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("dark", dark);
   };
+  const t = useT().common.theme;
   return (
-    <select className="input w-auto py-0.5 text-xs" value={pref} onChange={(e) => apply(e.target.value)} aria-label="Color theme">
-      <option value="system">Auto</option>
-      <option value="light">Light</option>
-      <option value="dark">Dark</option>
+    <select className="input w-auto py-0.5 text-xs" value={pref} onChange={(e) => apply(e.target.value)} aria-label={t.label}>
+      <option value="system">{t.system}</option>
+      <option value="light">{t.light}</option>
+      <option value="dark">{t.dark}</option>
     </select>
   );
 }
@@ -118,6 +121,7 @@ function Folder({
   children?: ReactNode;
 }) {
   const [over, setOver] = useState<"" | "address" | "category">("");
+  const t = useT().common.nav;
   const kind = (e: DragEvent) =>
     onDropAddress && e.dataTransfer.types.includes(ADDRESS_DRAG_TYPE)
       ? "address"
@@ -161,14 +165,14 @@ function Folder({
         {icon}
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {pinned && (
-          <span className="text-zinc-400" title="Pinned">
+          <span className="text-zinc-400" title={t.pinned}>
             <PinIcon filled className="size-3" />
           </span>
         )}
         {unread ? (
           <span
             className={`text-xs font-semibold tabular-nums text-zinc-900 dark:text-zinc-100 ${children ? "group-hover/f:invisible" : ""}`}
-            title={`${unread} unread`}
+            title={t.unread(unread)}
           >
             {unread}
           </span>
@@ -191,13 +195,13 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const nav = useNavigate();
   const [editing, setEditing] = useState<Category | null | undefined>(undefined);
   const toast = useToast();
+  const t = useT().common.nav;
   const refreshLists = () => invalidate(qc, ["addresses"], ["address"], ["categories"]);
   const moveTo = (cat: Category | null) => (ids: string[]) =>
     post("/v1/addresses/bulk", { ids, action: "move", category_id: cat?.id ?? null }).then(
       () => {
         refreshLists();
-        const n = ids.length > 1 ? `${ids.length} addresses` : "";
-        toast(cat ? `${n || "Moved"}${n ? " moved" : ""} to ${cat.name}` : `${n || "Address"} removed from category`, "success");
+        toast(cat ? t.movedTo(ids.length, cat.name) : t.removedFromCategory(ids.length), "success");
       },
       (e: Error) => toast(e.message, "error"),
     );
@@ -228,31 +232,31 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </span>
         <span className="font-semibold tracking-tight">Throwaway Mail</span>
       </div>
-      <nav aria-label="Mailbox" className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
-        <Folder to={folderHref("inbox")} active={isFolder("inbox")} icon={<Icon d={ICONS.inbox} />} label="Inbox" />
-        <Folder to={folderHref("pinned")} active={isFolder("pinned")} icon={<PinIcon />} label="Pinned" />
+      <nav aria-label={t.mailbox} className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
+        <Folder to={folderHref("inbox")} active={isFolder("inbox")} icon={<Icon d={ICONS.inbox} />} label={t.inbox} />
+        <Folder to={folderHref("pinned")} active={isFolder("pinned")} icon={<PinIcon />} label={t.pinned} />
         {(review.data?.count ?? 0) > 0 && (
           <NavLink to="/review" className={navCls}>
             <Icon d={ICONS.sort} />
-            <span className="flex-1">To sort</span>
+            <span className="flex-1">{t.toSort}</span>
             <span className="rounded-full bg-zinc-900 px-1.5 text-[11px] font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">
               {review.data!.count}
             </span>
           </NavLink>
         )}
-        <Folder to={folderHref("archived")} active={isFolder("archived")} icon={<Icon d={ICONS.archive} />} label="Archived" />
+        <Folder to={folderHref("archived")} active={isFolder("archived")} icon={<Icon d={ICONS.archive} />} label={t.archived} />
         <NavLink to="/digest" className={navCls}>
           <Icon d={ICONS.digest} />
-          <span className="flex-1">This week</span>
+          <span className="flex-1">{t.thisWeek}</span>
         </NavLink>
 
         <div className="flex items-center justify-between px-2.5 pt-5 pb-1">
-          <span className="text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Categories</span>
+          <span className="text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">{t.categories}</span>
           <button
             className="rounded px-1 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
             onClick={() => setEditing(null)}
-            aria-label="New category"
-            title="New category"
+            aria-label={t.newCategory}
+            title={t.newCategory}
           >
             +
           </button>
@@ -276,15 +280,15 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               className={`absolute top-1 right-7 rounded px-1 py-0.5 text-zinc-500 hover:bg-zinc-300/60 focus-visible:opacity-100 dark:hover:bg-zinc-700 ${c.hidden ? "opacity-100 group-hover/f:opacity-100" : "opacity-0 group-hover/f:opacity-100"}`}
               onClick={() => toggleHidden(c)}
               aria-pressed={c.hidden}
-              aria-label={c.hidden ? `Show ${c.name} in the Inbox` : `Hide ${c.name} from the Inbox`}
-              title={c.hidden ? "Hidden from the Inbox, click to show" : "Hide from the Inbox"}
+              aria-label={c.hidden ? t.showInInbox(c.name) : t.hideFromInbox(c.name)}
+              title={c.hidden ? t.hiddenTitle : t.hideTitle}
             >
               <EyeIcon off={c.hidden} />
             </button>
             <button
               className="absolute top-1 right-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 opacity-0 group-hover/f:opacity-100 hover:bg-zinc-300/60 focus-visible:opacity-100 dark:hover:bg-zinc-700"
               onClick={() => setEditing(c)}
-              aria-label={`Edit category ${c.name}`}
+              aria-label={t.editCategory(c.name)}
             >
               ⋯
             </button>
@@ -294,7 +298,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           to={folderHref("none")}
           active={isFolder("none")}
           icon={<Icon d={ICONS.none} />}
-          label="No category"
+          label={t.noCategory}
           onDropAddress={moveTo(null)}
         />
         {cats.length === 0 && (
@@ -302,13 +306,13 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             className="px-2.5 py-1 text-left text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
             onClick={() => setEditing(null)}
           >
-            Group addresses: create a category
+            {t.createCategory}
           </button>
         )}
 
         {(searches.data ?? []).length > 0 && (
           <>
-            <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Smart folders</p>
+            <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">{t.smartFolders}</p>
             {searches.data!.map((x) => (
               <Folder
                 key={x.id}
@@ -320,7 +324,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 <button
                   className="absolute top-1 right-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 opacity-0 group-hover/f:opacity-100 hover:bg-zinc-300/60 focus-visible:opacity-100 dark:hover:bg-zinc-700"
                   onClick={() => del(`/v1/saved-searches/${x.id}`).then(() => qc.invalidateQueries({ queryKey: ["saved-searches"] }))}
-                  aria-label={`Delete smart folder ${x.name}`}
+                  aria-label={t.deleteSmartFolder(x.name)}
                 >
                   ×
                 </button>
@@ -329,53 +333,51 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </>
         )}
 
-        <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Filtering</p>
+        <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">{t.filtering}</p>
         <NavLink to="/rules" className={navCls}>
-          <Icon d={ICONS.rules} /> Rules
+          <Icon d={ICONS.rules} /> {t.rules}
         </NavLink>
         <NavLink to="/quarantine" className={navCls}>
-          <Icon d={ICONS.quarantine} /> Quarantine
+          <Icon d={ICONS.quarantine} /> {t.quarantine}
         </NavLink>
         <NavLink to="/deliveries" className={navCls}>
-          <Icon d={ICONS.failed} /> Failed deliveries
+          <Icon d={ICONS.failed} /> {t.failedDeliveries}
         </NavLink>
 
-        <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Settings</p>
+        <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">{t.settings}</p>
         <NavLink to="/destinations" className={navCls}>
-          <Icon d={ICONS.dest} /> Destinations
+          <Icon d={ICONS.dest} /> {t.destinations}
         </NavLink>
         <NavLink to="/keys" className={navCls}>
-          <Icon d={ICONS.key} /> API keys
+          <Icon d={ICONS.key} /> {t.apiKeys}
         </NavLink>
         <NavLink to="/account" className={navCls}>
-          <Icon d={ICONS.user} /> Account
+          <Icon d={ICONS.user} /> {t.account}
         </NavLink>
         {user?.role === "admin" && (
           <>
-            <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Admin</p>
+            <p className="px-2.5 pt-5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">{t.admin}</p>
             <NavLink to="/admin/domains" className={navCls}>
-              <Icon d={ICONS.globe} /> Domains
+              <Icon d={ICONS.globe} /> {t.domains}
             </NavLink>
             <NavLink to="/admin/users" className={navCls}>
-              <Icon d={ICONS.users} /> Users
+              <Icon d={ICONS.users} /> {t.users}
             </NavLink>
             <NavLink to="/admin/audit" className={navCls}>
-              <Icon d={ICONS.log} /> Audit log
+              <Icon d={ICONS.log} /> {t.audit}
             </NavLink>
             <NavLink to="/admin/health" className={navCls}>
-              <Icon d={ICONS.digest} /> Health
+              <Icon d={ICONS.digest} /> {t.health}
             </NavLink>
             <NavLink to="/admin/setup-check" className={navCls}>
-              <Icon d={ICONS.check} /> Setup check
+              <Icon d={ICONS.check} /> {t.setupCheck}
             </NavLink>
           </>
         )}
       </nav>
       <div className="space-y-2 border-t border-zinc-200 px-4 py-3 dark:border-zinc-800">
-        {cloudflareMode === "mock" && <p className="text-xs text-amber-700 dark:text-amber-400">Cloudflare mock mode</p>}
-        {cloudflareMode === "unconfigured" && user?.role === "admin" && (
-          <p className="text-xs text-zinc-500">Cloudflare off: IMAP domains only</p>
-        )}
+        {cloudflareMode === "mock" && <p className="text-xs text-amber-700 dark:text-amber-400">{t.cfMock}</p>}
+        {cloudflareMode === "unconfigured" && user?.role === "admin" && <p className="text-xs text-zinc-500">{t.cfOff}</p>}
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-xs text-zinc-500" title={user?.email}>
             {user?.email}
@@ -384,10 +386,10 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </div>
         <div className="flex items-center justify-between text-xs">
           <a href="/docs" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" target="_blank" rel="noreferrer">
-            API docs ↗
+            {t.apiDocs}
           </a>
           <button className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" onClick={logout}>
-            Log out
+            {t.logout}
           </button>
         </div>
       </div>
@@ -400,18 +402,19 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 /** Public demo (DEMO_MODE): explains what is read-only and when the data is reset. */
 function DemoBanner() {
   const { demo } = useAuth();
+  const t = useT().common.nav;
   if (!demo) return null;
   const next = demo.reset_at ? demo.reset_at + demo.reset_minutes * 60_000 : null;
   return (
     <div role="note" data-testid="demo-banner" className="bg-[#b8461f] px-4 py-1.5 text-center text-xs text-white">
-      Public demo: mail is simulated, nothing is forwarded, domains, destinations, users and keys are read-only. Everything is reset every{" "}
-      {demo.reset_minutes} minutes{next ? ` (next ${new Date(next).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})` : ""}.
+      {t.demo(demo.reset_minutes, next ? formatTime(next) : null)}
     </div>
   );
 }
 
 export function Layout({ children, bare }: { children: ReactNode; bare?: boolean }) {
   const [open, setOpen] = useState(false);
+  const t = useT().common;
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden">
       <DemoBanner />
@@ -420,12 +423,12 @@ export function Layout({ children, bare }: { children: ReactNode; bare?: boolean
           href="#main"
           className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2"
         >
-          Skip to content
+          {t.nav.skip}
         </a>
         <header className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2.5 md:hidden dark:border-zinc-800 dark:bg-zinc-950">
           <span className="font-semibold tracking-tight">Throwaway Mail</span>
           <button className="btn-ghost" aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen(!open)}>
-            {open ? "Close" : "Menu"}
+            {open ? t.close : t.nav.menu}
           </button>
         </header>
         {open && (

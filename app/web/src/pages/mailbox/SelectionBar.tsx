@@ -1,4 +1,5 @@
 import type { Category } from "../../types";
+import { useT } from "../../i18n";
 
 export function SelectionBar({
   count,
@@ -13,16 +14,17 @@ export function SelectionBar({
   onClear: () => void;
   onAction: (action: string, extra?: Record<string, unknown>) => void;
 }) {
+  const t = useT().mailbox;
   const btn = "rounded px-2 py-1 hover:bg-blue-100 dark:hover:bg-blue-900/50";
   return (
     <div
       role="toolbar"
-      aria-label="Selected addresses"
+      aria-label={t.selectedLabel}
       className="flex flex-wrap items-center gap-1 border-b border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-950 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-100"
     >
-      <span className="mr-1 font-semibold">{count} selected</span>
+      <span className="mr-1 font-semibold">{t.selected(count)}</span>
       <label className="sr-only" htmlFor="bulk-move">
-        Move selection to
+        {t.moveSelection}
       </label>
       <select
         id="bulk-move"
@@ -31,31 +33,31 @@ export function SelectionBar({
         onChange={(e) => onAction("move", { category_id: e.target.value === "__none" ? null : e.target.value })}
       >
         <option value="" disabled>
-          Move to…
+          {t.moveTo}
         </option>
         {categories.map((c) => (
           <option key={c.id} value={c.id}>
             {c.name}
           </option>
         ))}
-        <option value="__none">No category</option>
+        <option value="__none">{t.noCategory}</option>
       </select>
       <button className={btn} onClick={() => onAction("pin")}>
-        Pin
+        {t.pin}
       </button>
       <button className={btn} onClick={() => onAction("unpin")}>
-        Unpin
+        {t.unpin}
       </button>
       <button className={btn} onClick={() => onAction("read")}>
-        Mark read
+        {t.markRead}
       </button>
       <button className={btn} onClick={() => onAction(archived ? "unarchive" : "archive")}>
-        {archived ? "Restore" : "Archive"}
+        {archived ? t.restore : t.archive}
       </button>
       <button className={`${btn} text-red-700 dark:text-red-300`} onClick={() => onAction("delete")}>
-        Delete
+        {t.delete}
       </button>
-      <button className={`${btn} ml-auto`} onClick={onClear} aria-label="Clear selection">
+      <button className={`${btn} ml-auto`} onClick={onClear} aria-label={t.clear}>
         ✕
       </button>
     </div>

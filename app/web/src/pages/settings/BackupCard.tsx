@@ -3,16 +3,18 @@ import { useQueryClient } from "@tanstack/react-query";
 import { get, post } from "../../api";
 import { useToast } from "../../components/ui";
 import { decryptJson, encryptJson, isEncrypted } from "../../backupCrypto";
+import { useT } from "../../i18n";
 
 export function BackupCard() {
   const qc = useQueryClient();
   const toast = useToast();
   const [result, setResult] = useState<string | null>(null);
+  const t = useT().settings.backup;
   const exportEncrypted = async () => {
-    const pass = window.prompt("Passphrase for the export (at least 8 characters, keep it safe: it cannot be recovered)");
+    const pass = window.prompt(t.passPrompt);
     if (!pass) return;
-    if (pass.length < 8) return toast("Passphrase too short", "error");
-    if (window.prompt("Type the passphrase again") !== pass) return toast("Passphrases do not match", "error");
+    if (pass.length < 8) return toast(t.tooShort, "error");
+    if (window.prompt(t.again) !== pass) return toast(t.mismatch, "error");
     try {
       const file = await encryptJson(await get("/v1/export"), pass);
       const url = URL.createObjectURL(new Blob([JSON.stringify(file)], { type: "application/json" }));
@@ -29,9 +31,12 @@ export function BackupCard() {
     try {
       let data = JSON.parse(await file.text());
       if (isEncrypted(data)) {
-        const pass = window.prompt("This export is encrypted. Passphrase:");
+        const pass = window.prompt(t.encryptedPrompt);
         if (!pass) return;
-        data = await decryptJson<{ categories?: unknown[]; addresses?: unknown[] }>(data, pass);
+        // backupCrypto stays free of UI code (it is unit-tested in Node): translate its error here.
+        data = await decryptJson<{ categories?: unknown[]; addresses?: unknown[] }>(data, pass).catch(() => {
+          throw new Error(t.wrongPassphrase);
+        });
       }
       const r = await post<{ categories_created: number; addresses_created: number; skipped: Array<{ email: string; reason: string }> }>(
         "/v1/import",
@@ -42,8 +47,8 @@ export function BackupCard() {
       );
       qc.invalidateQueries();
       setResult(
-        `${r.addresses_created} address(es) and ${r.categories_created} categor${r.categories_created === 1 ? "y" : "ies"} imported` +
-          (r.skipped.length ? `, ${r.skipped.length} skipped (${[...new Set(r.skipped.map((x) => x.reason))].join(", ")})` : ""),
+        t.imported(r.addresses_created, r.categories_created) +
+          (r.skipped.length ? t.skipped(r.skipped.length, [...new Set(r.skipped.map((x) => x.reason))].join(", ")) : ""),
       );
     } catch (e) {
       toast((e as Error).message, "error");
@@ -51,20 +56,17 @@ export function BackupCard() {
   };
   return (
     <div className="card mt-4 max-w-xl space-y-2 p-5 text-sm">
-      <h2 className="font-semibold">Export / import</h2>
-      <p className="text-zinc-500">
-        Download your addresses and categories as JSON (mails are not included), optionally encrypted with a passphrase in your browser
-        (AES-256-GCM), or import such a file. Addresses must be on a domain configured here; existing ones are skipped.
-      </p>
+      <h2 className="font-semibold">{t.title}</h2>
+      <p className="text-zinc-500">{t.help}</p>
       <div className="flex flex-wrap gap-2">
         <a className="btn-secondary" href="/v1/export" download>
-          Export JSON
+          {t.exportJson}
         </a>
         <button className="btn-secondary" onClick={exportEncrypted}>
-          Export encrypted…
+          {t.exportEncrypted}
         </button>
         <label className="btn-secondary cursor-pointer">
-          Import JSON…
+          {t.importJson}
           <input
             type="file"
             accept="application/json,.json"

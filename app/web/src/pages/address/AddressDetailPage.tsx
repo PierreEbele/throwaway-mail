@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { get, patch } from "../../api";
 import type { Address, CodeResult, MessageSummary } from "../../types";
 import { ErrorText, Spinner, useToast } from "../../components/ui";
+import { useT } from "../../i18n";
 import { invalidate } from "../../queries";
 import { useDestinations } from "../Addresses";
 import { AddressHeader } from "./AddressHeader";
@@ -21,6 +22,7 @@ export function AddressDetailPage() {
   const { id = "" } = useParams();
   const qc = useQueryClient();
   const toast = useToast();
+  const t = useT().address;
   const address = useQuery({
     queryKey: ["address", id],
     queryFn: () => get<{ address: Address }>(`/v1/addresses/${id}`).then((r) => r.address),
@@ -48,7 +50,7 @@ export function AddressDetailPage() {
   const onUpdate = (body: Record<string, unknown>) => update.mutate(body);
 
   if (address.isLoading) return <Spinner />;
-  if (address.error || !address.data) return <ErrorText error={address.error ?? "Not found"} />;
+  if (address.error || !address.data) return <ErrorText error={address.error ?? t.notFound} />;
   const a = address.data;
 
   return (

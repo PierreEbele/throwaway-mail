@@ -2,6 +2,7 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { get } from "../../api";
 import type { Address, Category, CategoryColor, SavedSearch } from "../../types";
+import { msg } from "../../i18n";
 
 export const COLORS: CategoryColor[] = ["zinc", "red", "orange", "amber", "green", "teal", "blue", "indigo", "violet", "pink"];
 // Full class names so Tailwind keeps them.
@@ -49,11 +50,35 @@ export function useSavedSearches(enabled = true) {
 }
 
 /** Quick filters shown as chips above the list; also what a smart folder stores. */
-export const QUICK_FILTERS: Array<{ key: string; value: string; label: string }> = [
-  { key: "unread", value: "true", label: "Unread" },
-  { key: "has_code", value: "true", label: "Has code" },
-  { key: "since_hours", value: "24", label: "Last 24 h" },
-  { key: "leak", value: "true", label: "Leak" },
+export const QUICK_FILTERS: Array<{ key: string; value: string; readonly label: string }> = [
+  {
+    key: "unread",
+    value: "true",
+    get label() {
+      return msg().mailbox.filters.unread;
+    },
+  },
+  {
+    key: "has_code",
+    value: "true",
+    get label() {
+      return msg().mailbox.filters.hasCode;
+    },
+  },
+  {
+    key: "since_hours",
+    value: "24",
+    get label() {
+      return msg().mailbox.filters.last24;
+    },
+  },
+  {
+    key: "leak",
+    value: "true",
+    get label() {
+      return msg().mailbox.filters.leak;
+    },
+  },
 ];
 
 /** Folder from `?folder=`: inbox | pinned | archived | none | smart:<id> | <category id>. */

@@ -4,6 +4,7 @@ import { del, get, patch } from "../../api";
 import type { Address } from "../../types";
 import { CopyButton, Toggle } from "../../components/ui";
 import { timeAgo } from "../../util";
+import { useT } from "../../i18n";
 import { ComposeDialog } from "./ComposeDialog";
 
 interface Contact {
@@ -31,42 +32,38 @@ export function RepliesCard({ a, onChange }: { a: Address; onChange: (b: Record<
   const forget = useMutation({ mutationFn: (c: Contact) => del(`/v1/addresses/${a.id}/contacts/${c.id}`), onSuccess: refresh });
   const unavailable = a.replies_unavailable;
   const [composing, setComposing] = useState(false);
+  const t = useT().messages.replies;
   return (
     <section className="card space-y-3 p-5" aria-labelledby="replies">
       <div className="flex items-center justify-between gap-2">
         <h2 id="replies" className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">
-          Replies
+          {t.title}
         </h2>
         <button
           className="btn-secondary px-3 py-1 text-xs"
           disabled={!!unavailable || a.status !== "active"}
-          title={unavailable ?? (a.status !== "active" ? "Only active addresses can send" : undefined)}
+          title={unavailable ?? (a.status !== "active" ? t.onlyActive : undefined)}
           onClick={() => setComposing(true)}
         >
-          New mail
+          {t.newMail}
         </button>
       </div>
       <ComposeDialog a={a} open={composing} onClose={() => setComposing(false)} />
       <div className="flex items-center justify-between gap-3">
         <label htmlFor="replies-toggle" className="text-sm">
-          Reply from this address
-          <span className="block text-xs text-zinc-500">
-            Forwarded mail gets a private reply address per sender. Replying from your verified mailbox sends the answer from {a.email};
-            your own address is never shown.
-          </span>
+          {t.replyFrom}
+          <span className="block text-xs text-zinc-500">{t.help(a.email)}</span>
         </label>
         <Toggle
           id="replies-toggle"
           checked={a.replies_enabled}
           disabled={!!unavailable && !a.replies_enabled}
           onChange={(v) => onChange({ replies_enabled: v })}
-          label="Reverse-alias replies"
+          label={t.label}
         />
       </div>
-      {unavailable && <p className="text-xs text-amber-700 dark:text-amber-400">Unavailable: {unavailable}</p>}
-      {a.replies_enabled && !a.forward_enabled && (
-        <p className="text-xs text-zinc-500">Turn forwarding on: reply addresses are only added to forwarded mail.</p>
-      )}
+      {unavailable && <p className="text-xs text-amber-700 dark:text-amber-400">{t.unavailable(unavailable)}</p>}
+      {a.replies_enabled && !a.forward_enabled && <p className="text-xs text-zinc-500">{t.turnOnForwarding}</p>}
       {(contacts.data?.length ?? 0) > 0 && (
         <ul className="divide-y divide-zinc-200 text-sm dark:divide-zinc-800">
           {contacts.data!.map((c) => (
@@ -75,17 +72,17 @@ export function RepliesCard({ a, onChange }: { a: Address; onChange: (b: Record<
                 {c.name ? `${c.name} · ` : ""}
                 {c.email}
                 <span className="block text-xs text-zinc-500">
-                  {c.reply_count} repl{c.reply_count === 1 ? "y" : "ies"}
-                  {c.last_reply_at ? `, last ${timeAgo(c.last_reply_at)}` : ""}
+                  {t.count(c.reply_count)}
+                  {c.last_reply_at ? t.last(timeAgo(c.last_reply_at)) : ""}
                 </span>
               </span>
               <span className="flex items-center gap-1">
-                <CopyButton text={c.reverse_address} label="Copy reply address" />
+                <CopyButton text={c.reverse_address} label={t.copy} />
                 <button className="btn-ghost px-2 py-0.5 text-xs" onClick={() => block.mutate(c)}>
-                  {c.blocked ? "Unblock" : "Block"}
+                  {c.blocked ? t.unblock : t.block}
                 </button>
                 <button className="btn-ghost px-2 py-0.5 text-xs text-red-600" onClick={() => forget.mutate(c)}>
-                  Forget
+                  {t.forget}
                 </button>
               </span>
             </li>

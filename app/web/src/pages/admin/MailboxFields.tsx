@@ -1,4 +1,5 @@
 import type { Mailbox } from "../../types";
+import { useT } from "../../i18n";
 
 /** Mailbox settings as edited in the form (sent as `mailbox` to POST / PATCH /v1/domains). */
 export interface MailboxDraft {
@@ -60,6 +61,7 @@ export function MailboxFields({
   /** Stored settings when editing: password fields may stay empty. */
   existing?: Mailbox;
 }) {
+  const t = useT().domainSetup;
   const set = <K extends keyof MailboxDraft>(k: K, v: MailboxDraft[K]) => onChange({ ...value, [k]: v });
   const text = (k: keyof MailboxDraft, label: string, opts: { type?: string; placeholder?: string; required?: boolean } = {}) => (
     <div>
@@ -81,30 +83,30 @@ export function MailboxFields({
   return (
     <div className="space-y-4">
       <fieldset className="grid gap-3 sm:grid-cols-4">
-        <legend className="mb-2 text-sm font-medium">IMAP (incoming, catch-all mailbox)</legend>
-        <div className="sm:col-span-2">{text("imap_host", "Server", { placeholder: "imap.provider.example", required: true })}</div>
-        {text("imap_port", "Port", { type: "number" })}
+        <legend className="mb-2 text-sm font-medium">{t.imapLegend}</legend>
+        <div className="sm:col-span-2">{text("imap_host", t.server, { placeholder: "imap.provider.example", required: true })}</div>
+        {text("imap_port", t.port, { type: "number" })}
         <label className="flex items-center gap-2 self-end pb-2 text-sm">
           <input type="checkbox" checked={value.imap_tls} onChange={(e) => set("imap_tls", e.target.checked)} /> TLS
         </label>
-        <div className="sm:col-span-2">{text("imap_user", "Login", { required: true })}</div>
+        <div className="sm:col-span-2">{text("imap_user", t.login, { required: true })}</div>
         <div className="sm:col-span-2">
-          {text("imap_password", existing?.has_imap_password ? "Password (empty = keep)" : "Password (app password)", {
+          {text("imap_password", existing?.has_imap_password ? t.pwKeep : t.pwApp, {
             type: "password",
             required: !existing?.has_imap_password,
           })}
         </div>
-        <div className="sm:col-span-2">{text("imap_folder", "Folder to watch")}</div>
-        <div className="sm:col-span-2">{text("imap_done_folder", "Move processed mail to (empty = delete)")}</div>
-        {text("poll_seconds", "Poll every (seconds, min 15)", { type: "number" })}
+        <div className="sm:col-span-2">{text("imap_folder", t.folder)}</div>
+        <div className="sm:col-span-2">{text("imap_done_folder", t.doneFolder)}</div>
+        {text("poll_seconds", t.poll, { type: "number" })}
       </fieldset>
       <fieldset className="grid gap-3 sm:grid-cols-4">
-        <legend className="mb-2 text-sm font-medium">SMTP (outgoing: forwarding and verification mail; optional)</legend>
-        <div className="sm:col-span-2">{text("smtp_host", "Server", { placeholder: "smtp.provider.example" })}</div>
-        {text("smtp_port", "Port", { type: "number" })}
+        <legend className="mb-2 text-sm font-medium">{t.smtpLegend}</legend>
+        <div className="sm:col-span-2">{text("smtp_host", t.server, { placeholder: "smtp.provider.example" })}</div>
+        {text("smtp_port", t.port, { type: "number" })}
         <div>
           <label htmlFor="mb-smtp_security" className="label">
-            Security
+            {t.security}
           </label>
           <select
             id="mb-smtp_security"
@@ -114,16 +116,16 @@ export function MailboxFields({
           >
             <option value="tls">TLS (465)</option>
             <option value="starttls">STARTTLS (587)</option>
-            <option value="none">none</option>
+            <option value="none">{t.none}</option>
           </select>
         </div>
-        <div className="sm:col-span-2">{text("smtp_user", "Login (empty = IMAP login)")}</div>
+        <div className="sm:col-span-2">{text("smtp_user", t.smtpLogin)}</div>
         <div className="sm:col-span-2">
-          {text("smtp_password", existing?.has_smtp_password ? "Password (empty = keep)" : "Password (empty = IMAP password)", {
+          {text("smtp_password", existing?.has_smtp_password ? t.pwKeep : t.smtpPw, {
             type: "password",
           })}
         </div>
-        <div className="sm:col-span-2">{text("smtp_from", "Sender address (empty = the alias)", { type: "email" })}</div>
+        <div className="sm:col-span-2">{text("smtp_from", t.smtpFrom, { type: "email" })}</div>
       </fieldset>
     </div>
   );

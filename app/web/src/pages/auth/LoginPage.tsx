@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { browserSupportsWebAuthn, startAuthentication, type PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/browser";
 import { ApiError, post } from "../../api";
 import { useAuth } from "../../auth";
-import { AuthCard, Field, useAfterSignIn } from "./AuthCard";
+import { AuthCard, Field, useAfterSignIn, useT } from "./AuthCard";
 
 type LoginResult = { two_factor_required?: boolean; challenge?: string; methods?: string[] };
 type Options = { options: PublicKeyCredentialRequestOptionsJSON };
@@ -15,6 +15,7 @@ const cancelled = (e: unknown) => e instanceof Error && (e.name === "NotAllowedE
 /** Usernameless sign-in with a passkey (no e-mail, no password, no second step). */
 function PasskeyButton({ returnTo }: { returnTo: string }) {
   const afterSignIn = useAfterSignIn();
+  const t = useT().auth;
   const m = useMutation({
     mutationFn: async () => {
       const { options } = await post<Options>("/v1/auth/passkey/options");
@@ -32,7 +33,7 @@ function PasskeyButton({ returnTo }: { returnTo: string }) {
         </p>
       )}
       <button type="button" className="btn-secondary w-full py-2 text-base" onClick={() => m.mutate()} disabled={m.isPending}>
-        {m.isPending ? "Waiting for your passkey…" : "Sign in with a passkey"}
+        {m.isPending ? t.waitingPasskey : t.signInPasskey}
       </button>
     </div>
   );
@@ -52,6 +53,7 @@ function CodeForm({
 }) {
   const [code, setCode] = useState("");
   const [recovery, setRecovery] = useState(!methods.includes("totp"));
+  const t = useT().auth;
   const afterSignIn = useAfterSignIn();
   const passkey = useMutation({
     mutationFn: async () => {
@@ -78,19 +80,17 @@ function CodeForm({
       {canPasskey && (
         <>
           <button type="button" className="btn-primary w-full py-2 text-base" onClick={() => passkey.mutate()} disabled={passkey.isPending}>
-            {passkey.isPending ? "Waiting for your passkey…" : "Use a passkey"}
+            {passkey.isPending ? t.waitingPasskey : t.usePasskey}
           </button>
           {passkey.error && !cancelled(passkey.error) && (
             <p className="text-sm text-red-700 dark:text-red-300" role="alert">
               {passkey.error.message}
             </p>
           )}
-          <p className="text-center text-xs text-zinc-500">or</p>
+          <p className="text-center text-xs text-zinc-500">{t.or}</p>
         </>
       )}
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        {recovery ? "Enter one of your recovery codes. Each code works only once." : "Enter the 6-digit code from your authenticator app."}
-      </p>
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">{recovery ? t.enterRecovery : t.enterTotp}</p>
       {verify.error && (
         <p className="text-sm text-red-700 dark:text-red-300" role="alert">
           {verify.error.message}
@@ -99,7 +99,7 @@ function CodeForm({
       <Field
         key={recovery ? "recovery" : "totp"}
         id="login-code"
-        label={recovery ? "Recovery code" : "Code"}
+        label={recovery ? t.recoveryCode : t.code}
         autoComplete="one-time-code"
         inputMode={recovery ? "text" : "numeric"}
         pattern={recovery ? undefined : "[0-9 ]{6,7}"}
@@ -110,11 +110,11 @@ function CodeForm({
       />
       {expired ? (
         <button type="button" className="btn-primary w-full py-2 text-base" onClick={onRestart}>
-          Start again
+          {t.startAgain}
         </button>
       ) : (
         <button className="btn-primary w-full py-2 text-base" disabled={verify.isPending}>
-          {verify.isPending ? "Checking…" : "Verify"}
+          {verify.isPending ? t.checking : t.verify}
         </button>
       )}
       <div className="flex justify-between text-xs">
@@ -127,13 +127,13 @@ function CodeForm({
               setCode("");
             }}
           >
-            {recovery ? "Use the authenticator app" : "Use a recovery code"}
+            {recovery ? t.useApp : t.useRecovery}
           </button>
         ) : (
           <span />
         )}
         <button type="button" className="text-zinc-500 underline" onClick={onRestart}>
-          Back
+          {t.back}
         </button>
       </div>
     </form>
@@ -144,6 +144,7 @@ function PasswordForm({ returnTo, autoFocus }: { returnTo: string; autoFocus: bo
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [challenge, setChallenge] = useState<{ token: string; methods: string[] } | null>(null);
+  const t = useT().auth;
   const afterSignIn = useAfterSignIn();
   const login = useMutation({
     mutationFn: () => post<LoginResult>("/v1/auth/login", { email, password }),
@@ -181,7 +182,7 @@ function PasswordForm({ returnTo, autoFocus }: { returnTo: string; autoFocus: bo
       )}
       <Field
         id="login-email"
-        label="E-mail"
+        label={t.email}
         type="email"
         autoComplete="username"
         required
@@ -191,7 +192,7 @@ function PasswordForm({ returnTo, autoFocus }: { returnTo: string; autoFocus: bo
       />
       <Field
         id="login-password"
-        label="Password"
+        label={t.password}
         type="password"
         autoComplete="current-password"
         required
@@ -199,7 +200,7 @@ function PasswordForm({ returnTo, autoFocus }: { returnTo: string; autoFocus: bo
         onChange={(e) => setPassword(e.target.value)}
       />
       <button className="btn-primary w-full py-2 text-base" disabled={login.isPending}>
-        {login.isPending ? "Signing in…" : "Sign in"}
+        {login.isPending ? t.signingIn : t.signIn}
       </button>
     </form>
   );
@@ -208,42 +209,41 @@ function PasswordForm({ returnTo, autoFocus }: { returnTo: string; autoFocus: bo
 export function LoginPage() {
   const [params] = useSearchParams();
   const { ssoProvider, ssoEnabled, localEnabled, setupRequired, demo } = useAuth();
+  const t = useT().auth;
   const afterSignIn = useAfterSignIn();
   const enterDemo = useMutation({ mutationFn: () => post("/v1/auth/demo"), onSuccess: () => afterSignIn("/") });
   if (demo)
     return (
-      <AuthCard subtitle="Public demo: simulated mail, reset regularly" error={enterDemo.error ? (enterDemo.error as Error).message : null}>
+      <AuthCard subtitle={t.demoSubtitle} error={enterDemo.error ? (enterDemo.error as Error).message : null}>
         <button className="btn-primary w-full py-2 text-base" autoFocus disabled={enterDemo.isPending} onClick={() => enterDemo.mutate()}>
-          Enter the demo
+          {t.enterDemo}
         </button>
-        <p className="mt-4 text-xs text-zinc-500">
-          No account needed. Everything you change is visible to other visitors and reset every {demo.reset_minutes} minutes.
-        </p>
+        <p className="mt-4 text-xs text-zinc-500">{t.demoNote(demo.reset_minutes)}</p>
       </AuthCard>
     );
   if (setupRequired) return <Navigate to="/setup" replace />;
-  const error = params.get("message") ?? (params.get("error") ? `Sign-in failed (${params.get("error")})` : null);
+  const error = params.get("message") ?? (params.get("error") ? t.signInFailed(params.get("error")!) : null);
   const returnTo = params.get("return_to") ?? "/";
   const href = `/v1/auth/oidc/login?return_to=${encodeURIComponent(returnTo)}`;
   return (
-    <AuthCard subtitle="Disposable addresses for every site" error={error}>
+    <AuthCard subtitle={t.tagline} error={error}>
       {ssoEnabled && (
         <a href={href} className="btn-primary w-full py-2 text-base" autoFocus>
-          Sign in with {ssoProvider}
+          {t.signInWith(ssoProvider ?? "SSO")}
         </a>
       )}
       {ssoEnabled && localEnabled && (
         <div className="my-4 flex items-center gap-3 text-xs text-zinc-500">
           <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-          or with a local account
+          {t.orLocal}
           <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
         </div>
       )}
       {localEnabled && <PasswordForm returnTo={returnTo} autoFocus={!ssoEnabled} />}
       {localEnabled && <PasskeyButton returnTo={returnTo} />}
       <p className="mt-4 text-xs text-zinc-500">
-        {ssoEnabled && `${ssoProvider} accounts: admins are the members of its admin group. `}
-        {localEnabled && "No local account yet? Ask an admin for an invite link."}
+        {ssoEnabled && t.ssoAdmins(ssoProvider ?? "SSO")}
+        {localEnabled && t.askInvite}
       </p>
     </AuthCard>
   );
