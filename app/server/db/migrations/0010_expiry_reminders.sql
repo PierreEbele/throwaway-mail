@@ -1,1 +1,0 @@
-ALTER TABLE `addresses` ADD `expiry_reminded_at` integer;

@@ -1,1 +1,0 @@
-ALTER TABLE `messages` ADD `archived_at` integer;
