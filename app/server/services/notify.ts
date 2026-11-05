@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import type { Deps } from "../context.js";
 import { addresses, domains, notifyTargets, users, type NotifyTarget } from "../db/schema.js";
 import type { AppEvent } from "./events.js";
-import { checkOutboundUrl } from "../lib/outbound.js";
+import { safeFetchNoRedirect } from "../lib/outbound.js";
 import { parseList } from "../lib/senders.js";
 import { metrics } from "./metrics.js";
 import { enqueueWebhooks } from "./webhooks.js";
@@ -92,8 +92,8 @@ export async function sendTo(deps: Deps, t: NotifyTarget, e: NotifyEvent): Promi
     const { url, init } = request(deps, t, e);
     // Re-checked at every send: the target's DNS may have changed since it was saved.
     const owner = deps.db.select({ role: users.role }).from(users).where(eq(users.id, t.userId)).get();
-    await checkOutboundUrl(url, { resolve: deps.resolve, allowPrivate: owner?.role === "admin" });
-    const res = await deps.fetch(url, { ...init, signal: AbortSignal.timeout(8000), redirect: "error" });
+    const res = await safeFetchNoRedirect(deps, url, init, { allowPrivate: owner?.role === "admin", timeoutMs: 8000 });
+    await res.body?.cancel().catch(() => {});
     if (!res.ok) {
       // The browser unsubscribed (or the subscription expired): stop sending to it.
       if (t.kind === "webpush" && (res.status === 404 || res.status === 410))

@@ -1,4 +1,4 @@
-import { listUnsubscribeTargets } from "../lib/listheaders.js";
+import { listUnsubscribeTargets, safeMailto } from "../lib/listheaders.js";
 import { decodeEntities, stripHidden } from "./html.js";
 import { unwrapRedirect } from "./links.js";
 
@@ -28,7 +28,7 @@ function headerTargets(headers: Array<{ key: string; value: string }>) {
   const lu = get("list-unsubscribe");
   const targets = listUnsubscribeTargets(lu);
   const url = targets.find((t) => /^https:\/\//i.test(t)) ?? null;
-  const mailto = targets.find((t) => /^mailto:/i.test(t)) ?? null;
+  const mailto = safeMailto(targets.find((t) => /^mailto:/i.test(t)));
   const oneClick = !!url && /list-unsubscribe\s*=\s*one-click/i.test(get("list-unsubscribe-post") ?? "");
   return { url, mailto, oneClick };
 }
@@ -43,8 +43,9 @@ export function bodyUnsubscribeLinks(input: { text?: string | null; html?: strin
     let url: string | null = null;
     let mailto: string | null = null;
     if (/^https?:\/\//i.test(href)) url = href;
-    else if (/^mailto:/i.test(href)) mailto = href;
+    else if (/^mailto:/i.test(href)) mailto = safeMailto(href);
     else return;
+    if (!url && !mailto) return;
     const unwrapped = url ? unwrapRedirect(url) : null;
     if (!isUnsubscribeText(label) && !isUnsubscribeText(href) && !(unwrapped && isUnsubscribeText(unwrapped))) return;
     const key = (url ?? mailto)!;

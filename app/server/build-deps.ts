@@ -6,7 +6,7 @@ import { OidcService } from "./auth/oidc.js";
 import { EventBus } from "./services/events.js";
 import { LlmFallbackStrategy } from "./parser/index.js";
 import type { Logger } from "./logger.js";
-import { dnsMxResolver, dnsResolver } from "./lib/outbound.js";
+import { dnsMxResolver, dnsResolver, outboundFetch } from "./lib/outbound.js";
 import { realMailClients } from "./services/mailbox/clients.js";
 import { MailboxRunner } from "./services/mailbox/runner.js";
 import { AuthLimits } from "./auth/ratelimit.js";
@@ -30,7 +30,7 @@ export function buildDeps(config: Config, logger: Logger, overrides: Partial<Dep
     parserStrategies: config.PARSER_LLM_FALLBACK ? [new LlmFallbackStrategy()] : [],
     now: () => Date.now(),
     oidc: new OidcService(config, logger),
-    fetch: (input, init) => fetch(input, init),
+    fetch: outboundFetch,
     resolve: dnsResolver,
     resolveMx: dnsMxResolver,
     mail: realMailClients,

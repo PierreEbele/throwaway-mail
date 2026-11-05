@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { confirmationForm, isUnsubscribeSuccess, visitUnsubscribe } from "../../app/server/services/unsubscribe-visit.js";
+import {
+  Jar,
+  confirmationForm,
+  formTargetAllowed,
+  isUnsubscribeSuccess,
+  visitUnsubscribe,
+} from "../../app/server/services/unsubscribe-visit.js";
 
 type Route = (req: { method: string; url: string; body: string; cookie: string }) => {
   status?: number;
@@ -86,5 +92,80 @@ describe("visitUnsubscribe", () => {
   it("reports HTTP errors", async () => {
     const { deps } = fakeFetch({ "GET https://n.io/u": () => ({ status: 500 }) });
     expect(await visitUnsubscribe(deps, "https://n.io/u")).toEqual({ done: false, error: "HTTP 500" });
+  });
+  it("refuses redirects downgrading to http", async () => {
+    const { deps, calls } = fakeFetch({ "GET https://n.io/u": () => ({ status: 302, location: "http://n.io/plain" }) });
+    expect(await visitUnsubscribe(deps, "https://n.io/u")).toEqual({ done: false, error: "https only" });
+    expect(calls).toHaveLength(1);
+  });
+  it("caps the number of redirects", async () => {
+    const { deps, calls } = fakeFetch({ "GET https://n.io/loop": () => ({ status: 302, location: "https://n.io/loop" }) });
+    expect(await visitUnsubscribe(deps, "https://n.io/loop")).toEqual({ done: false, error: "Too many redirects" });
+    expect(calls).toHaveLength(6);
+  });
+  it("re-resolves and refuses a host that rebinds to a private address mid-visit", async () => {
+    const { deps, calls } = fakeFetch({ "GET https://n.io/u": () => ({ status: 302, location: "https://evil.example/x" }) });
+    const resolve = async (h: string) => (h === "evil.example" ? ["169.254.169.254"] : ["93.184.216.34"]);
+    expect((await visitUnsubscribe({ ...deps, resolve }, "https://n.io/u")).error).toMatch(/private address/);
+    expect(calls).toHaveLength(1);
+  });
+  it("pins every hop to the resolved IP and sends no credentials", async () => {
+    const seen: Array<RequestInit & { pinnedIp?: string | null }> = [];
+    const fetch = (async (_u: string, init: RequestInit) => {
+      seen.push(init);
+      return new Response("You have been unsubscribed");
+    }) as unknown as typeof globalThis.fetch;
+    await visitUnsubscribe({ fetch, resolve: async () => ["93.184.216.34"] }, "https://n.io/u");
+    expect(seen[0]!.pinnedIp).toBe("93.184.216.34");
+    expect(seen[0]!.credentials).toBe("omit");
+    expect((seen[0]!.headers as Record<string, string>).cookie).toBeUndefined();
+  });
+  it("never sends a host's cookies to another host", async () => {
+    const { deps, calls } = fakeFetch({
+      "GET https://n.io/u": () => ({ cookie: "sid=secret", status: 302, location: "https://other.example/u" }),
+      "GET https://other.example/u": () => ({ html: "You have been unsubscribed" }),
+    });
+    expect((await visitUnsubscribe(deps, "https://n.io/u")).done).toBe(true);
+    expect((calls[1] as unknown as { cookie: string }).cookie).toBe("");
+  });
+  it("does not submit a confirmation form to another site", async () => {
+    const { deps, calls } = fakeFetch({
+      "GET https://n.io/u": () => ({
+        html: `<form method="post" action="https://attacker.example/unsubscribe"><button>Confirm</button></form>`,
+      }),
+    });
+    expect(await visitUnsubscribe(deps, "https://n.io/u")).toEqual({
+      done: false,
+      error: "The confirmation form points to another site",
+    });
+    expect(calls).toHaveLength(1);
+  });
+  it("allows forms on the same site, refuses non-https targets", () => {
+    const page = new URL("https://www.n.io/u");
+    expect(formTargetAllowed("https://lists.n.io/confirm", page, page)).toBe(true);
+    expect(formTargetAllowed("https://esp.example/confirm", page, new URL("https://esp.example/u"))).toBe(true);
+    expect(formTargetAllowed("http://n.io/confirm", page, page)).toBe(false);
+    expect(formTargetAllowed("javascript:alert(1)", page, page)).toBe(false);
+    expect(formTargetAllowed("https://u:p@n.io/confirm", page, page)).toBe(false);
+  });
+  it("caps the size of the page it reads", async () => {
+    const big = "x".repeat(2 * 1024 * 1024) + "You have been unsubscribed";
+    const { deps } = fakeFetch({ "GET https://n.io/u": () => ({ html: big }) });
+    expect((await visitUnsubscribe(deps, "https://n.io/u")).done).toBe(false);
+  });
+});
+
+describe("Jar", () => {
+  it("scopes cookies by host and drops malformed ones", () => {
+    const jar = new Jar();
+    const res = new Response("", {
+      headers: [
+        ["set-cookie", "a=1; Path=/"],
+        ["set-cookie", "bad name=2"],
+      ],
+    });
+    jar.add("n.io", res);
+    expect(jar.header("n.io")).toBe("a=1");
+    expect(jar.header("other.example")).toBe("");
   });
 });
