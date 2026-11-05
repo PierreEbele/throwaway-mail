@@ -83,25 +83,34 @@ self.addEventListener("push", (event) => {
       icon: "/icon-192.png",
       badge: "/icon-192.png",
       tag: data.tag || undefined,
-      data: { url: data.url || "/" },
+      // "Copy code" / "Open" when the mail has a verification code (browsers without action support ignore them).
+      actions: Array.isArray(data.actions) ? data.actions.slice(0, 2) : undefined,
+      data: { url: data.url || "/", code: typeof data.code === "string" ? data.code : null },
     }),
   );
 });
 
+// A service worker has no clipboard: the code is handed to a window of the app, which copies it.
+// An open window gets a postMessage; a new one gets the code in the URL fragment (never sent to the server).
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = new URL(event.notification.data?.url || "/", self.location.origin);
+  const data = event.notification.data || {};
+  const target = new URL(data.url || "/", self.location.origin);
   // Only ever open pages of this app.
   const href = target.origin === self.location.origin ? target.href : self.location.origin + "/";
+  const code = event.action === "copy" && data.code ? String(data.code) : null;
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      for (const c of list) {
-        if ("focus" in c) {
-          c.navigate?.(href);
-          return c.focus();
-        }
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (list) => {
+      const existing = list.find((c) => "focus" in c);
+      if (existing) {
+        let client = existing;
+        if (client.url !== href && client.navigate) client = (await client.navigate(href).catch(() => null)) || existing;
+        await client.focus().catch(() => {});
+        if (code) client.postMessage({ type: "copy-code", code });
+        return;
       }
-      return self.clients.openWindow(href);
+      const url = code ? `${href.split("#")[0]}#copy-code=${encodeURIComponent(code)}` : href;
+      return self.clients.openWindow(url);
     }),
   );
 });

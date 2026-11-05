@@ -10,6 +10,7 @@ import type { MxResolver, Resolver } from "./lib/outbound.js";
 import type { MailClients } from "./services/mailbox/types.js";
 import type { MailboxRunner } from "./services/mailbox/runner.js";
 import type { AuthLimits } from "./auth/ratelimit.js";
+import type { ApiKeyScope } from "./auth/tokens.js";
 
 export interface Deps {
   config: Config;
@@ -45,6 +46,8 @@ export type AppEnv = {
     user: User | null;
     session: SessionInfo | null;
     apiKeyId: string | null;
+    /** Scope of the API key used for this request; null for sessions and anonymous callers. */
+    apiScope: ApiKeyScope | null;
     requestId: string;
   };
 };

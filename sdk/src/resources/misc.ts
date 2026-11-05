@@ -1,5 +1,15 @@
 import { compact, seg, type HttpClient, type RequestOptions } from "../http.js";
-import type { ApiKey, Destination, Directory, NotifyEvent, NotifyKind, NotifyTarget, SmartFolder, WebhookDelivery } from "../types.js";
+import type {
+  ApiKey,
+  CreateApiKeyOptions,
+  Destination,
+  Directory,
+  NotifyEvent,
+  NotifyKind,
+  NotifyTarget,
+  SmartFolder,
+  WebhookDelivery,
+} from "../types.js";
 
 export class SmartFolders {
   constructor(private http: HttpClient) {}
@@ -105,8 +115,9 @@ export class Keys {
     return (await this.http.get<{ keys: ApiKey[] }>("/v1/keys", undefined, opts)).keys;
   }
   /** The secret (`key`) is only returned here, once. */
-  async create(name: string, opts?: RequestOptions): Promise<{ key: string; apiKey: ApiKey }> {
-    const r = await this.http.post<{ key: string; api_key: ApiKey }>("/v1/keys", { name }, opts);
+  /** Read-only and address-restricted keys get 403 here. */
+  async create(name: string, scope?: CreateApiKeyOptions, opts?: RequestOptions): Promise<{ key: string; apiKey: ApiKey }> {
+    const r = await this.http.post<{ key: string; api_key: ApiKey }>("/v1/keys", { name, ...scope }, opts);
     return { key: r.key, apiKey: r.api_key };
   }
   async revoke(id: string, opts?: RequestOptions): Promise<void> {

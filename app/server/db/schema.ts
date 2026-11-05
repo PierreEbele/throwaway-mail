@@ -141,6 +141,13 @@ export const apiKeys = sqliteTable(
     createdAt: integer("created_at").notNull(),
     lastUsedAt: integer("last_used_at"),
     revokedAt: integer("revoked_at"),
+    /** "full" or "read" (GET/HEAD only). */
+    scope: text("scope", { enum: ["full", "read"] })
+      .notNull()
+      .default("full"),
+    /** JSON array of address ids this key is limited to; null means every address. */
+    addressIds: text("address_ids", { mode: "json" }).$type<string[]>(),
+    expiresAt: integer("expires_at"),
   },
   (t) => [index("api_keys_user_idx").on(t.userId)],
 );

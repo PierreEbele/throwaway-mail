@@ -10,7 +10,7 @@ import type { AppEnv, Deps } from "./context.js";
 import { HttpError } from "./lib/errors.js";
 import { ApiRouter, clientIp } from "./lib/http.js";
 import { randomString } from "./lib/crypto.js";
-import { authenticate, callerKey, csrf, rateLimit } from "./auth/middleware.js";
+import { authenticate, callerKey, csrf, enforceScope, rateLimit } from "./auth/middleware.js";
 import { RateLimiter } from "./auth/ratelimit.js";
 import { registerIngest } from "./routes/ingest.js";
 import { registerAuth } from "./routes/auth.js";
@@ -131,7 +131,7 @@ export function createApp(deps: Deps) {
 
   // API: auth → CSRF → rate limit
   const limiter = new RateLimiter(deps.config.RATE_LIMIT_PER_MINUTE);
-  app.use("/v1/*", authenticate, csrf, rateLimit(limiter, callerKey));
+  app.use("/v1/*", authenticate, csrf, rateLimit(limiter, callerKey), enforceScope);
   if (deps.config.DEMO_MODE) {
     app.use("/v1/*", async (c, next) => {
       if (demoBlocks(c.req.method, c.req.path))

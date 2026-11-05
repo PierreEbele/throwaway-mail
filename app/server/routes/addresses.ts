@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNotNull, isNull, like, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, inArray, isNull, like, ne, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import type { ApiRouter } from "../lib/http.js";
 import { addressDestinations, addresses, categories, domains, extractedItems, messages, type Address } from "../db/schema.js";
@@ -111,6 +111,8 @@ export function registerAddresses(r: ApiRouter) {
       const d = c.get("deps");
       const user = c.get("user")!;
       const conds: SQL[] = [eq(addresses.userId, user.id), eq(addresses.isUnassigned, false)];
+      const scoped = c.get("apiScope")?.addressIds;
+      if (scoped) conds.push(inArray(addresses.id, [...scoped]));
       if (query.status && query.status !== "all") conds.push(eq(addresses.status, query.status));
       else if (!query.status) conds.push(ne(addresses.status, "archived"));
       if (query.domain) conds.push(eq(domains.name, query.domain.toLowerCase()));

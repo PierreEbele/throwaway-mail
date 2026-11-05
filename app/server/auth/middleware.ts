@@ -5,7 +5,9 @@ import { HttpError } from "../lib/errors.js";
 import { safeEqual } from "../lib/crypto.js";
 import { clientIp } from "../lib/http.js";
 import { RateLimiter } from "./ratelimit.js";
-import { SESSION_COOKIE, resolveApiKey, resolveSession } from "./tokens.js";
+import { eq } from "drizzle-orm";
+import { messages } from "../db/schema.js";
+import { SESSION_COOKIE, resolveApiKey, resolveSession, type ApiKeyScope } from "./tokens.js";
 
 /** Resolves the caller from a Bearer API key or the session cookie. Never throws for anonymous callers. */
 export const authenticate: MiddlewareHandler<AppEnv> = async (c, next) => {
@@ -13,6 +15,7 @@ export const authenticate: MiddlewareHandler<AppEnv> = async (c, next) => {
   c.set("user", null);
   c.set("session", null);
   c.set("apiKeyId", null);
+  c.set("apiScope", null);
   const authz = c.req.header("authorization");
   if (authz) {
     const m = /^Bearer\s+(\S+)$/i.exec(authz);
@@ -20,6 +23,7 @@ export const authenticate: MiddlewareHandler<AppEnv> = async (c, next) => {
     if (!r) throw new HttpError(401, "invalid_api_key", "Invalid or revoked API key");
     c.set("user", r.user);
     c.set("apiKeyId", r.keyId);
+    c.set("apiScope", r.scope);
   } else {
     const token = getCookie(c, SESSION_COOKIE);
     const r = token ? resolveSession(deps, token) : null;
@@ -62,3 +66,46 @@ export function callerKey(c: Parameters<MiddlewareHandler<AppEnv>>[0]): string {
   if (user) return `user:${user.id}`;
   return `ip:${clientIp(c)}`;
 }
+
+/**
+ * Routes an address-restricted key may reach. Anything else (settings, exports, admin, account-wide
+ * lists, address creation) is refused, so a new route stays closed to restricted keys until listed here.
+ */
+const ADDRESS_ROUTES: { method: string; re: RegExp; kind: "list" | "address" | "message" }[] = [
+  { method: "GET", re: /^\/v1\/addresses\/?$/, kind: "list" },
+  { method: "GET", re: /^\/v1\/events\/?$/, kind: "list" },
+  { method: "GET", re: /^\/v1\/auth\/(me|status)\/?$/, kind: "list" },
+  { method: "*", re: /^\/v1\/addresses\/(?!bulk(?:\/|$))([^/]+)(?:\/.*)?$/, kind: "address" },
+  { method: "*", re: /^\/v1\/messages\/([^/]+)(?:\/.*)?$/, kind: "message" },
+];
+
+/** True when the caller may see this address (sessions and unrestricted keys see all of the user's addresses). */
+export function scopeAllows(scope: ApiKeyScope | null, addressId: string): boolean {
+  return !scope?.addressIds || scope.addressIds.has(addressId);
+}
+
+/** Enforces API key scopes: read-only keys cannot write, address-restricted keys only reach their addresses. */
+export const enforceScope: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const scope = c.get("apiScope");
+  if (scope) {
+    if (scope.readOnly && !SAFE.has(c.req.method)) throw new HttpError(403, "insufficient_scope", "This API key is read-only");
+    const ids = scope.addressIds;
+    if (ids) {
+      const method = c.req.method === "HEAD" ? "GET" : c.req.method;
+      const route = ADDRESS_ROUTES.map((r) => ({ r, m: r.method === "*" || r.method === method ? r.re.exec(c.req.path) : null })).find(
+        (x) => x.m,
+      );
+      if (!route) throw new HttpError(403, "insufficient_scope", "This API key is restricted to some addresses");
+      const id = route.m![1] ? decodeURIComponent(route.m![1]) : "";
+      let allowed = route.r.kind === "list";
+      if (route.r.kind === "address") allowed = ids.has(id);
+      if (route.r.kind === "message") {
+        const row = c.get("deps").db.select({ a: messages.addressId }).from(messages).where(eq(messages.id, id)).get();
+        allowed = !!row && ids.has(row.a);
+      }
+      // Out-of-scope ids look missing, like another user's address.
+      if (!allowed) throw new HttpError(404, "not_found", "Not found");
+    }
+  }
+  await next();
+};

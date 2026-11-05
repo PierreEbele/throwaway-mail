@@ -42,11 +42,42 @@ export function subscriptionOf(t: NotifyTarget): webpush.PushSubscription {
   return { endpoint: t.url, keys: { p256dh: keys.p256dh, auth: keys.auth } };
 }
 
+export interface PushPayload {
+  title: string;
+  body: string;
+  url?: string;
+  tag?: string;
+  /** Verification code: the service worker then offers a "Copy code" action. */
+  code?: string;
+  /** Notification actions the service worker shows (it handles "copy" and "open"). */
+  actions?: { action: "copy" | "open"; title: string }[];
+}
+
+/** Payload of a push: a code notification gets "Copy code" and "Open" actions. */
+export function pushPayload(e: { type: string; title: string; body: string; url?: string; data?: Record<string, unknown> }): PushPayload {
+  const code = e.type === "code.received" && typeof e.data?.code === "string" ? e.data.code : undefined;
+  return {
+    title: e.title,
+    body: e.body,
+    url: e.url,
+    tag: e.type === "code.received" ? "code" : undefined,
+    ...(code
+      ? {
+          code,
+          actions: [
+            { action: "copy", title: "Copy code" },
+            { action: "open", title: "Open" },
+          ],
+        }
+      : {}),
+  };
+}
+
 /** Encrypted Web Push request (RFC 8291) for one notification; sent with deps.fetch like the other targets. */
 export function webPushRequest(
   deps: Pick<Deps, "db" | "now" | "config">,
   t: NotifyTarget,
-  payload: { title: string; body: string; url?: string; tag?: string },
+  payload: PushPayload,
   urgent: boolean,
 ): { url: string; init: RequestInit } {
   const v = vapidKeys(deps);
