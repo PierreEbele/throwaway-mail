@@ -54,7 +54,7 @@ app/server/            Hono API (Node 22, SQLite via Drizzle)
     mailbox/           IMAP poller, runner, SMTP forwarding, recipient detection, app-side destination verification
     addresses, categories, notify, pgp, reminders, retention, metrics, icons, domains, destinations
   lib/                 Pure helpers: senders (leak checks), phishing, trackers, listheaders, outbound, sanitize, time
-  parser/              Verification-code and link extraction (English and French), pluggable strategies
+  parser/              Verification-code and link extraction (English, French, German, Spanish and Italian), pluggable strategies
   cloudflare/          Live, mock and unconfigured Cloudflare clients
   auth/                OIDC, sessions, API keys, CSRF, rate limiting
   db/                  Drizzle schema and SQL migrations (applied at startup)

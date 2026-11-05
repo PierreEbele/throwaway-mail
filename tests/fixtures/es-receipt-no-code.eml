@@ -1,0 +1,18 @@
+Return-Path: <bounce@tiendaejemplo.example>
+From: Tienda Ejemplo <noreply@tiendaejemplo.example>
+To: silver-otter-4821@mail.example.test
+Subject: Confirmación de tu pedido
+Date: Tue, 15 Oct 2024 10:12:00 +0000
+Message-ID: <es-receipt-no-code.eml@tiendaejemplo.example>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+
+Hola,
+
+Gracias por tu compra. Número de pedido: 402918
+Factura nº 771034
+Total: 59,90 €
+
+Recibirás tu paquete en 3 días.
+

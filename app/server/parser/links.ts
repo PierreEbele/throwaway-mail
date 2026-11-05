@@ -50,15 +50,21 @@ export function unwrapRedirect(url: string, depth = 0): string {
   return url;
 }
 
-const STRONG = /verif|confirm|activat|validat|magic|valider|confirmer|activer|vérif|v[ée]rifier/i;
-const MEDIUM = /sign[-_ ]?in|log[-_ ]?in|signin|login|auth|reset|password|passwort|mot-de-passe|connexion|onboard|invite|accept/i;
+const STRONG =
+  /verif|confirm|activat|validat|magic|valider|confirmer|activer|vérif|v[ée]rifier|best[äa]tig|aktivier|verifizier|verific|confirma|conferm|activa|attiva/i;
+const MEDIUM =
+  /sign[-_ ]?in|log[-_ ]?in|signin|login|auth|reset|password|passwort|mot-de-passe|connexion|anmeld|einloggen|iniciar|acceso|accedi|accesso|contrase|onboard|invite|accept/i;
 const TOKEN_PARAM = /[?&#](?:token|code|key|t|otp|ticket|hash|sig|signature|nonce|k)=[^&]{8,}/i;
 const LONG_TOKEN_PATH = /\/[A-Za-z0-9_-]{24,}(?:\/|$|\?)/;
 const NEGATIVE =
-  /unsubscribe|d[ée]sinscri|d[ée]sabonn|optout|opt-out|privacy|confidentialit|\/terms|conditions|\/legal|\/help|support\.|\/support|aide|preferences|pr[ée]f[ée]rences|facebook\.com|twitter\.com|x\.com\/|instagram\.com|linkedin\.com|youtube\.com|tiktok\.com|apps\.apple\.com|play\.google\.com|\.(?:png|jpe?g|gif|svg|webp)(?:\?|$)/i;
+  /unsubscribe|d[ée]sinscri|d[ée]sabonn|optout|opt-out|privacy|confidentialit|\/terms|conditions|\/legal|\/help|support\.|\/support|aide|preferences|abmelden|abbestellen|\/baja|darse-de-baja|disiscri|cancellati|pr[ée]f[ée]rences|facebook\.com|twitter\.com|x\.com\/|instagram\.com|linkedin\.com|youtube\.com|tiktok\.com|apps\.apple\.com|play\.google\.com|\.(?:png|jpe?g|gif|svg|webp)(?:\?|$)/i;
 
 function scoreLink(url: string, label: string): number {
-  if (NEGATIVE.test(url) || /unsubscribe|d[ée]sabonner|se d[ée]sinscrire/i.test(label)) return -100;
+  if (
+    NEGATIVE.test(url) ||
+    /unsubscribe|d[ée]sabonner|se d[ée]sinscrire|abmelden|abbestellen|darse de baja|annulla iscrizione|disiscriviti/i.test(label)
+  )
+    return -100;
   let s = 0;
   let path = url;
   try {

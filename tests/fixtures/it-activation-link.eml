@@ -1,0 +1,11 @@
+Return-Path: <bounce@libreria.example>
+From: Libreria <noreply@libreria.example>
+To: silver-otter-4821@mail.example.test
+Subject: Attiva il tuo account
+Date: Tue, 15 Oct 2024 10:12:00 +0000
+Message-ID: <it-activation-link.eml@libreria.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+
+<html><body><p>Ciao,</p><p>grazie per esserti registrato. Clicca sul pulsante per attivare il tuo account.</p><p><a href="https://libreria.example/account/attiva?token=ZXNlbXBpb3Rva2VuMTIzNDU2Nzg">Attiva account</a></p><p><a href="https://libreria.example/disiscriviti">Annulla iscrizione</a></p></body></html>

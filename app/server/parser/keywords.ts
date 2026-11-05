@@ -58,6 +58,59 @@ export const STRONG_KEYWORDS = [
   "code de validation",
   "code :",
   "le code",
+  // German
+  "bestätigungscode",
+  "bestaetigungscode",
+  "verifizierungscode",
+  "verifikationscode",
+  "sicherheitscode",
+  "anmeldecode",
+  "zugangscode",
+  "einmalcode",
+  "einmalpasswort",
+  "einmal-passwort",
+  "einmalkennwort",
+  "ihr code",
+  "dein code",
+  "der code",
+  "code lautet",
+  "pin lautet",
+  "ihre pin",
+  "deine pin",
+  // Spanish
+  "código de verificación",
+  "codigo de verificacion",
+  "código de seguridad",
+  "codigo de seguridad",
+  "código de confirmación",
+  "codigo de confirmacion",
+  "código de acceso",
+  "codigo de acceso",
+  "código de inicio de sesión",
+  "código de un solo uso",
+  "clave de un solo uso",
+  "contraseña de un solo uso",
+  "tu código",
+  "tu codigo",
+  "su código",
+  "su codigo",
+  "el código",
+  "código:",
+  "código es",
+  // Italian
+  "codice di verifica",
+  "codice di sicurezza",
+  "codice di conferma",
+  "codice di accesso",
+  "codice di autenticazione",
+  "codice monouso",
+  "codice otp",
+  "password monouso",
+  "il tuo codice",
+  "il suo codice",
+  "il codice",
+  "codice:",
+  "codice è",
 ];
 
 export const WEAK_KEYWORDS = [
@@ -82,15 +135,35 @@ export const WEAK_KEYWORDS = [
   "valider",
   "connexion",
   "copy",
+  // German, Spanish, Italian
+  "eingeben",
+  "geben sie",
+  "bestätigen",
+  "anmeldung",
+  "código",
+  "codigo",
+  "introduce",
+  "introduzca",
+  "ingresa",
+  "ingrese",
+  "verificar",
+  "confirmar",
+  "codice",
+  "inserisci",
+  "inserire",
+  "immetti",
+  "conferma",
+  "verifica",
 ];
 
 export const ORDER_CONTEXT_RE =
-  /(?:order|commande|invoice|facture|ticket|tracking|suivi|colis|ref|réf|référence|reference|n°|numéro|numero|number|no\.|#|id|transaction|case|dossier|account number|customer number|client|ending in|ends in|se terminant par|terminant par|carte|card)\s*(?:number|no\.?|n°|#|id)?\s*[:#°.-]?\s*$/i;
+  /(?:order|commande|bestellnummer|bestellung|rechnungsnummer|rechnung|kundennummer|sendungsnummer|pedido|factura|ordine|fattura|numero ordine|número|nummer|invoice|facture|ticket|tracking|suivi|colis|ref|réf|référence|reference|n°|numéro|numero|number|no\.|#|id|transaction|case|dossier|account number|customer number|n\.|nº|client|ending in|ends in|se terminant par|terminant par|carte|card)\s*(?:number|no\.?|n°|#|id)?\s*[:#°.-]?\s*$/i;
 
-export const PHONE_CONTEXT_RE = /(?:tel|tél|phone|téléphone|telephone|call|appel(?:ez)?|fax|mobile|whatsapp|sms au)\b[^\n]{0,20}$/i;
+export const PHONE_CONTEXT_RE =
+  /(?:tel|tél|phone|téléphone|telephone|call|appel(?:ez)?|fax|mobile|whatsapp|sms au|telefon|teléfono|llame(?: al)?|llama(?: al)?|chiama(?:re)?|telefono)\b[^\n]{0,20}$/i;
 
 export const UNIT_AFTER_RE =
-  /^\s?(?:px|pt|km|kg|mb|gb|ko|mo|go|points?|pts|items?|articles?|users?|people|personnes|jours|days|hours|heures|minutes|mins?|ans|years|followers|members|membres|stars|étoiles|reviews|avis|calories|steps|pas|m²|sq|ft|miles)\b/i;
+  /^\s?(?:px|pt|km|kg|mb|gb|ko|mo|go|points?|pts|items?|articles?|users?|people|personnes|jours|days|hours|heures|minutes|mins?|ans|years|followers|members|membres|stars|étoiles|reviews|avis|calories|steps|pas|tage|tagen|stunden|minuten|artikel|días|dias|horas|minutos|artículos|giorni|ore|minuti|articoli|punkte|puntos|punti|m²|sq|ft|miles)\b/i;
 
 export const UPPERCASE_STOPWORDS = new Set([
   "HTTPS",
@@ -173,8 +246,16 @@ export const UPPERCASE_STOPWORDS = new Set([
   "DOCTOLIB",
   "AMELI",
   "CAF",
+  "HALLO",
+  "HOLA",
+  "CIAO",
+  "KONTO",
+  "CUENTA",
+  "GRAZIE",
+  "GRACIAS",
+  "DANKE",
 ]);
 
 /** "1355 Market Street", "24 rue des Jeûneurs", "410 Terry Avenue" … */
 export const STREET_AFTER_RE =
-  /^\s+(?:(?:[A-Z][\wà-ÿ.'-]*\s+){0,3}(?:street|st\.?|avenue|ave\.?|road|rd\.?|boulevard|blvd\.?|way|drive|dr\.?|lane|ln\.?|place|plaza|parkway|square|suite|floor)\b|(?:rue|avenue|av\.|boulevard|bd|quai|place|allée|chemin|impasse|route|cours)\b)/i;
+  /^\s+(?:(?:[A-Z][\wà-ÿ.'-]*\s+){0,3}(?:street|st\.?|avenue|ave\.?|road|rd\.?|boulevard|blvd\.?|way|drive|dr\.?|lane|ln\.?|place|plaza|parkway|square|suite|floor)\b|(?:rue|avenue|av\.|calle|avenida|via|viale|piazza|corso|boulevard|bd|quai|place|allée|chemin|impasse|route|cours)\b)/i;

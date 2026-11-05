@@ -1,0 +1,11 @@
+Return-Path: <bounce@wanderforum.example>
+From: Wanderforum <noreply@wanderforum.example>
+To: silver-otter-4821@mail.example.test
+Subject: Bitte bestätigen Sie Ihre E-Mail-Adresse
+Date: Tue, 15 Oct 2024 10:12:00 +0000
+Message-ID: <de-activation-link.eml@wanderforum.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+
+<html><body><p>Hallo,</p><p>vielen Dank für Ihre Registrierung. Bitte klicken Sie auf den folgenden Link, um Ihr Konto zu aktivieren:</p><p><a href="https://www.wanderforum.example/konto/aktivieren?token=a8F3kLq92ZxP0vWmN7tR">Konto aktivieren</a></p><p><a href="https://www.wanderforum.example/newsletter/abmelden">Newsletter abmelden</a></p></body></html>

@@ -20,7 +20,7 @@ app polls a catch-all mailbox of any provider over IMAP and forwards over SMTP. 
 **Addresses**
 
 - One address per site, readable local parts (`amber-otter-4821@your-domain`) or your own format, several domains
-- Verification codes and confirmation links extracted automatically (English and French), long-poll API
+- Verification codes and confirmation links extracted automatically (English, French, German, Spanish and Italian), long-poll API
 - On-the-fly addresses: `name.anysite@your-domain` creates the address when its first mail arrives
 - Expiring and self-destructing addresses (after N mails or after the first code), with reminders
 

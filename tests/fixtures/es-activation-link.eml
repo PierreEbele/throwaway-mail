@@ -1,0 +1,11 @@
+Return-Path: <bounce@recetario.example>
+From: Recetario <noreply@recetario.example>
+To: silver-otter-4821@mail.example.test
+Subject: Activa tu cuenta
+Date: Tue, 15 Oct 2024 10:12:00 +0000
+Message-ID: <es-activation-link.eml@recetario.example>
+MIME-Version: 1.0
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+
+<html><body><p>¡Hola!</p><p>Gracias por registrarte. Haz clic en el botón para confirmar tu dirección de correo electrónico.</p><p><a href="https://recetario.example/cuenta/confirmar?token=Qm9vYmFyYmF6cXV4OTg3NjU0">Confirmar mi cuenta</a></p><p><a href="https://recetario.example/baja">Darse de baja</a></p></body></html>

@@ -7,6 +7,19 @@ describe("code extraction", () => {
   it("finds a code next to an English keyword", () => expect(code("Your verification code is 123456.")).toBe("123456"));
   it("finds a code before a keyword", () => expect(code("123456 is your one-time passcode")).toBe("123456"));
   it("finds a French code", () => expect(code("Votre code de vérification : 908172")).toBe("908172"));
+  it("finds a German code", () => expect(code("Ihr Bestätigungscode lautet: 551902")).toBe("551902"));
+  it("finds a Spanish code", () => expect(code("Tu código de verificación es 730418")).toBe("730418"));
+  it("finds an Italian code", () => expect(code("Il tuo codice è 264051")).toBe("264051"));
+  it("rejects German order numbers", () => expect(code("Bestellnummer: 482913\nRechnungsnummer 557812")).toBeNull());
+  it("rejects Spanish order numbers", () => expect(code("Número de pedido: 482913. Factura nº 557812")).toBeNull());
+  it("rejects Italian order numbers", () => expect(code("Numero ordine: 482913. Fattura n. 557812")).toBeNull());
+  it("finds German, Spanish and Italian activation links", () => {
+    const links = (html: string) => parseMessage({ html }).links.map((l) => l.url);
+    expect(links('<a href="https://ex.test/x?token=abcdefgh12">Konto bestätigen</a>')).toHaveLength(1);
+    expect(links('<a href="https://ex.test/activar?id=1">Activar cuenta</a>')).toHaveLength(1);
+    expect(links('<a href="https://ex.test/attiva?id=1">Attiva il tuo account</a>')).toHaveLength(1);
+    expect(links('<a href="https://ex.test/newsletter/abmelden">Abmelden</a>')).toHaveLength(0);
+  });
   it("rejects years", () => expect(code("Copyright 2024 – thanks for being with us since 2019")).toBeNull());
   it("rejects phone numbers", () => expect(code("Call us: +33 1 23 45 67 89 for help with your account")).toBeNull());
   it("rejects amounts", () => expect(code("Your code purchase total is $1299 and €4500")).toBeNull());
