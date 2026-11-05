@@ -11,7 +11,7 @@ import { badRequest, notFound } from "../lib/errors.js";
 import { audit } from "../services/audit.js";
 import { userOut } from "../services/serialize.js";
 import { getMailbox } from "../services/mailbox/settings.js";
-import { runDiagnostics } from "../services/diagnostics.js";
+import { runDiagnostics } from "../services/diagnostics/index.js";
 import { backupStatus } from "../services/backup/index.js";
 import { probeStatus } from "../services/probe.js";
 

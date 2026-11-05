@@ -7,7 +7,7 @@ import { addDomain, makeTestApp, setupAdmin, loginAs } from "../helpers.js";
 import { fakeMail } from "../mail-fakes.js";
 import { LiveCloudflareClient, UnconfiguredCloudflareClient } from "../../app/server/cloudflare/index.js";
 import { domains } from "../../app/server/db/schema.js";
-import { runDiagnostics, type Check } from "../../app/server/services/diagnostics.js";
+import { runDiagnostics, type Check } from "../../app/server/services/diagnostics/index.js";
 
 /** Outbound fetch for APP_URL / OIDC probes: url → response (anything else fails like an unreachable host). */
 function fakeFetch(routes: Record<string, () => Response>): typeof fetch {

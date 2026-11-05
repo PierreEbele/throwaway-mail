@@ -4,7 +4,7 @@
 import { loadConfig } from "./config.js";
 import { createLogger } from "./logger.js";
 import { buildDeps } from "./build-deps.js";
-import { runDiagnostics, type CheckStatus } from "./services/diagnostics.js";
+import { runDiagnostics, type CheckStatus } from "./services/diagnostics/index.js";
 
 try {
   process.loadEnvFile(".env");
