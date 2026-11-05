@@ -39,6 +39,10 @@ export function registerAddresses(r: ApiRouter) {
           .toLowerCase()
           .optional()
           .describe("Domain to use when `domain` is not given, unless the site is known to reject it"),
+        domain_choice: z
+          .enum(["first", "random", "rotate"])
+          .optional()
+          .describe("Overrides the user's domain choice for this address, when `domain` is not given"),
         site_name: z.string().trim().min(1).max(120),
         site_url: SiteUrl.optional(),
         local_part: z.string().trim().toLowerCase().optional(),

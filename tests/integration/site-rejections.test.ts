@@ -70,6 +70,15 @@ describe("sites rejecting alias domains", () => {
     expect(seen.size).toBeGreaterThan(1);
   });
 
+  it("lets one request override the domain choice", async () => {
+    const { user } = await setup();
+    const seen = new Set<string>();
+    for (let i = 0; i < 30; i++)
+      seen.add((await user.post("/v1/addresses", { site_name: `o${i}`, domain_choice: "random" })).json.address.domain);
+    expect(seen.size).toBeGreaterThan(1);
+    expect((await user.post("/v1/addresses", { site_name: "f" })).json.address.domain).toBe("a.example.test");
+  });
+
   it("flags addresses that received nothing after N minutes", async () => {
     const { t, user, advance } = await setup();
     const a = (await user.post("/v1/addresses", { site_name: "Quiet" })).json.address;

@@ -108,13 +108,21 @@ export interface NewAddress {
   max_messages?: number | null;
   /** Used when `domain` is not given, unless the site rejected it. */
   preferred_domain?: string;
+  /** Overrides the user's domain choice for this address (when `domain` is not given). */
+  domain_choice?: User["domainChoice"];
   /** Never pick these domains (when `domain` is not given). */
   exclude_domain_ids?: string[];
 }
 
 /** Creates an address for `user`. Shared by `POST /v1/addresses` and the alias-service compatibility API. */
 export function createAddress(d: Deps, user: User, body: NewAddress): { a: Address; domain: string; avoided: string[] } {
-  const pick = body.domain ? null : pickDomain(d, user, body, { preferred: body.preferred_domain, exclude: body.exclude_domain_ids });
+  const pick = body.domain
+    ? null
+    : pickDomain(d, user, body, {
+        preferred: body.preferred_domain,
+        exclude: body.exclude_domain_ids,
+        choice: body.domain_choice,
+      });
   const domain = body.domain
     ? d.db
         .select()

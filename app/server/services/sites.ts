@@ -45,15 +45,16 @@ export interface DomainPick {
 
 /**
  * Domain for a new address when the caller did not force one: active domains minus those the site rejected, then the
- * user's choice (first, random, rotate). `preferred` (name or id) wins when it is active and not rejected.
+ * user's choice (first, random, rotate), or `choice` for this call. `preferred` (name or id) wins when it is active and not rejected.
  * When the site rejected every domain, falls back to all active domains (minus `exclude`).
  */
 export function pickDomain(
   d: Deps,
   user: User,
   site: { site_name?: string | null; site_url?: string | null },
-  opts: { preferred?: string; exclude?: string[] } = {},
+  opts: { preferred?: string; exclude?: string[]; choice?: User["domainChoice"] } = {},
 ): DomainPick {
+  const choice = opts.choice ?? user.domainChoice;
   const exclude = new Set(opts.exclude ?? []);
   const active = d.db
     .select()
@@ -69,8 +70,8 @@ export function pickDomain(
     const p = pool.find((x) => x.name === opts.preferred || x.id === opts.preferred);
     if (p) return { domain: p, avoided };
   }
-  if (pool.length <= 1 || user.domainChoice === "first") return { domain: pool[0], avoided };
-  if (user.domainChoice === "random") return { domain: pool[Math.floor(Math.random() * pool.length)], avoided };
+  if (pool.length <= 1 || choice === "first") return { domain: pool[0], avoided };
+  if (choice === "random") return { domain: pool[Math.floor(Math.random() * pool.length)], avoided };
   // rotate: the next domain after the one of the user's latest address
   const last = d.db
     .select({ domainId: addresses.domainId })
