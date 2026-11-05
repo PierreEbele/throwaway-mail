@@ -53,7 +53,13 @@ async function checkUrl(d: Deps, user: User, url: string | undefined) {
 }
 
 const Events = z.array(z.enum(NOTIFY_EVENTS)).min(1);
-const DEFAULT_EVENTS: (typeof NOTIFY_EVENTS)[number][] = ["code.received", "leak.detected", "address.expiring", "address.burned"];
+const DEFAULT_EVENTS: (typeof NOTIFY_EVENTS)[number][] = [
+  "code.received",
+  "leak.detected",
+  "address.expiring",
+  "address.burned",
+  "address.rotated",
+];
 
 export function registerNotify(r: ApiRouter) {
   r.add(

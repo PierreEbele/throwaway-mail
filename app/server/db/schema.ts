@@ -314,6 +314,20 @@ export const addresses = sqliteTable(
     feedToken: text("feed_token").unique(),
     /** JSON array of destination ids tried in order when forwarding fails (null: the user's fallback chain). */
     fallbackDestinationIdsJson: text("fallback_destination_ids_json"),
+    /**
+     * Scheduled rotation: "default" follows the account setting, "off", "after_leak" (rotate `rotationDays` after a
+     * leak is detected) or "every" (rotate `rotationDays` after creation).
+     */
+    rotationMode: text("rotation_mode", { enum: ["default", "off", "after_leak", "every"] })
+      .notNull()
+      .default("default"),
+    rotationDays: integer("rotation_days"),
+    /** Days the old address keeps receiving after a rotation (null: the account setting). */
+    rotationGraceDays: integer("rotation_grace_days"),
+    /** Set on an address replaced by a rotation: it keeps receiving until then, then is paused. */
+    rotationGraceUntil: integer("rotation_grace_until"),
+    /** The address that replaced this one in a rotation. */
+    rotatedToId: text("rotated_to_id"),
   },
   (t) => [uniqueIndex("addresses_domain_local_uq").on(t.domainId, t.localPart), index("addresses_user_idx").on(t.userId)],
 );

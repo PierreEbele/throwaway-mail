@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { post } from "../../api";
-import type { Address } from "../../types";
+import type { Address, RotationMode } from "../../types";
 import { CopyButton, Toggle } from "../../components/ui";
 import { hostOf } from "../../util";
 import { useReplace } from "./hooks";
@@ -32,6 +33,83 @@ function FeedRow({ a }: { a: Address }) {
         </div>
       )}
     </div>
+  );
+}
+
+function RotationRow({ a, onChange }: { a: Address; onChange: (b: Record<string, unknown>) => void }) {
+  const r = a.rotation;
+  const [days, setDays] = useState(r.days == null ? "" : String(r.days));
+  const [grace, setGrace] = useState(r.grace_days == null ? "" : String(r.grace_days));
+  const num = (v: string) => (v.trim() ? Math.max(0, Math.floor(Number(v))) : null);
+  return (
+    <form
+      className="space-y-2 text-sm"
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        onChange({ rotation_days: num(days), rotation_grace_days: num(grace) });
+      }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <label htmlFor="rot-mode">
+          Scheduled rotation
+          <span className="block text-xs text-zinc-500">Replaced by a fresh address for this site; you are notified with the new one.</span>
+        </label>
+        <select
+          id="rot-mode"
+          className="input w-auto py-1"
+          value={r.mode}
+          onChange={(e) => onChange({ rotation_mode: e.target.value as RotationMode | "default" })}
+        >
+          <option value="default">Account default</option>
+          <option value="off">Never</option>
+          <option value="after_leak">N days after a leak</option>
+          <option value="every">Every N days</option>
+        </select>
+      </div>
+      {r.mode !== "off" && (
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <label htmlFor="rot-days" className="label">
+              N (days)
+            </label>
+            <input
+              id="rot-days"
+              type="number"
+              min={0}
+              className="input py-1"
+              placeholder="Default"
+              value={days}
+              onChange={(e) => setDays(e.target.value)}
+            />
+          </div>
+          <div className="flex-1">
+            <label htmlFor="rot-grace" className="label">
+              Grace (days)
+            </label>
+            <input
+              id="rot-grace"
+              type="number"
+              min={0}
+              className="input py-1"
+              placeholder="Default"
+              value={grace}
+              onChange={(e) => setGrace(e.target.value)}
+            />
+          </div>
+          <button className="btn-secondary">Save</button>
+        </div>
+      )}
+      {r.grace_until && (
+        <p className="text-xs text-amber-600">
+          Rotated: still receiving until {new Date(r.grace_until).toLocaleDateString()}, then paused.{" "}
+          {r.rotated_to_id && (
+            <Link className="underline" to={`/addresses/${r.rotated_to_id}`}>
+              Open the new address
+            </Link>
+          )}
+        </p>
+      )}
+    </form>
   );
 }
 
@@ -89,6 +167,7 @@ export function ProtectionCard({ a, onChange }: { a: Address; onChange: (b: Reco
         </div>
         <button className="btn-secondary">Save</button>
       </form>
+      <RotationRow a={a} onChange={onChange} />
       <FeedRow a={a} />
       <button className="btn-secondary w-full" onClick={replace}>
         Replace with a fresh address…

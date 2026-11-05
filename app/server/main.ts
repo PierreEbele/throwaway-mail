@@ -7,6 +7,7 @@ import { runRetention } from "./services/retention.js";
 import { pruneIconCache } from "./services/icons.js";
 import { pauseExpired, runExpiryReminders } from "./services/reminders.js";
 import { metrics } from "./services/metrics.js";
+import { endRotationGrace, runRotations } from "./services/rotation.js";
 import { backfillAuthResults } from "./services/maintenance.js";
 import { scheduledBackup } from "./services/backup/index.js";
 import { probeTick } from "./services/probe.js";
@@ -68,6 +69,14 @@ const reminders = () => {
   } catch (e) {
     metrics.job("expiry_reminders", false, (e as Error).message);
     logger.error("expiry reminders failed", { err: e as Error });
+  }
+  try {
+    const rotated = runRotations(deps);
+    const ended = endRotationGrace(deps);
+    metrics.job("rotation", true, `${rotated} address(es) rotated, ${ended} grace period(s) ended`);
+  } catch (e) {
+    metrics.job("rotation", false, (e as Error).message);
+    logger.error("address rotation failed", { err: e as Error });
   }
 };
 retention();

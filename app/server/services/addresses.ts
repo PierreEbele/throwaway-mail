@@ -174,13 +174,13 @@ export function createAddress(d: Deps, user: User, body: NewAddress): { a: Addre
 
 /**
  * Create a fresh address for the same site (copying category, forwarding, pin and protections) and pause or archive
- * the old one. The new address keeps the old domain unless `exclude_domain_ids` asks for another one.
+ * the old one (or leave it active with `keep_old_active`, for a rotation grace period). The new address keeps the old domain unless `exclude_domain_ids` asks for another one.
  */
 export function replaceAddress(
   d: Deps,
   user: User,
   old: Address,
-  opts: { archive_old?: boolean; exclude_domain_ids?: string[] } = {},
+  opts: { archive_old?: boolean; exclude_domain_ids?: string[]; keep_old_active?: boolean } = {},
 ): { a: Address; domain: string } {
   const { a, domain } = createAddress(d, user, {
     domain: opts.exclude_domain_ids ? undefined : old.domainId,
@@ -200,13 +200,16 @@ export function replaceAddress(
       siteLock: old.siteLock,
       blockedSendersJson: old.blockedSendersJson,
       trustedSendersJson: old.trustedSendersJson,
+      rotationMode: old.rotationMode,
+      rotationDays: old.rotationDays,
+      rotationGraceDays: old.rotationGraceDays,
     })
     .where(eq(addresses.id, a.id))
     .run();
   d.db
     .update(addresses)
     .set({
-      status: opts.archive_old ? "archived" : "paused",
+      status: opts.keep_old_active ? old.status : opts.archive_old ? "archived" : "paused",
       pinned: false,
       leakSender: null,
       leakAt: null,

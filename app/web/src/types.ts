@@ -53,6 +53,14 @@ export interface Address {
   replies_unavailable?: string | null;
   burned: { reason: string; at: number } | null;
   leak: { sender: string; at: number } | null;
+  /** Scheduled rotation ("default": the account setting); grace_until is set on an address being phased out. */
+  rotation: {
+    mode: RotationMode | "default";
+    days: number | null;
+    grace_days: number | null;
+    grace_until: number | null;
+    rotated_to_id: string | null;
+  };
   /** Nothing received some minutes after creation: the site may reject the domain. */
   no_mail_warning?: boolean;
   /** Only on single-address responses: the user reported that the site rejected this address. */
@@ -376,7 +384,11 @@ export interface AddressSettings {
   template: string | null;
   default_expires_in_days: number | null;
   default_max_messages: number | null;
+  rotation_mode: RotationMode;
+  rotation_days: number;
+  rotation_grace_days: number;
 }
+export type RotationMode = "off" | "after_leak" | "every";
 export interface AddressSettingsResponse {
   settings: AddressSettings;
   examples: string[];

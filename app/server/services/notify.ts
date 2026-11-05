@@ -21,6 +21,7 @@ export const NOTIFY_EVENTS = [
   "address.created",
   "address.deleted",
   "address.expired",
+  "address.rotated",
   "message.blocked",
   "forward.failed",
 ] as const;

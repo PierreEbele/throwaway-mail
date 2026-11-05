@@ -206,6 +206,19 @@ export function registerAddresses(r: ApiRouter) {
         site_lock: z.boolean().optional(),
         max_messages: z.number().int().min(1).max(100_000).nullable().optional(),
         burn_after_code: z.boolean().optional(),
+        rotation_mode: z
+          .enum(["default", "off", "after_leak", "every"])
+          .optional()
+          .describe("Scheduled rotation: account default, off, N days after a leak, or every N days"),
+        rotation_days: z.number().int().min(0).max(3650).nullable().optional().describe("N for rotation_mode (null: account default)"),
+        rotation_grace_days: z
+          .number()
+          .int()
+          .min(0)
+          .max(365)
+          .nullable()
+          .optional()
+          .describe("Days the old address keeps receiving after a rotation (null: account default)"),
         replies_enabled: z
           .boolean()
           .optional()
@@ -241,8 +254,11 @@ export function registerAddresses(r: ApiRouter) {
       if (body.site_lock !== undefined) set.siteLock = body.site_lock;
       if (body.max_messages !== undefined) set.maxMessages = body.max_messages;
       if (body.burn_after_code !== undefined) set.burnAfterCode = body.burn_after_code;
+      if (body.rotation_mode !== undefined) set.rotationMode = body.rotation_mode;
+      if (body.rotation_days !== undefined) set.rotationDays = body.rotation_days;
+      if (body.rotation_grace_days !== undefined) set.rotationGraceDays = body.rotation_grace_days;
       if (body.replies_enabled !== undefined) set.repliesEnabled = body.replies_enabled;
-      if (body.status === "active") Object.assign(set, { burnReason: null, burnedAt: null });
+      if (body.status === "active") Object.assign(set, { burnReason: null, burnedAt: null, rotationGraceUntil: null });
       if (body.site_name !== undefined) set.siteName = body.site_name;
       if (body.site_url !== undefined) set.siteUrl = body.site_url;
       if (body.label !== undefined) set.label = body.label || null;
