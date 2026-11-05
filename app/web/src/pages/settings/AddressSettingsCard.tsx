@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { post, put } from "../../api";
-import type { AddressSettings, AddressSettingsResponse, AliasFormat } from "../../types";
+import type { AddressSettings, AddressSettingsResponse, AliasFormat, RotationMode } from "../../types";
 import { ErrorText, Spinner, useToast } from "../../components/ui";
 import { useAddressSettings } from "../Addresses";
 
@@ -148,6 +148,55 @@ export function AddressSettingsCard() {
           />
         </div>
       </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div>
+          <label htmlFor="as-rot-mode" className="label">
+            Rotate addresses
+          </label>
+          <select
+            id="as-rot-mode"
+            className="input"
+            value={s.rotation_mode}
+            onChange={(e) => set({ rotation_mode: e.target.value as RotationMode })}
+          >
+            <option value="off">Never</option>
+            <option value="after_leak">N days after a leak</option>
+            <option value="every">Every N days</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="as-rot-days" className="label">
+            N <span className="font-normal text-zinc-400">(days)</span>
+          </label>
+          <input
+            id="as-rot-days"
+            className="input"
+            type="number"
+            min={0}
+            max={3650}
+            value={s.rotation_days}
+            onChange={(e) => set({ rotation_days: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+          />
+        </div>
+        <div>
+          <label htmlFor="as-rot-grace" className="label">
+            Grace period <span className="font-normal text-zinc-400">(days)</span>
+          </label>
+          <input
+            id="as-rot-grace"
+            className="input"
+            type="number"
+            min={0}
+            max={365}
+            value={s.rotation_grace_days}
+            onChange={(e) => set({ rotation_grace_days: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+          />
+        </div>
+      </div>
+      <p className="text-xs text-zinc-500">
+        Applies to addresses left on &quot;account default&quot;. A rotation creates a new address for the same site, keeps the old one
+        receiving during the grace period, then pauses it; you are notified with the new address to update on the site.
+      </p>
       <ErrorText error={save.error} />
       <button className="btn-primary" disabled={save.isPending}>
         Save

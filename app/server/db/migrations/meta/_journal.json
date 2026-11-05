@@ -183,6 +183,13 @@
       "when": 1793797425636,
       "tag": "0025_address_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1793898615561,
+      "tag": "0026_scheduled_rotation",
+      "breakpoints": true
     }
   ]
 }

@@ -16,6 +16,7 @@ const EVENT_LABELS: Record<string, string> = {
   "address.created": "Address created",
   "address.deleted": "Address deleted",
   "address.expired": "Address expired",
+  "address.rotated": "Address rotated",
   "message.blocked": "Mail blocked",
   "message.sent": "Mail sent from an alias",
   "forward.failed": "Forward failed",
@@ -87,7 +88,13 @@ export function PushTargetsCard() {
   const [url, setUrl] = useState("");
   const [token, setToken] = useState("");
   const [chat, setChat] = useState("");
-  const [events, setEvents] = useState<string[]>(["code.received", "leak.detected", "address.expiring", "address.burned"]);
+  const [events, setEvents] = useState<string[]>([
+    "code.received",
+    "leak.detected",
+    "address.expiring",
+    "address.burned",
+    "address.rotated",
+  ]);
   const refresh = () => invalidate(qc, ["notify-targets"]);
   const add = useMutation({
     mutationFn: () =>
@@ -109,7 +116,7 @@ export function PushTargetsCard() {
     },
   });
   const enablePush = useMutation({
-    mutationFn: () => subscribeThisDevice(["code.received", "leak.detected", "address.expiring", "address.burned"]),
+    mutationFn: () => subscribeThisDevice(["code.received", "leak.detected", "address.expiring", "address.burned", "address.rotated"]),
     onSuccess: () => {
       refresh();
       toast("Notifications enabled on this device", "success");

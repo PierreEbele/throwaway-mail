@@ -55,6 +55,9 @@ describe("new-address settings", () => {
       template: null,
       default_expires_in_days: null,
       default_max_messages: null,
+      rotation_mode: "off",
+      rotation_days: 30,
+      rotation_grace_days: 7,
     });
     expect(def.json.examples).toHaveLength(3);
 

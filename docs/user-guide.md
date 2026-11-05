@@ -198,6 +198,11 @@ On the address page:
 - **Trust this sender**: no more warning for that domain (e.g. a payment provider the site uses).
 - **Only accept mail from the site** (site lock): other senders are rejected and logged as leaks.
 - **Burn after the first code** / **Burn after N mails**: the address pauses itself, ideal for one-shot sign-ups.
+- **Scheduled rotation** (_Protection_ card): _N days after a leak_ or _Every N days_, or _Account default_. When
+  due, a fresh address is created for the same site (same domain and settings, like _Replace_), the old one keeps
+  receiving for the grace period and is then paused, and you get an _Address rotated_ notification with the new
+  address so you can update it on the site. The account default (mode, N and grace period, 7 days unless changed)
+  is under **Account → New addresses**. Rotations run with the periodic maintenance (every 10 minutes).
 
 **This week → Leak history by sender** groups leaks by sender domain across all your addresses, with
 _Block everywhere_.
@@ -218,7 +223,7 @@ _Block everywhere_.
     [API → webhooks](api.md#webhooks)).
 
   Choose the events: verification codes (the code is in the title), every mail, possible leaks, address about to
-  expire, address burned, and for automation also address created / deleted / expired, mail blocked, mail sent from
+  expire, address burned, address rotated, and for automation also address created / deleted / expired, mail blocked, mail sent from
   an alias and forward failed. _Test_ sends a sample. Private or LAN URLs are reserved to admins.
 
   Webhooks are queued and retried while the endpoint is down (for about an hour). _Recent deliveries_ shows each

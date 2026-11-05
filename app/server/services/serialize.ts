@@ -90,6 +90,13 @@ export function addressOut(a: Address, domainName: string, counts?: { unread: nu
     fallback_destination_ids: addressFallbackIds(a),
     burned: a.burnReason ? { reason: a.burnReason, at: a.burnedAt } : null,
     leak: a.leakSender ? { sender: a.leakSender, at: a.leakAt } : null,
+    rotation: {
+      mode: a.rotationMode,
+      days: a.rotationDays,
+      grace_days: a.rotationGraceDays,
+      grace_until: a.rotationGraceUntil,
+      rotated_to_id: a.rotatedToId,
+    },
     unread_count: counts?.unread ?? 0,
     message_count: counts?.total ?? 0,
   };

@@ -23,6 +23,11 @@ export const AddressSettings = z.object({
   template: z.string().trim().max(64).nullable().default(null),
   default_expires_in_days: z.number().int().min(1).max(3650).nullable().default(null),
   default_max_messages: z.number().int().min(1).max(100_000).nullable().default(null),
+  /** Scheduled rotation for addresses left on "default": off, `rotation_days` after a leak, or every `rotation_days`. */
+  rotation_mode: z.enum(["off", "after_leak", "every"]).default("off"),
+  rotation_days: z.number().int().min(0).max(3650).default(30),
+  /** Days a rotated address keeps receiving before it is paused. */
+  rotation_grace_days: z.number().int().min(0).max(365).default(7),
 });
 export type AddressSettings = z.infer<typeof AddressSettings>;
 
