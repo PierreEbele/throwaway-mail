@@ -111,8 +111,8 @@ function useCopyCodeFromNotification(toast: ReturnType<typeof useToast>) {
     const copy = (code: string) =>
       navigator.clipboard
         .writeText(code)
-        .then(() => toast(`Code ${code} copied`, "success"))
-        .catch(() => toast(`Code ${code} (copy it manually)`, "success"));
+        .then(() => toast(msg().auth.codeCopied(code), "success"))
+        .catch(() => toast(msg().auth.codeCopyManual(code), "success"));
     const m = /^#copy-code=([^&]+)$/.exec(location.hash);
     if (m) {
       history.replaceState(null, "", location.pathname + location.search);

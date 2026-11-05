@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { post } from "../../api";
 import type { Address, RotationMode } from "../../types";
 import { CopyButton, Toggle } from "../../components/ui";
-import { useT } from "../../i18n";
+import { getLang, useT } from "../../i18n";
 import { hostOf } from "../../util";
 import { useReplace } from "./hooks";
 
@@ -40,6 +40,8 @@ function RotationRow({ a, onChange }: { a: Address; onChange: (b: Record<string,
   const r = a.rotation;
   const [days, setDays] = useState(r.days == null ? "" : String(r.days));
   const [grace, setGrace] = useState(r.grace_days == null ? "" : String(r.grace_days));
+  const t = useT().addressCards.protection;
+  const tc = useT().common;
   const num = (v: string) => (v.trim() ? Math.max(0, Math.floor(Number(v))) : null);
   return (
     <form
@@ -51,8 +53,8 @@ function RotationRow({ a, onChange }: { a: Address; onChange: (b: Record<string,
     >
       <div className="flex items-center justify-between gap-3">
         <label htmlFor="rot-mode">
-          Scheduled rotation
-          <span className="block text-xs text-zinc-500">Replaced by a fresh address for this site; you are notified with the new one.</span>
+          {t.rotation}
+          <span className="block text-xs text-zinc-500">{t.rotationHelp}</span>
         </label>
         <select
           id="rot-mode"
@@ -60,51 +62,51 @@ function RotationRow({ a, onChange }: { a: Address; onChange: (b: Record<string,
           value={r.mode}
           onChange={(e) => onChange({ rotation_mode: e.target.value as RotationMode | "default" })}
         >
-          <option value="default">Account default</option>
-          <option value="off">Never</option>
-          <option value="after_leak">N days after a leak</option>
-          <option value="every">Every N days</option>
+          <option value="default">{t.accountDefault}</option>
+          <option value="off">{t.never}</option>
+          <option value="after_leak">{t.afterLeak}</option>
+          <option value="every">{t.every}</option>
         </select>
       </div>
       {r.mode !== "off" && (
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <label htmlFor="rot-days" className="label">
-              N (days)
+              {t.nDays}
             </label>
             <input
               id="rot-days"
               type="number"
               min={0}
               className="input py-1"
-              placeholder="Default"
+              placeholder={t.defaultPlaceholder}
               value={days}
               onChange={(e) => setDays(e.target.value)}
             />
           </div>
           <div className="flex-1">
             <label htmlFor="rot-grace" className="label">
-              Grace (days)
+              {t.graceDays}
             </label>
             <input
               id="rot-grace"
               type="number"
               min={0}
               className="input py-1"
-              placeholder="Default"
+              placeholder={t.defaultPlaceholder}
               value={grace}
               onChange={(e) => setGrace(e.target.value)}
             />
           </div>
-          <button className="btn-secondary">Save</button>
+          <button className="btn-secondary">{tc.save}</button>
         </div>
       )}
       {r.grace_until && (
         <p className="text-xs text-amber-600">
-          Rotated: still receiving until {new Date(r.grace_until).toLocaleDateString()}, then paused.{" "}
+          {t.rotated(new Date(r.grace_until).toLocaleDateString(getLang()))}{" "}
           {r.rotated_to_id && (
             <Link className="underline" to={`/addresses/${r.rotated_to_id}`}>
-              Open the new address
+              {t.openNew}
             </Link>
           )}
         </p>

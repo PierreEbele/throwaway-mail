@@ -50,6 +50,14 @@ export const addressPrefs = area(
       create: "create",
     },
     settings: {
+      rotate: "Rotate addresses",
+      never: "Never",
+      afterLeak: "N days after a leak",
+      every: "Every N days",
+      days: "(days)",
+      grace: "Grace period",
+      rotationHelp:
+        "Applies to addresses left on “account default”. A rotation creates a new address for the same site, keeps the old one receiving during the grace period, then pauses it; you are notified with the new address to update on the site.",
       formats: {
         words: "Readable words and digits (amber-otter-4821)",
         random: "Random characters",
@@ -121,6 +129,14 @@ export const addressPrefs = area(
       create: "créer",
     },
     settings: {
+      rotate: "Renouveler les adresses",
+      never: "Jamais",
+      afterLeak: "N jours après une fuite",
+      every: "Tous les N jours",
+      days: "(jours)",
+      grace: "Délai de grâce",
+      rotationHelp:
+        "S’applique aux adresses laissées sur « valeur du compte ». Un renouvellement crée une nouvelle adresse pour le même site, laisse l’ancienne recevoir pendant le délai de grâce, puis la met en pause ; vous êtes averti avec la nouvelle adresse à mettre à jour sur le site.",
       formats: {
         words: "Mots lisibles et chiffres (amber-otter-4821)",
         random: "Caractères aléatoires",

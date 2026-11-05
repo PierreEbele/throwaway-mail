@@ -145,7 +145,7 @@ export function AddressSettingsCard() {
       <div className="grid gap-3 sm:grid-cols-3">
         <div>
           <label htmlFor="as-rot-mode" className="label">
-            Rotate addresses
+            {t.rotate}
           </label>
           <select
             id="as-rot-mode"
@@ -153,14 +153,14 @@ export function AddressSettingsCard() {
             value={s.rotation_mode}
             onChange={(e) => set({ rotation_mode: e.target.value as RotationMode })}
           >
-            <option value="off">Never</option>
-            <option value="after_leak">N days after a leak</option>
-            <option value="every">Every N days</option>
+            <option value="off">{t.never}</option>
+            <option value="after_leak">{t.afterLeak}</option>
+            <option value="every">{t.every}</option>
           </select>
         </div>
         <div>
           <label htmlFor="as-rot-days" className="label">
-            N <span className="font-normal text-zinc-400">(days)</span>
+            N <span className="font-normal text-zinc-400">{t.days}</span>
           </label>
           <input
             id="as-rot-days"
@@ -174,7 +174,7 @@ export function AddressSettingsCard() {
         </div>
         <div>
           <label htmlFor="as-rot-grace" className="label">
-            Grace period <span className="font-normal text-zinc-400">(days)</span>
+            {t.grace} <span className="font-normal text-zinc-400">{t.days}</span>
           </label>
           <input
             id="as-rot-grace"
@@ -187,10 +187,7 @@ export function AddressSettingsCard() {
           />
         </div>
       </div>
-      <p className="text-xs text-zinc-500">
-        Applies to addresses left on &quot;account default&quot;. A rotation creates a new address for the same site, keeps the old one
-        receiving during the grace period, then pauses it; you are notified with the new address to update on the site.
-      </p>
+      <p className="text-xs text-zinc-500">{t.rotationHelp}</p>
       <ErrorText error={save.error} />
       <button className="btn-primary" disabled={save.isPending}>
         {tc.save}
