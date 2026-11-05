@@ -4,6 +4,7 @@ import { appUrlChecks, secretChecks, signInChecks } from "./app.js";
 import { backupCheck } from "./backup.js";
 import { cloudflareChecks, cloudflareDomainChecks } from "./cloudflare.js";
 import { imapDomainChecks, lastMailCheck } from "./domains.js";
+import { outboundCheck } from "./outbound.js";
 import { msg, type Check, type CheckStatus, type Diagnostics } from "./types.js";
 
 export type { Check, CheckStatus, Diagnostics } from "./types.js";
@@ -30,6 +31,7 @@ export async function runDiagnostics(deps: Deps): Promise<Diagnostics> {
     guard("app_url", () => appUrlChecks(deps)),
     guard("secrets", async () => secretChecks(deps)),
     guard("sign_in", () => signInChecks(deps)),
+    guard("outbound", async () => [outboundCheck(deps)]),
     guard("cloudflare", () => cloudflareChecks(deps, cfDomains)),
     ...cfDomains.map((d) => guard(`domain:${d.name}`, async () => [...(await cloudflareDomainChecks(deps, d)), lastMailCheck(deps, d)])),
     ...imapDomains.map((d) => guard(`domain:${d.name}`, async () => [...(await imapDomainChecks(deps, d)), lastMailCheck(deps, d)])),

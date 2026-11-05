@@ -38,8 +38,11 @@ Then:
    | Zone       | DNS                     | Read       |
    | Account    | Email Routing Addresses | Edit       |
    | Account    | Workers Scripts         | Read       |
+   | Account    | Email Sending           | Edit       |
 
-   The last row is optional: it only lets Setup check confirm that the Worker is deployed. Use **Zone Settings:
+   The Workers Scripts row is optional: it only lets Setup check confirm that the Worker is deployed. The Email
+   Sending row is only needed with `OUTBOUND_TRANSPORT=cloudflare` (replies and sending from aliases through
+   Cloudflare Email Sending); onboard each mail domain under **Email Service → Email Sending** as well. Use **Zone Settings:
    Edit** instead of Read if you want the app to turn Email Routing on for new domains by itself.
 
 4. **Zone Resources**: _Include → All zones_, or _Specific zone_ once per mail domain.

@@ -50,6 +50,18 @@ export interface CloudflareClient {
   getDestination(id: string): Promise<DestinationInfo | null>;
   findDestinationByEmail(email: string): Promise<DestinationInfo | null>;
   deleteDestination(id: string): Promise<void>;
+  /**
+   * Email Sending (send_raw): relays a complete MIME message with the given SMTP envelope. The envelope sender's
+   * domain must be onboarded to Email Sending. Needs the Account → Email Sending → Edit permission.
+   */
+  sendRawEmail(from: string, recipients: string[], mime: Uint8Array): Promise<RawSendResult>;
+}
+
+export interface RawSendResult {
+  delivered: string[];
+  queued: string[];
+  permanentBounces: string[];
+  messageId: string | null;
 }
 
 export class CloudflareError extends Error {

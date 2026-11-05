@@ -20,4 +20,5 @@ export class UnconfiguredCloudflareClient implements CloudflareClient {
   getDestination = async () => this.fail();
   findDestinationByEmail = async () => this.fail();
   deleteDestination = async () => this.fail();
+  sendRawEmail = async () => this.fail();
 }

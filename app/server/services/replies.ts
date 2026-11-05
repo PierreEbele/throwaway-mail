@@ -9,6 +9,7 @@ import type { IngestInput, IngestResult } from "./ingest/types.js";
 import { getMailbox, smtpSettings } from "./mailbox/settings.js";
 import type { SmtpSettings } from "./mailbox/types.js";
 import { audit } from "./audit.js";
+import { relayTransport, smtpTransport, type OutboundTransport } from "./transport.js";
 
 /**
  * Reverse-alias replies. Mail forwarded for an address with replies enabled is rewritten: From becomes the alias
@@ -21,7 +22,7 @@ import { audit } from "./audit.js";
 export const REVERSE_LOCAL_RE = /^r\+([0-9a-f]{24})$/;
 
 export interface Outbound {
-  settings: SmtpSettings;
+  transport: OutboundTransport;
   /** Envelope sender to use instead of the alias (mailbox smtp_from / SMTP_RELAY_FROM). */
   envelopeFrom: string | null;
   via: "mailbox" | "relay";
@@ -48,21 +49,24 @@ export function outboundFor(deps: Deps, domain: Domain): Outbound | null {
     const m = getMailbox(deps, domain.id);
     try {
       const s = m ? smtpSettings(deps, m) : null;
-      if (s) return { settings: s, envelopeFrom: m!.smtpFrom, via: "mailbox" };
+      if (s) return { transport: smtpTransport(deps.mail.smtp, s), envelopeFrom: m!.smtpFrom, via: "mailbox" };
     } catch {
       // APP_SECRET missing: fall through to the relay.
     }
   }
-  const relay = relaySettings(deps.config.SMTP_RELAY_URL);
-  return relay ? { settings: relay, envelopeFrom: deps.config.SMTP_RELAY_FROM ?? null, via: "relay" } : null;
+  const relay = relayTransport(deps, relaySettings(deps.config.SMTP_RELAY_URL));
+  if (!relay) return null;
+  // Cloudflare Email Sending only accepts envelope senders on onboarded domains: the alias itself.
+  const envelopeFrom = relay.kind === "smtp" ? (deps.config.SMTP_RELAY_FROM ?? null) : null;
+  return { transport: relay, envelopeFrom, via: "relay" };
 }
 
 /** Why replies cannot be enabled for this domain (null: they can). */
 export function repliesUnavailableReason(deps: Deps, domain: Domain): string | null {
   if (outboundFor(deps, domain)) return null;
   return domain.transport === "imap"
-    ? "This domain's mailbox has no SMTP server and SMTP_RELAY_URL is not set: replies cannot be sent."
-    : "No outbound SMTP server: an admin must set SMTP_RELAY_URL (Cloudflare can only send to verified destinations).";
+    ? "This domain's mailbox has no SMTP server and no outbound transport is set (SMTP_RELAY_URL or OUTBOUND_TRANSPORT=cloudflare): replies cannot be sent."
+    : "No outbound transport: an admin must set SMTP_RELAY_URL or OUTBOUND_TRANSPORT=cloudflare (Email Routing alone can only send to verified destinations).";
 }
 
 /** The contact of (address, sender), created on first use. */
@@ -224,7 +228,7 @@ export async function handleReply(deps: Deps, domain: Domain, token: string, inp
   const reverse = `r+${token}@${domain.name}`;
   const mime = rewriteReply(input.raw, { alias, contact, reverse, userEmails: verified, now: deps.now() });
   try {
-    await deps.mail.smtp.send(out.settings, { from: out.envelopeFrom ?? alias, to: [contact.email] }, mime);
+    await out.transport.send({ from: out.envelopeFrom ?? alias, to: [contact.email] }, mime);
   } catch (e) {
     log.error("reply could not be sent", { address_id: address.id, err: (e as Error).message });
     return { action: "reject", reason: "reply_failed" };

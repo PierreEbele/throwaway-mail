@@ -150,7 +150,7 @@ export interface SmtpRoute {
 export function smtpRoute(deps: Deps, address: Address, alias: string): SmtpRoute | null {
   const out = outboundFor(deps, domainOf(deps, address));
   if (!out) return null;
-  return { send: (to, raw) => deps.mail.smtp.send(out.settings, { from: out.envelopeFrom ?? alias, to: [to] }, raw) };
+  return { send: (to, raw) => out.transport.send({ from: out.envelopeFrom ?? alias, to: [to] }, raw) };
 }
 
 export const NO_SMTP =

@@ -1,4 +1,4 @@
-import type { CatchAllRule, CloudflareClient, DestinationInfo, DnsRecord, ZoneInfo } from "./index.js";
+import type { CatchAllRule, RawSendResult, CloudflareClient, DestinationInfo, DnsRecord, ZoneInfo } from "./index.js";
 import { CloudflareError } from "./index.js";
 
 /**
@@ -92,5 +92,18 @@ export class MockCloudflareClient implements CloudflareClient {
   }
   async deleteDestination(id: string): Promise<void> {
     this.destinations.delete(id);
+  }
+
+  /** Mails relayed through Email Sending; recipients containing "bounce" bounce permanently. */
+  sent: Array<{ from: string; recipients: string[]; mime: string }> = [];
+  async sendRawEmail(from: string, recipients: string[], mime: Uint8Array): Promise<RawSendResult> {
+    if (from.includes("unverified")) throw new CloudflareError("email.sending.error.email.sending_disabled (code 10203)", 403, 10203);
+    this.sent.push({ from, recipients: [...recipients], mime: Buffer.from(mime).toString("utf8") });
+    return {
+      delivered: recipients.filter((r) => !r.includes("bounce")),
+      queued: [],
+      permanentBounces: recipients.filter((r) => r.includes("bounce")),
+      messageId: `mock-${this.sent.length}`,
+    };
   }
 }

@@ -159,7 +159,11 @@ export async function sendFromAlias(
   const recipients = [...new Set(wanted.map((r) => rewrite.get(r) ?? r))];
 
   const out = outboundFor(deps, domain);
-  if (!out) throw new SendError("No outbound SMTP server for this domain (an admin must set SMTP_RELAY_URL)", "unavailable");
+  if (!out)
+    throw new SendError(
+      "No outbound transport for this domain (an admin must set SMTP_RELAY_URL or OUTBOUND_TRANSPORT=cloudflare)",
+      "unavailable",
+    );
   const now = deps.now();
   const wait = limiter(deps).hit(user.id, now);
   if (wait) throw new SendError(`Sending limit reached (${deps.config.SEND_RATE_LIMIT_PER_HOUR} mails per hour)`, "rate_limited", wait);
@@ -183,7 +187,7 @@ export async function sendFromAlias(
 
   const log = deps.logger.child({ component: "sending" });
   try {
-    await deps.mail.smtp.send(out.settings, { from: out.envelopeFrom ?? aliasEmail, to: recipients }, mime);
+    await out.transport.send({ from: out.envelopeFrom ?? aliasEmail, to: recipients }, mime);
   } catch (e) {
     const permanent = e instanceof SmtpError && e.permanent;
     log.warn("mail could not be sent", { address_id: address.id, err: (e as Error).message, permanent });
