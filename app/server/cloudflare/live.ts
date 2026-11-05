@@ -1,4 +1,4 @@
-import type { CatchAllRule, CloudflareClient, DestinationInfo, DnsRecord, TokenInfo, ZoneInfo } from "./index.js";
+import type { CatchAllRule, RawSendResult, CloudflareClient, DestinationInfo, DnsRecord, TokenInfo, ZoneInfo } from "./index.js";
 import { CloudflareError } from "./index.js";
 
 const API = "https://api.cloudflare.com/client/v4";
@@ -206,5 +206,20 @@ export class LiveCloudflareClient implements CloudflareClient {
     } catch (e) {
       if (!(e instanceof CloudflareError && e.status === 404)) throw e;
     }
+  }
+
+  async sendRawEmail(from: string, recipients: string[], mime: Uint8Array): Promise<RawSendResult> {
+    type Raw = { delivered?: string[]; queued?: string[]; permanent_bounces?: string[]; message_id?: string };
+    const r = await this.call<Raw>("POST", `/accounts/${this.accountId}/email/sending/send_raw`, {
+      from,
+      recipients,
+      mime_message: Buffer.from(mime).toString("utf8"),
+    });
+    return {
+      delivered: r?.delivered ?? [],
+      queued: r?.queued ?? [],
+      permanentBounces: r?.permanent_bounces ?? [],
+      messageId: r?.message_id ?? null,
+    };
   }
 }

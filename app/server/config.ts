@@ -90,6 +90,11 @@ const EnvSchema = z.object({
     .string()
     .regex(/^smtps?:\/\//, "SMTP_RELAY_URL must start with smtp:// or smtps://")
     .optional(),
+  /**
+   * How mail leaves the app when no domain mailbox SMTP server applies (Cloudflare domains, IMAP domains without
+   * SMTP): "smtp" (SMTP_RELAY_URL, default) or "cloudflare" (Cloudflare Email Sending REST API, with CF_API_TOKEN).
+   */
+  OUTBOUND_TRANSPORT: z.enum(["smtp", "cloudflare"]).default("smtp"),
   /** Envelope sender for mail sent through SMTP_RELAY_URL (default: the alias itself). */
   SMTP_RELAY_FROM: z.string().email().optional(),
   /**
@@ -167,6 +172,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
         "SMTP submission refuses passwords over plain connections: set SUBMISSION_TLS_CERT and SUBMISSION_TLS_KEY (or SUBMISSION_ALLOW_INSECURE=true for local development only)",
       );
   }
+  if (parsed.OUTBOUND_TRANSPORT === "cloudflare" && !parsed.CF_MOCK && !(parsed.CF_API_TOKEN && parsed.CF_ACCOUNT_ID))
+    throw new Error("OUTBOUND_TRANSPORT=cloudflare needs CF_API_TOKEN and CF_ACCOUNT_ID (or CF_MOCK=1)");
   const cookieSecure =
     parsed.COOKIE_SECURE !== undefined
       ? parsed.COOKIE_SECURE === "1" || parsed.COOKIE_SECURE === "true"
