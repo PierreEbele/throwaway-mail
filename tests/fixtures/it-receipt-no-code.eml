@@ -1,0 +1,18 @@
+Return-Path: <bounce@negozio.example>
+From: Negozio <noreply@negozio.example>
+To: silver-otter-4821@mail.example.test
+Subject: Conferma del tuo ordine
+Date: Tue, 15 Oct 2024 10:12:00 +0000
+Message-ID: <it-receipt-no-code.eml@negozio.example>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+
+Ciao,
+
+grazie per il tuo acquisto. Numero ordine: 583910
+Fattura n. 220417
+Totale: 24,50 €
+
+Consegna prevista entro 2 giorni.
+

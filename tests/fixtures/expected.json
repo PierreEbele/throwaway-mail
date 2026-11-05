@@ -102,5 +102,44 @@
   "fr-activation-link.eml": {
     "code": null,
     "link": "account/activation?key="
+  },
+  "de-shop-code.eml": {
+    "code": "482716"
+  },
+  "de-bank-tan.eml": {
+    "code": "739205"
+  },
+  "de-activation-link.eml": {
+    "code": null,
+    "link": "konto/aktivieren?token="
+  },
+  "de-newsletter-no-code.eml": {
+    "code": null
+  },
+  "es-app-code.eml": {
+    "code": "615384"
+  },
+  "es-bank-otp.eml": {
+    "code": "904713"
+  },
+  "es-activation-link.eml": {
+    "code": null,
+    "link": "cuenta/confirmar?token="
+  },
+  "es-receipt-no-code.eml": {
+    "code": null
+  },
+  "it-app-code.eml": {
+    "code": "358201"
+  },
+  "it-login-otp.eml": {
+    "code": "27419836"
+  },
+  "it-activation-link.eml": {
+    "code": null,
+    "link": "account/attiva?token="
+  },
+  "it-receipt-no-code.eml": {
+    "code": null
   }
 }
