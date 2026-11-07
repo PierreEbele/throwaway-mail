@@ -4,7 +4,11 @@ Self-hosted disposable e-mail addresses on Cloudflare Email Routing or any catch
 verification codes in the web UI, the API or your browser, choose per site whether mail reaches your real mailbox, and
 see when a site leaks or sells your address.
 
-![Inbox with a verification code](docs/images/inbox.png)
+![A new address for a site, then its verification mail arrives and the code is extracted](docs/images/demo.gif)
+
+Demo video (38 s), with the [Aliasfill](https://github.com/PierreEbele/Aliasfill) browser extension filling a sign-up
+form and pasting the code: [docs/media/throwaway-mail-demo.mp4](docs/media/throwaway-mail-demo.mp4). More screenshots
+in the [tour](docs/tour.md).
 
 ```
 Sender → Cloudflare MX → Email Routing catch-all → Email Worker ──HMAC──▶ App (API + web UI, SQLite)
