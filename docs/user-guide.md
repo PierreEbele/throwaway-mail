@@ -72,7 +72,8 @@ archive, delete.
 - **Newsletters** are labelled. _Unsubscribe_ uses one-click unsubscribe (RFC 8058) when the sender supports it,
   otherwise opens the unsubscribe page. _Unsubscribe & block newsletters_ also turns on newsletter rejection for the
   address.
-- **Attachments** are listed (name, type, size) but not stored.
+- **Attachments** are listed (name, type, size). Their content is not kept in the app, except inside the original
+  message held for forwarded mail (3 days, so a failed delivery can be retried) and for quarantined mail.
 - **Activity** card: mail per week over 12 weeks, mail with a code, top sender domains.
 
 ## Forwarding
