@@ -2,7 +2,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { ApiRouter } from "../lib/http.js";
 import { clientIp } from "../lib/http.js";
-import { addresses, categories, domainMailboxes, domains, messages, users, type Domain } from "../db/schema.js";
+import { addressDestinations, addresses, categories, domainMailboxes, domains, messages, users, type Domain } from "../db/schema.js";
 import type { Deps } from "../context.js";
 import { newId } from "../lib/crypto.js";
 import { DOMAIN_RE } from "../lib/email.js";
@@ -28,7 +28,10 @@ function full(d: Deps, dom: Domain) {
   };
 }
 
-/** Hand a domain (and its "To sort" box with the mail in it) over to another user. */
+/**
+ * Hand a domain (and its "To sort" box with the mail in it) over to another user. What the previous owner had set
+ * on the box (feed URL, forwarding, category) is cleared: none of it may follow the mail to the new owner.
+ */
 function transferDomain(d: Deps, dom: Domain, newOwnerId: string) {
   d.db.transaction((tx) => {
     tx.update(domains).set({ createdBy: newOwnerId }).where(eq(domains.id, dom.id)).run();
@@ -38,7 +41,11 @@ function transferDomain(d: Deps, dom: Domain, newOwnerId: string) {
       .where(and(eq(addresses.domainId, dom.id), eq(addresses.isUnassigned, true)))
       .all();
     for (const b of boxes) {
-      tx.update(addresses).set({ userId: newOwnerId }).where(eq(addresses.id, b.id)).run();
+      tx.update(addresses)
+        .set({ userId: newOwnerId, feedToken: null, forwardEnabled: false, destinationId: null, categoryId: null })
+        .where(eq(addresses.id, b.id))
+        .run();
+      tx.delete(addressDestinations).where(eq(addressDestinations.addressId, b.id)).run();
       tx.update(messages).set({ userId: newOwnerId }).where(eq(messages.addressId, b.id)).run();
     }
   });
