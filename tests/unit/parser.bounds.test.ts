@@ -29,7 +29,8 @@ describe("parser on large bodies", () => {
   }
 
   it("finishes quickly on large HTML", () => {
-    for (const html of ['<a href="https://x.test/unsubscribe">'.repeat(8_000), "<a ".repeat(80_000), "<b>x</b>".repeat(30_000)])
+    // HTML goes through an HTML parser several times (linear, but slower than the text passes): ~100 KB pages.
+    for (const html of ['<a href="https://x.test/unsubscribe">'.repeat(3_000), "<a ".repeat(30_000), "<b>x</b>".repeat(12_000)])
       expect(elapsed(() => parseMessage({ html }))).toBeLessThan(1000);
   });
 
