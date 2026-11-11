@@ -3,6 +3,7 @@ import type { Deps } from "../context.js";
 import {
   addressDestinations,
   addresses,
+  deletedAddresses,
   destinations,
   directories,
   domains,
@@ -128,6 +129,35 @@ export function reservedByDirectory(d: Pick<Deps, "db">, userId: string, localPa
   return !!dir && dir.userId !== userId;
 }
 
+/** Days after its deletion during which an address can only be registered again by its previous holder. */
+export const DELETED_ADDRESS_HOLD_DAYS = 90;
+
+/** Remember who held these addresses before deleting them (see DELETED_ADDRESS_HOLD_DAYS). Call before the delete. */
+export function recordDeletedAddresses(
+  d: Pick<Deps, "db" | "now">,
+  rows: Pick<Address, "domainId" | "localPart" | "userId" | "isUnassigned">[],
+) {
+  const now = d.now();
+  for (const a of rows) {
+    if (a.isUnassigned) continue;
+    d.db
+      .insert(deletedAddresses)
+      .values({ id: newId("dla"), domainId: a.domainId, localPart: a.localPart, userId: a.userId, deletedAt: now })
+      .onConflictDoUpdate({ target: [deletedAddresses.domainId, deletedAddresses.localPart], set: { userId: a.userId, deletedAt: now } })
+      .run();
+  }
+}
+
+/** Whether `localPart@domainId` was deleted less than DELETED_ADDRESS_HOLD_DAYS ago by a user other than `userId`. */
+export function heldAfterDeletion(d: Pick<Deps, "db" | "now">, userId: string, domainId: string, localPart: string): boolean {
+  const row = d.db
+    .select({ userId: deletedAddresses.userId, deletedAt: deletedAddresses.deletedAt })
+    .from(deletedAddresses)
+    .where(and(eq(deletedAddresses.domainId, domainId), eq(deletedAddresses.localPart, localPart)))
+    .get();
+  return !!row && row.userId !== userId && d.now() - row.deletedAt < DELETED_ADDRESS_HOLD_DAYS * 86400_000;
+}
+
 /** 409 for a name on a domain whose preserved catch-all belongs to another user (see catchAllKeptByOther). */
 const catchAllReserved = (domain: string) =>
   new HttpError(
@@ -168,7 +198,7 @@ export function createAddress(d: Deps, user: User, body: NewAddress): { a: Addre
   const maxMessages = body.max_messages === undefined ? prefs.default_max_messages : body.max_messages;
   for (let attempt = 0; attempt < 12; attempt++) {
     const localPart = body.local_part ?? generateLocalPart(prefs, body.site_name, attempt);
-    if (reservedByDirectory(d, user.id, localPart)) {
+    if (reservedByDirectory(d, user.id, localPart) || heldAfterDeletion(d, user.id, domain.id, localPart)) {
       if (body.local_part) throw conflict(`${body.local_part}@${domain.name} is already taken`);
       continue;
     }

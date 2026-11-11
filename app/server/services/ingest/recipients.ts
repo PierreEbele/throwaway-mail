@@ -4,6 +4,7 @@ import { addresses, categories, directories, users, type Address, type Domain, t
 import { newId } from "../../lib/crypto.js";
 import { LOCAL_PART_RE } from "../../lib/email.js";
 import { matchCategory } from "../categories.js";
+import { heldAfterDeletion } from "../addresses.js";
 
 const UNASSIGNED_LOCAL = "_unassigned";
 
@@ -101,6 +102,7 @@ function resolveDirectory(deps: Deps, domain: Domain, local: string): Address | 
   const site = m[2]!;
   const storedLocal = local;
   if (!LOCAL_PART_RE.test(storedLocal)) return null;
+  if (heldAfterDeletion(deps, dir.userId, domain.id, storedLocal)) return null;
   const now = deps.now();
   const siteUrl = /\.[a-z]{2,}$/.test(site) ? `https://${site}` : null;
   deps.db

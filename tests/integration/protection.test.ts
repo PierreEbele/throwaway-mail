@@ -175,6 +175,66 @@ describe("directory namespaces", () => {
   });
 });
 
+describe("deleted addresses", () => {
+  const D = "mail.example.test";
+  const DAY = 86400_000;
+
+  it("only the previous holder can register a deleted address during the hold period", async () => {
+    const { t } = await setup();
+    const real = t.deps.now;
+    const start = real();
+    // Sessions expire across the jumps in time: log in again after each one.
+    const at = (days: number) => {
+      t.deps.now = () => start + days * DAY;
+      return { user: loginAs(t, "u@example.org"), other: loginAs(t, "v@example.org"), admin: loginAs(t, "admin@example.org", "admin") };
+    };
+    let { user, other, admin } = at(0);
+    const ids: string[] = [];
+    for (const local of ["reset", "bulk", "stale"]) {
+      ids.push((await user.post("/v1/addresses", { site_name: "Bank", domain: D, local_part: local })).json.address.id);
+    }
+    expect((await user.del(`/v1/addresses/${ids[0]}`)).status).toBe(200);
+    expect((await user.post("/v1/addresses/bulk", { ids: [ids[1]], action: "delete" })).json.affected).toBe(1);
+    ({ user } = at(2)); // the stale list only holds addresses older than `days`
+    expect((await user.post("/v1/stale-addresses", { action: "delete", ids: [ids[2]], days: 1 })).json.affected).toBe(1);
+
+    ({ user, other, admin } = at(89));
+    for (const local of ["reset", "bulk", "stale"]) {
+      const r = await other.post("/v1/addresses", { site_name: "Bank", domain: D, local_part: local });
+      expect(r.status).toBe(409);
+      expect(r.json.error.code).toBe("conflict");
+    }
+    expect((await admin.post("/v1/addresses", { site_name: "Bank", domain: D, local_part: "reset" })).status).toBe(409);
+    const backup = await other.post("/v1/import", { addresses: [{ email: `bulk@${D}`, site_name: "Bank" }] });
+    expect(backup.json.addresses_created).toBe(0);
+    const csv = `alias,note,enabled,mailboxes\r\nstale@${D},Bank,True,me@example.org\r\n`;
+    expect((await other.post("/v1/import/aliases", { content: csv, domain: D, dry_run: false })).json.created).toBe(0);
+    expect((await other.get("/v1/addresses")).json.addresses).toHaveLength(0);
+
+    // The previous holder can take it back at any time.
+    expect((await user.post("/v1/addresses", { site_name: "Bank", domain: D, local_part: "reset" })).status).toBe(201);
+    // After the hold period, anyone can.
+    ({ other } = at(91));
+    expect((await other.post("/v1/addresses", { site_name: "Bank", domain: D, local_part: "bulk" })).status).toBe(201);
+    t.deps.now = real;
+  });
+
+  it("a directory taken over by another user does not recreate a recently deleted address", async () => {
+    const { t, user } = await setup();
+    const other = loginAs(t, "v@example.org");
+    const dir = (await user.post("/v1/directories", { name: "alex" })).json.directory;
+    expect((await ingest(t, `alex.shop@${D}`, simpleEml({ text: "welcome" }))).json.action).toBe("store_only");
+    const a = (await user.get("/v1/addresses")).json.addresses[0];
+    await user.del(`/v1/addresses/${a.id}`);
+    await user.del(`/v1/directories/${dir.id}`);
+    expect((await other.post("/v1/directories", { name: "alex" })).status).toBe(201);
+
+    expect((await ingest(t, `alex.shop@${D}`, simpleEml({ text: "reset link" }))).json.action).toBe("reject");
+    expect((await other.get("/v1/addresses")).json.addresses).toHaveLength(0);
+    expect((await ingest(t, `alex.forum@${D}`, simpleEml({ text: "hi" }))).json.action).toBe("store_only");
+  });
+});
+
 describe("feeds", () => {
   it("serves a private RSS / JSON feed only with the token", async () => {
     const { t, user, mk } = await setup();

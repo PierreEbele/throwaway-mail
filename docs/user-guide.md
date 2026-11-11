@@ -37,6 +37,7 @@ Right-click an address in the list for quick actions: open, copy, mark read, pin
 archive, delete.
 
 - **Pause** rejects new mail; **Archive** also hides the address from the lists; **Delete** removes it with its mail.
+  For 90 days after a delete, only you can create that address again.
 - **Expiry**: an address can expire after a number of days. A banner appears three days before, with
   _+7 days_, _+30 days_ and _Never expire_, and a notification is sent 24 hours before. Once expired, the address
   is paused automatically (shown as _expired_; its mail is rejected); extending it brings it back.

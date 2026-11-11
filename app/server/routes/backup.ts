@@ -9,7 +9,7 @@ import { CATEGORY_COLORS } from "../services/categories.js";
 import { csvLine } from "../lib/csv.js";
 import { badRequest } from "../lib/errors.js";
 import { importAliases, parseAliasFile } from "../services/importers.js";
-import { reservedByDirectory } from "../services/addresses.js";
+import { heldAfterDeletion, reservedByDirectory } from "../services/addresses.js";
 import { catchAllKeptByOther } from "../services/ingest/recipients.js";
 
 /** Export and import of addresses and categories. */
@@ -148,7 +148,7 @@ export function registerBackup(r: ApiRouter) {
             result.skipped.push({ email: a.email, reason: domain ? "invalid address" : "unknown domain" });
             continue;
           }
-          if (reservedByDirectory(d, user.id, local)) {
+          if (reservedByDirectory(d, user.id, local) || heldAfterDeletion(d, user.id, domain.id, local)) {
             result.skipped.push({ email: a.email, reason: "already exists" });
             continue;
           }

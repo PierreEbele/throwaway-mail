@@ -4,6 +4,7 @@ import type { ApiRouter } from "../lib/http.js";
 import type { Deps } from "../context.js";
 import { addresses, domains, messages, type User } from "../db/schema.js";
 import { addressOut } from "../services/serialize.js";
+import { recordDeletedAddresses } from "../services/addresses.js";
 
 /** Addresses that never received any mail. */
 export function registerStale(r: ApiRouter) {
@@ -63,7 +64,11 @@ export function registerStale(r: ApiRouter) {
       const ids = body.ids.filter((id) => allowed.has(id));
       if (ids.length) {
         const where = and(eq(addresses.userId, user.id), inArray(addresses.id, ids));
-        if (body.action === "delete") d.db.delete(addresses).where(where).run();
+        if (body.action === "delete")
+          d.db.transaction(() => {
+            recordDeletedAddresses(d, d.db.select().from(addresses).where(where).all());
+            d.db.delete(addresses).where(where).run();
+          });
         else if (body.action === "archive") d.db.update(addresses).set({ status: "archived", updatedAt: d.now() }).where(where).run();
         else d.db.update(addresses).set({ staleDismissedAt: d.now() }).where(where).run();
         for (const id of ids)
