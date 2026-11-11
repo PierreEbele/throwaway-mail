@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import type { ApiRouter } from "../lib/http.js";
-import { addresses, domains, extractedItems, messages } from "../db/schema.js";
+import { addresses, domains, extractedItems, messages, users } from "../db/schema.js";
 import { randomString } from "../lib/crypto.js";
 import { notFound } from "../lib/errors.js";
 import { addressOut, itemsOut } from "../services/serialize.js";
@@ -49,7 +49,9 @@ export function registerFeeds(r: ApiRouter) {
         .select({ a: addresses, domain: domains.name })
         .from(addresses)
         .innerJoin(domains, eq(domains.id, addresses.domainId))
-        .where(eq(addresses.feedToken, m[1]!))
+        // The feed of a disabled user's address stops with the rest of the account.
+        .innerJoin(users, eq(users.id, addresses.userId))
+        .where(and(eq(addresses.feedToken, m[1]!), eq(users.disabled, false)))
         .get();
       if (!row) throw notFound("Feed");
       const { a, domain } = row;
