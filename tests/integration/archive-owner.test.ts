@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { and, eq } from "drizzle-orm";
 import { Client, addDomain, ingest, loginAs, makeTestApp, setupAdmin, simpleEml, type TestApp } from "../helpers.js";
+import { addresses } from "../../app/server/db/schema.js";
 
 let t: TestApp;
 let admin: Client;
@@ -65,5 +67,25 @@ describe("domain owner", () => {
     const created = (await admin.post("/v1/domains", { name: "x.example.test", owner_id: bobId })).json.domain;
     expect(created.owner.email).toBe("bob@example.org");
     expect((await admin.post("/v1/domains", { name: "y.example.test", owner_id: "usr_nope" })).status).toBe(400);
+  });
+
+  it("does not let the previous owner keep reading the To sort box through its feed", async () => {
+    const bob = loginAs(t, "bob@example.org");
+    const bobId = (await bob.get("/v1/auth/me")).json.user.id;
+    const dom = await addDomain(admin, "catchall.example.test");
+    await ingest(t, "someone@catchall.example.test", simpleEml({ text: "x" }));
+    const box = t.deps.db
+      .select()
+      .from(addresses)
+      .where(and(eq(addresses.domainId, dom.id), eq(addresses.isUnassigned, true)))
+      .get()!;
+    const token = (await admin.post(`/v1/addresses/${box.id}/feed`, { enabled: true })).json.address.feed_token;
+    expect((await t.app.request(`/feeds/${token}.json`)).status).toBe(200);
+
+    await admin.patch(`/v1/domains/${dom.id}`, { owner_id: bobId });
+    await ingest(t, "other@catchall.example.test", simpleEml({ text: "for bob" }));
+    expect((await t.app.request(`/feeds/${token}.json`)).status).toBe(404);
+    const moved = t.deps.db.select().from(addresses).where(eq(addresses.id, box.id)).get()!;
+    expect(moved).toMatchObject({ userId: bobId, feedToken: null, forwardEnabled: false, destinationId: null });
   });
 });
