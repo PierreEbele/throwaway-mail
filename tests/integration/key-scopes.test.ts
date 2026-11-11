@@ -80,6 +80,11 @@ describe("API key scopes", () => {
     }
     expect((await c.post("/v1/addresses", { site_name: "Nope" })).status).toBe(403);
     expect((await c.post("/v1/addresses/bulk", { action: "pause", ids: [b.id] })).status).toBe(403);
+    // Replacing an in-scope address would create a new one: refused too, and nothing changes.
+    expect((await c.post(`/v1/addresses/${a.id}/replace`, {})).status).toBe(403);
+    expect((await c.post(`/v1/addresses/${a.id}/rejected`, { replace: true })).status).toBe(403);
+    expect((await admin.get("/v1/addresses?status=all")).json.addresses).toHaveLength(2);
+    expect((await admin.get(`/v1/addresses/${a.id}`)).json.address.status).toBe("active");
     expect((await compat(t, secret)).status).toBe(403);
   });
 
