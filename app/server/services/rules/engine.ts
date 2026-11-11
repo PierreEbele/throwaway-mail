@@ -2,7 +2,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Deps } from "../../context.js";
 import { addresses, categories, extractedItems, rules, type Address, type Message, type Rule } from "../../db/schema.js";
 import { listed, parseList } from "../../lib/senders.js";
-import { safeTest } from "./regex.js";
+import { safeTest, usablePattern } from "./regex.js";
 import type { Action, Condition, MailFacts, RuleEffect } from "./types.js";
 
 const FAILED = new Set(["fail", "softfail", "permerror"]);
@@ -53,6 +53,8 @@ function test(c: Condition, f: MailFacts): boolean {
 
 /** Whether a rule's conditions match these facts. */
 export function ruleMatches(match: "all" | "any", conditions: Condition[], f: MailFacts): boolean {
+  // A pattern refused by the current checks disables its whole rule, negated or not, rather than being run.
+  if (conditions.some((c) => c.type === "recipient_matches" && !usablePattern(c.value))) return false;
   const results = conditions.map((c) => test(c, f) !== !!c.negate);
   return match === "all" ? results.every(Boolean) : results.some(Boolean);
 }
