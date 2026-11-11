@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Deps } from "../context.js";
 import { addresses, domains, siteRejections, type Address, type Domain, type User } from "../db/schema.js";
 import { newId } from "../lib/crypto.js";
+import { catchAllKeptByOther } from "./ingest/recipients.js";
 
 /** Normalised keys of a site: host of its URL without "www.", and the lower-case site name. */
 export function siteKeys(siteName: string | null | undefined, siteUrl: string | null | undefined): string[] {
@@ -61,7 +62,8 @@ export function pickDomain(
     .from(domains)
     .where(eq(domains.status, "active"))
     .orderBy(asc(domains.createdAt), asc(sql`rowid`))
-    .all();
+    .all()
+    .filter((x) => !catchAllKeptByOther(d, x, user));
   const rejected = rejectedDomainIds(d, site.site_name, site.site_url);
   const avoided = active.filter((x) => rejected.has(x.id));
   let pool = active.filter((x) => !rejected.has(x.id) && !exclude.has(x.id));

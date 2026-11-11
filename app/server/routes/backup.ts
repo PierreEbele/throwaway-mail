@@ -10,6 +10,7 @@ import { csvLine } from "../lib/csv.js";
 import { badRequest } from "../lib/errors.js";
 import { importAliases, parseAliasFile } from "../services/importers.js";
 import { reservedByDirectory } from "../services/addresses.js";
+import { catchAllKeptByOther } from "../services/ingest/recipients.js";
 
 /** Export and import of addresses and categories. */
 export function registerBackup(r: ApiRouter) {
@@ -149,6 +150,10 @@ export function registerBackup(r: ApiRouter) {
           }
           if (reservedByDirectory(d, user.id, local)) {
             result.skipped.push({ email: a.email, reason: "already exists" });
+            continue;
+          }
+          if (catchAllKeptByOther(d, domain, user)) {
+            result.skipped.push({ email: a.email, reason: "catch-all kept by the domain owner" });
             continue;
           }
           const res = tx
