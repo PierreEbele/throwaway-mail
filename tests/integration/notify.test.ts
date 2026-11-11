@@ -59,6 +59,36 @@ describe("notifications", () => {
     expect(JSON.stringify(t)).not.toContain("SECRET");
   });
 
+  it("stops notifications and feeds of a disabled user", async () => {
+    const { t, admin, user, calls, flush } = await setup();
+    await user.post("/v1/notify-targets", { kind: "ntfy", name: "phone", url: "https://ntfy.sh/my-topic", events: ["code.received"] });
+    await user.post("/v1/notify-targets", {
+      kind: "webhook",
+      name: "hook",
+      url: "https://n8n.example.com/hook",
+      events: ["code.received"],
+    });
+    const a = (await user.post("/v1/addresses", { site_name: "GitHub" })).json.address;
+    const token = (await user.post(`/v1/addresses/${a.id}/feed`, { enabled: true })).json.address.feed_token;
+    await ingest(t, a.email, simpleEml({ subject: "Your code", text: "Your verification code is 482913" }));
+    await flush();
+    expect(calls.map((c) => c.url).sort()).toEqual(["https://n8n.example.com/hook", "https://ntfy.sh/my-topic"]);
+    expect((await t.app.request(`/feeds/${token}.json`)).status).toBe(200);
+
+    const id = (await user.get("/v1/auth/me")).json.user.id;
+    expect((await admin.patch(`/v1/admin/users/${id}`, { disabled: true })).status).toBe(200);
+    calls.length = 0;
+    await ingest(t, a.email, simpleEml({ subject: "Your code", text: "Your verification code is 551902" }));
+    await flush();
+    expect(calls).toEqual([]);
+    expect((await t.app.request(`/feeds/${token}.json`)).status).toBe(404);
+    expect((await t.app.request(`/feeds/${token}.rss`)).status).toBe(404);
+
+    // Enabled again: both come back.
+    expect((await admin.patch(`/v1/admin/users/${id}`, { disabled: false })).status).toBe(200);
+    expect((await t.app.request(`/feeds/${token}.json`)).status).toBe(200);
+  });
+
   it("pushes codes to ntfy, Telegram and signed webhooks", async () => {
     const { t, user, calls, flush } = await setup();
     await user.post("/v1/notify-targets", {

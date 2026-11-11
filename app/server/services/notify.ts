@@ -108,13 +108,15 @@ export async function sendTo(deps: Deps, t: NotifyTarget, e: NotifyEvent): Promi
   }
 }
 
-/** Fire-and-forget fan-out to every enabled target of `userId` subscribed to `e.type`. */
+/** Fire-and-forget fan-out to every enabled target of `userId` subscribed to `e.type`. A disabled user gets nothing. */
 export function notify(deps: Deps, userId: string, e: NotifyEvent): Promise<unknown> {
   const targets = deps.db
-    .select()
+    .select({ t: notifyTargets })
     .from(notifyTargets)
-    .where(and(eq(notifyTargets.userId, userId), eq(notifyTargets.enabled, true)))
+    .innerJoin(users, eq(users.id, notifyTargets.userId))
+    .where(and(eq(notifyTargets.userId, userId), eq(notifyTargets.enabled, true), eq(users.disabled, false)))
     .all()
+    .map((r) => r.t)
     .filter((t) => parseList(t.eventsJson).includes(e.type) && !t.pausedAt);
   const hooks = targets.filter((t) => t.kind === "webhook");
   return Promise.all([enqueueWebhooks(deps, hooks, e), ...targets.filter((t) => t.kind !== "webhook").map((t) => sendTo(deps, t, e))]);
