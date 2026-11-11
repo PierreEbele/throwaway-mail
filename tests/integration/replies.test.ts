@@ -90,6 +90,24 @@ describe("reverse-alias replies", () => {
     expect(mime).toContain("Shipped");
     expect(mime).not.toMatch(/^From: Shop Team <orders@shop.com>/m);
 
+    // Read-receipt and error-report requests would be answered from the user's real mailbox: they are dropped.
+    const receipt = [
+      "From: orders@shop.com",
+      `To: ${a.email}`,
+      "Subject: Did you read this?",
+      "Message-ID: <receipt-1@shop.com>",
+      "Disposition-Notification-To: track@shop.com",
+      "Return-Receipt-To: track@shop.com",
+      "X-Confirm-Reading-To: track@shop.com",
+      "Errors-To: track@shop.com",
+      "",
+      "Hello",
+      "",
+    ].join("\r\n");
+    const copy = Buffer.from((await ingest(t, a.email, receipt)).json.send[0].raw_base64, "base64").toString("utf8");
+    expect(copy).toContain("Subject: Did you read this?");
+    expect(copy).not.toContain("track@shop.com");
+
     // Same sender again: same contact.
     await ingest(t, a.email, simpleEml({ text: "Again", from: "orders@shop.com" }));
     expect((await admin.get(`/v1/addresses/${a.id}/contacts`)).json.contacts).toHaveLength(1);

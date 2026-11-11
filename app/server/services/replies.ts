@@ -129,8 +129,23 @@ export function displayName(name: string): string {
 
 export const field = (name: string, value: string): Field => ({ name: name.toLowerCase(), text: `${name}: ${value}` });
 
-/** Headers that would let the recipient (or the user's mail client) bypass the alias. */
-export const FORWARD_DROP = new Set(["from", "reply-to", "sender", "return-path", "dkim-signature", "x-original-from", "mail-followup-to"]);
+/**
+ * Headers that would let the recipient (or the user's mail client) bypass the alias, including read-receipt and
+ * error-report requests, which the client would answer from the user's real mailbox.
+ */
+export const FORWARD_DROP = new Set([
+  "from",
+  "reply-to",
+  "sender",
+  "return-path",
+  "dkim-signature",
+  "x-original-from",
+  "mail-followup-to",
+  "disposition-notification-to",
+  "return-receipt-to",
+  "x-confirm-reading-to",
+  "errors-to",
+]);
 
 /** The forwarded copy: From the alias, Reply-To the reverse address, the original sender kept in X-Original-From. */
 export function rewriteForward(
