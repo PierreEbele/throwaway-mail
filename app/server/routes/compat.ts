@@ -2,7 +2,7 @@ import type { Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import type { AppEnv } from "../context.js";
 import { resolveApiKey } from "../auth/tokens.js";
-import { RateLimiter } from "../auth/ratelimit.js";
+import { limiterKey, RateLimiter } from "../auth/ratelimit.js";
 import { HttpError } from "../lib/errors.js";
 import { createAddress } from "../services/addresses.js";
 import { addressOut } from "../services/serialize.js";
@@ -62,7 +62,9 @@ export function registerCompat(app: Hono<AppEnv>, limiter: RateLimiter) {
   );
   app.use("/api/*", async (c, next) => {
     if (c.req.method === "OPTIONS") return next();
-    const r = limiter.hit(`compat:${c.req.header("authentication") || c.req.header("authorization") || "anon"}`);
+    // Keyed on a hash: the header is caller-supplied and may be up to the server's header size limit.
+    const credential = c.req.header("authentication") || c.req.header("authorization");
+    const r = limiter.hit(`compat:${credential ? limiterKey(credential) : "anon"}`);
     if (!r.ok) throw new HttpError(429, "rate_limited", `Too many requests, retry in ${r.retryAfter}s`);
     await next();
   });
