@@ -11,7 +11,7 @@ import { sanitizeEmail } from "../../lib/sanitize.js";
 import { authWarning } from "../../lib/phishing.js";
 import { listInfo } from "../../lib/listheaders.js";
 import { listed, looksLikeLeak, parseList, senderDomain } from "../../lib/senders.js";
-import { runParser } from "../../parser/index.js";
+import { boundedInput, runParser } from "../../parser/index.js";
 import { unsubscribeCandidates } from "../../parser/unsubscribe.js";
 import { pauseExpired } from "../reminders.js";
 import { handleReply, REVERSE_LOCAL_RE } from "../replies.js";
@@ -149,10 +149,12 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
     }
   }
 
-  const parsed = await runParser({ subject: email.subject, text: email.text, html: email.html }, deps.parserStrategies);
+  // Code, link and unsubscribe extraction only look at the first MAX_PARSE_CHARS of each body.
+  const body = boundedInput({ subject: email.subject, text: email.text, html: email.html });
+  const parsed = await runParser(body, deps.parserStrategies);
   const list = listInfo(email.headers);
   // No List-Unsubscribe URL: fall back to an unsubscribe link or button found in the body.
-  const unsub = list.url ? null : unsubscribeCandidates({ text: email.text, html: email.html }).find((u) => u.url);
+  const unsub = list.url ? null : unsubscribeCandidates({ text: body.text, html: body.html }).find((u) => u.url);
   if (address.blockPromos && list.bulk && !parsed.code) {
     log.info("reject: promotional mail blocked", { address_id: address.id });
     emitBlocked(deps, address, rcpt.full, email.from?.address ?? envelopeSender, "promotional_blocked");

@@ -35,6 +35,10 @@ function headerTargets(headers: Array<{ key: string; value: string }>) {
 
 const cleanUrl = (u: string) => decodeEntities(u.trim()).replace(/[.,;:!?)\]>'"]+$/, "");
 
+const CONTEXT_LOOKBACK = 2000;
+/** Plain-text URLs examined per message (the rest of a huge body is ignored). */
+const MAX_TEXT_URLS = 500;
+
 /** Unsubscribe links found in the body (anchors, buttons, images with an unsubscribe alt, plain-text URLs). */
 export function bodyUnsubscribeLinks(input: { text?: string | null; html?: string | null }): UnsubscribeCandidate[] {
   const out = new Map<string, UnsubscribeCandidate>();
@@ -82,12 +86,14 @@ export function bodyUnsubscribeLinks(input: { text?: string | null; html?: strin
   if (input.text) {
     const re = /(?:https?:\/\/|mailto:)[^\s<>"'\]]+/gi;
     let m: RegExpExecArray | null;
-    while ((m = re.exec(input.text))) {
-      const lineStart = input.text.lastIndexOf("\n", m.index - 1) + 1;
-      const prevLineStart = input.text.lastIndexOf("\n", Math.max(0, lineStart - 2)) + 1;
+    for (let n = 0; n < MAX_TEXT_URLS && (m = re.exec(input.text)); n++) {
+      // Only a bounded look-back is examined, so long lines full of URLs stay linear.
+      const win = input.text.slice(Math.max(0, m.index - CONTEXT_LOOKBACK), m.index);
+      const lineStart = win.lastIndexOf("\n") + 1;
+      const prevLineStart = lineStart === 0 ? 0 : win.lastIndexOf("\n", lineStart - 2) + 1;
       // Words before the URL on its line, or the line above when the URL stands alone (unless that line has its own link).
-      const before = input.text.slice(lineStart, m.index).trim();
-      const above = input.text.slice(prevLineStart, lineStart);
+      const before = win.slice(lineStart).trim();
+      const above = win.slice(prevLineStart, lineStart);
       const ctx = (before || /(?:https?:\/\/|mailto:)/i.test(above) ? before : above).replace(/\s+/g, " ").trim().slice(-120);
       add(m[0], ctx);
     }
