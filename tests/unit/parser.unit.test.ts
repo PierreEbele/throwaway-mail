@@ -100,6 +100,7 @@ describe("display sanitiser", async () => {
 
 describe("authentication results", async () => {
   const { authResult } = await import("../../app/server/services/ingest/index.js");
+  const { authservId } = await import("../../app/server/services/ingest/auth.js");
   // Exactly what Cloudflare wrote for the test mail on 2026-11-01
   const cf = [
     {
@@ -116,5 +117,15 @@ describe("authentication results", async () => {
   it("still reads a single SPF clause", () => {
     expect(authResult([{ key: "authentication-results", value: "mx; spf=softfail smtp.helo=x" }], "spf")).toBe("softfail");
     expect(authResult([], "spf")).toBeNull();
+  });
+  it("only reads headers from trusted authserv-ids when a list is given", () => {
+    const forged = { key: "authentication-results", value: "evil.example; dkim=pass header.d=bank.example; dmarc=pass" };
+    const real = { key: "authentication-results", value: "MX.Cloudflare.NET (comment) 1; dkim=fail; dmarc=fail" };
+    expect(authResult([forged, real], "dmarc")).toBe("pass"); // unset: every header counts, as before
+    expect(authResult([forged, real], "dmarc", ["mx.cloudflare.net"])).toBe("fail");
+    expect(authResult([forged, real], "dkim", ["mx.cloudflare.net", "other.example"])).toBe("fail");
+    expect(authResult([forged], "dmarc", ["mx.cloudflare.net"])).toBeNull();
+    expect(authservId("mx.cloudflare.net;\tdkim=pass")).toBe("mx.cloudflare.net");
+    expect(authservId("(c) Example.ORG 1 ; spf=pass")).toBe("example.org");
   });
 });
