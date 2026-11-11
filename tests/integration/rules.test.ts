@@ -4,6 +4,7 @@ import { addDomain, ingest, makeTestApp, setupAdmin, simpleEml, SECRET, type Cli
 import { fakeMail, SmtpError } from "../mail-fakes.js";
 import { messageRaw, messages } from "../../app/server/db/schema.js";
 import { patternProblem, safeTest } from "../../app/server/services/rules/regex.js";
+import { rules } from "../../app/server/db/schema.js";
 import { reportSignature } from "../../app/server/routes/ingest.js";
 
 const RELAY = "smtps://u:p@smtp.relay.example:465";
@@ -65,6 +66,46 @@ describe("rule regex guard", () => {
     expect(patternProblem("[")).toMatch(/valid/);
     expect(safeTest("(a+)+$", "aaaa")).toBe(false);
     expect(safeTest("^news\\.", "NEWS.shop@mail.example.test")).toBe(true);
+  });
+
+  it("refuses patterns whose repetitions can split the input too many ways", () => {
+    expect(patternProblem(".*".repeat(90) + "!")).toMatch(/Too much repetition/);
+    expect(patternProblem(".*".repeat(3) + "!")).toMatch(/Too much repetition/);
+    expect(patternProblem(".*shop.*")).toMatch(/Too much repetition/);
+    expect(patternProblem(".{0,99}.{0,99}.{0,99}!")).toMatch(/Too much repetition/);
+    expect(patternProblem("((a+))+")).toMatch(/Repeated groups/);
+    expect(patternProblem("((a{0,9})){0,9}")).toMatch(/Repeated groups/);
+    expect(patternProblem("^.*shop.*$")).toBeNull();
+    expect(patternProblem("^[a-z]+-\\d{4,6}@")).toBeNull();
+    expect(patternProblem("shop\\d*@")).toBeNull();
+    expect(patternProblem("^(?:info|contact)@")).toBeNull();
+  });
+
+  it("matches any accepted pattern quickly on the longest input", () => {
+    const inputs = ["a".repeat(400), "a-".repeat(200), "amber-otter-4821@example.test"];
+    for (const p of ["^.*.*!", ".*a?!", "^.{0,99}.{0,99}.{0,19}!", ".{0,320}.?!", "[a-]*-a!"]) {
+      expect(patternProblem(p)).toBeNull();
+      const t = performance.now();
+      for (const input of inputs) safeTest(p, input);
+      expect(performance.now() - t).toBeLessThan(250);
+    }
+  });
+
+  it("skips a saved rule whose pattern is no longer accepted, without failing the delivery", async () => {
+    const { t, admin, a } = await setup();
+    const saved = await rule(admin, {
+      conditions: [{ type: "recipient_matches", value: "^nomatch", negate: true }],
+      actions: [{ type: "block" }],
+    });
+    expect(saved.status).toBe(201);
+    // As if saved before the checks were tightened: negated, it would otherwise match every mail.
+    t.deps.db
+      .update(rules)
+      .set({ conditionsJson: JSON.stringify([{ type: "recipient_matches", value: ".*".repeat(40) + "!", negate: true }]) })
+      .where(eq(rules.id, saved.json.rule.id))
+      .run();
+    const r = await ingest(t, a.email, simpleEml({ text: "hi", subject: "hello" }));
+    expect(r.json.action).toBe("forward");
   });
 
   it("is enforced by the API", async () => {

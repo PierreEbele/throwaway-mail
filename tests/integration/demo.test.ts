@@ -38,6 +38,10 @@ describe("demo mode", () => {
     expect((await c.post("/v1/keys", { name: "k" })).status).toBe(403);
     expect((await c.post("/v1/notify-targets", { kind: "ntfy", name: "n", url: "https://ntfy.sh/x" })).status).toBe(403);
     expect((await c.patch("/v1/admin/users/x", { role: "user" })).status).toBe(403);
+    const rule = { name: "r", conditions: [{ type: "recipient_matches", value: "^x" }], actions: [{ type: "block" }] };
+    expect((await c.post("/v1/rules", rule)).status).toBe(403);
+    expect((await c.post("/v1/rules/test", rule)).status).toBe(403);
+    expect((await c.get("/v1/rules")).status).toBe(200);
     expect((await c.get("/v1/domains")).status).toBe(200);
     expect((await c.post("/v1/addresses", { site_name: "Visitor" })).status).toBe(201);
     expect((await c.post("/v1/categories", { name: "Mine" })).status).toBe(201);

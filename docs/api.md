@@ -120,7 +120,7 @@ const { code } = await tm.addresses.waitForCode(addr.id, { since: Date.now(), ti
 
 A rule is `{name, match: "all" | "any", conditions: [...], actions: [...], address_id?, category_id?}`. Condition
 types: `sender` (`op`: `is`/`contains`/`ends_with`, `value`), `sender_domain`, `subject_contains`,
-`recipient_matches` (regular expression, max 200 characters, no nested quantifiers / back-references / look-arounds),
+`recipient_matches` (regular expression, max 200 characters, no nested quantifiers / back-references / look-arounds, at most one open-ended repetition such as `.*`, two when the pattern starts with `^`),
 `category`, `has_attachments`, `size_over_kb`, `header_exists` (`name`), `header_equals` (`name`, `value`),
 `auth_failed` (`value`: `any`/`spf`/`dkim`/`dmarc`), `is_newsletter`, `has_code`; each takes `negate: true`. Action
 types: `block`, `quarantine`, `strip_attachments`, `forward_to` (`destination_id`), `set_category` (`category_id`),

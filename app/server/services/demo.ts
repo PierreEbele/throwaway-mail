@@ -163,7 +163,7 @@ export function demoUser(d: Deps) {
 /**
  * Writes refused in demo mode: anything that would change the instance for other visitors or send something out
  * (domains, destinations, users and invites, API keys, notifications, passwords and two-factor, backups, probes,
- * one-click unsubscribe). Addresses, categories and mail stay editable; they come back at the next reset.
+ * one-click unsubscribe, mail rules). Addresses, categories and mail stay editable; they come back at the next reset.
  */
 const DEMO_BLOCKED = [
   /^\/v1\/domains(\/|$)/,
@@ -174,6 +174,7 @@ const DEMO_BLOCKED = [
   /^\/v1\/auth\/(2fa|password|setup|invite|login)/,
   /^\/v1\/messages\/[^/]+\/unsubscribe$/,
   /^\/v1\/directories(\/|$)/,
+  /^\/v1\/rules(\/|$)/,
 ];
 
 export function demoBlocks(method: string, p: string): boolean {
