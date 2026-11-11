@@ -4,6 +4,7 @@ import {
   addressDestinations,
   addresses,
   destinations,
+  directories,
   domains,
   extractedItems,
   messages,
@@ -114,6 +115,18 @@ export interface NewAddress {
   exclude_domain_ids?: string[];
 }
 
+/**
+ * Whether `localPart` falls in the namespace of another user's directory (`<name>.<anything>`, see
+ * services/ingest/recipients.ts): mail to it must create an address for that directory's owner, so nobody else may
+ * register it.
+ */
+export function reservedByDirectory(d: Pick<Deps, "db">, userId: string, localPart: string): boolean {
+  const m = /^([a-z0-9]{3,32})\./.exec(localPart);
+  if (!m) return false;
+  const dir = d.db.select({ userId: directories.userId }).from(directories).where(eq(directories.name, m[1]!)).get();
+  return !!dir && dir.userId !== userId;
+}
+
 /** Creates an address for `user`. Shared by `POST /v1/addresses` and the alias-service compatibility API. */
 export function createAddress(d: Deps, user: User, body: NewAddress): { a: Address; domain: string; avoided: string[] } {
   const pick = body.domain
@@ -145,6 +158,10 @@ export function createAddress(d: Deps, user: User, body: NewAddress): { a: Addre
   const maxMessages = body.max_messages === undefined ? prefs.default_max_messages : body.max_messages;
   for (let attempt = 0; attempt < 12; attempt++) {
     const localPart = body.local_part ?? generateLocalPart(prefs, body.site_name, attempt);
+    if (reservedByDirectory(d, user.id, localPart)) {
+      if (body.local_part) throw conflict(`${body.local_part}@${domain.name} is already taken`);
+      continue;
+    }
     const row = {
       id: newId("adr"),
       userId: user.id,

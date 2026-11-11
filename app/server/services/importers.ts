@@ -5,7 +5,7 @@ import { csvObjects } from "../lib/csv.js";
 import { LOCAL_PART_RE } from "../lib/email.js";
 import { badRequest } from "../lib/errors.js";
 import { categoryByName } from "./categories.js";
-import { createAddress } from "./addresses.js";
+import { createAddress, reservedByDirectory } from "./addresses.js";
 
 /**
  * Import of aliases exported by other alias services. Formats (see docs/import.md for the sources and assumptions):
@@ -170,7 +170,7 @@ export function importAliases(d: Deps, user: User, list: SourceAlias[], opts: Im
             .from(addresses)
             .where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, srcLocal)))
             .get();
-        if (taken) {
+        if (taken || reservedByDirectory(d, user.id, srcLocal)) {
           row.reason = `${srcLocal}@${domain.name} already exists`;
           continue;
         }

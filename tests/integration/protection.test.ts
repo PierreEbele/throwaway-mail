@@ -143,6 +143,38 @@ describe("directories", () => {
   });
 });
 
+describe("directory namespaces", () => {
+  it("cannot be claimed by another user, through any creation path", async () => {
+    const { t, user } = await setup();
+    const other = loginAs(t, "v@example.org");
+    expect((await user.post("/v1/directories", { name: "alex" })).status).toBe(201);
+
+    const direct = await other.post("/v1/addresses", { site_name: "Bank", domain: "mail.example.test", local_part: "alex.bank" });
+    expect(direct.status).toBe(409);
+    const backup = await other.post("/v1/import", {
+      addresses: [{ email: "alex.shop@mail.example.test", site_name: "Shop" }],
+    });
+    expect(backup.json.addresses_created).toBe(0);
+    expect(backup.json.skipped).toEqual([{ email: "alex.shop@mail.example.test", reason: "already exists" }]);
+    const csv = "alias,note,enabled,mailboxes\r\nalex.forum@elsewhere.example,Forum,True,me@example.org\r\n";
+    const imported = await other.post("/v1/import/aliases", { content: csv, domain: "mail.example.test", dry_run: false });
+    expect(imported.json.created).toBe(0);
+    expect((await other.get("/v1/addresses")).json.addresses).toHaveLength(0);
+
+    // The owner can still register it, and mail to the namespace still reaches the owner.
+    expect((await user.post("/v1/addresses", { site_name: "Bank", domain: "mail.example.test", local_part: "alex.bank" })).status).toBe(
+      201,
+    );
+    expect((await ingest(t, "alex.shop@mail.example.test", simpleEml({ text: "welcome" }))).json.action).toBe("store_only");
+    expect((await user.get("/v1/addresses")).json.addresses.map((a: { email: string }) => a.email).sort()).toEqual([
+      "alex.bank@mail.example.test",
+      "alex.shop@mail.example.test",
+    ]);
+    // Names outside any directory namespace stay free for everyone.
+    expect((await other.post("/v1/addresses", { site_name: "X", domain: "mail.example.test", local_part: "al.bank" })).status).toBe(201);
+  });
+});
+
 describe("feeds", () => {
   it("serves a private RSS / JSON feed only with the token", async () => {
     const { t, user, mk } = await setup();
