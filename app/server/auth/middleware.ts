@@ -79,6 +79,9 @@ const ADDRESS_ROUTES: { method: string; re: RegExp; kind: "list" | "address" | "
   { method: "*", re: /^\/v1\/messages\/([^/]+)(?:\/.*)?$/, kind: "message" },
 ];
 
+/** Per-address routes that create a new address (a replacement), refused to restricted keys like any creation. */
+const ADDRESS_CREATING_ROUTES = [/^\/v1\/addresses\/[^/]+\/(?:replace|rejected)\/?$/];
+
 /** True when the caller may see this address (sessions and unrestricted keys see all of the user's addresses). */
 export function scopeAllows(scope: ApiKeyScope | null, addressId: string): boolean {
   return !scope?.addressIds || scope.addressIds.has(addressId);
@@ -92,6 +95,8 @@ export const enforceScope: MiddlewareHandler<AppEnv> = async (c, next) => {
     const ids = scope.addressIds;
     if (ids) {
       const method = c.req.method === "HEAD" ? "GET" : c.req.method;
+      if (method === "POST" && ADDRESS_CREATING_ROUTES.some((re) => re.test(c.req.path)))
+        throw new HttpError(403, "insufficient_scope", "This API key is restricted to some addresses");
       const route = ADDRESS_ROUTES.map((r) => ({ r, m: r.method === "*" || r.method === method ? r.re.exec(c.req.path) : null })).find(
         (x) => x.m,
       );
