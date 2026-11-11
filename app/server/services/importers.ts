@@ -6,6 +6,7 @@ import { LOCAL_PART_RE } from "../lib/email.js";
 import { badRequest } from "../lib/errors.js";
 import { categoryByName } from "./categories.js";
 import { createAddress, reservedByDirectory } from "./addresses.js";
+import { catchAllKeptByOther } from "./ingest/recipients.js";
 
 /**
  * Import of aliases exported by other alias services. Formats (see docs/import.md for the sources and assumptions):
@@ -155,6 +156,10 @@ export function importAliases(d: Deps, user: User, list: SourceAlias[], opts: Im
       const domain = target ?? active.get(srcDomain);
       if (!domain) {
         row.reason = `${srcDomain} is not a domain of this instance: choose a target domain`;
+        continue;
+      }
+      if (catchAllKeptByOther(d, domain, user)) {
+        row.reason = `${domain.name} keeps its owner's catch-all: only its owner can create addresses on it`;
         continue;
       }
       let local: string | undefined;

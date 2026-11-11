@@ -1,16 +1,26 @@
 import { and, asc, eq } from "drizzle-orm";
 import type { Deps } from "../../context.js";
-import { addresses, categories, directories, users, type Address, type Domain } from "../../db/schema.js";
+import { addresses, categories, directories, users, type Address, type Domain, type User } from "../../db/schema.js";
 import { newId } from "../../lib/crypto.js";
 import { LOCAL_PART_RE } from "../../lib/email.js";
 import { matchCategory } from "../categories.js";
 
 const UNASSIGNED_LOCAL = "_unassigned";
 
-function domainOwner(deps: Deps, domain: Domain): string | null {
+export function domainOwner(deps: Pick<Deps, "db">, domain: Domain): string | null {
   if (domain.createdBy) return domain.createdBy;
   const admin = deps.db.select().from(users).where(eq(users.role, "admin")).orderBy(asc(users.createdAt)).get();
   return admin?.id ?? null;
+}
+
+/**
+ * Whether `domain` forwards unknown addresses to a preserved catch-all that is not kept by `user`. Names claimed on
+ * such a domain would take mail away from the catch-all's owner (the domain owner), so only that owner and admins
+ * may claim them.
+ */
+export function catchAllKeptByOther(deps: Pick<Deps, "db">, domain: Domain, user: Pick<User, "id" | "role">): boolean {
+  if (!domain.catchallForwardTo || user.role === "admin") return false;
+  return domainOwner(deps, domain) !== user.id;
 }
 
 function resolveUnknown(deps: Deps, domain: Domain, local: string, senderDomain: string | null): Address | null {
@@ -82,6 +92,12 @@ function resolveDirectory(deps: Deps, domain: Domain, local: string): Address | 
   if (!m || domain.status !== "active") return null;
   const dir = deps.db.select().from(directories).where(eq(directories.name, m[1]!)).get();
   if (!dir) return null;
+  // On a domain with a preserved catch-all, only its owner's (or an admin's) directories apply: others' mail stays
+  // with the catch-all.
+  if (domain.catchallForwardTo) {
+    const dirOwner = deps.db.select({ id: users.id, role: users.role }).from(users).where(eq(users.id, dir.userId)).get();
+    if (!dirOwner || catchAllKeptByOther(deps, domain, dirOwner)) return null;
+  }
   const site = m[2]!;
   const storedLocal = local;
   if (!LOCAL_PART_RE.test(storedLocal)) return null;

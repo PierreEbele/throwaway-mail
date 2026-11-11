@@ -16,11 +16,12 @@ import {
 import { newId } from "../lib/crypto.js";
 import { LOCAL_PART_RE } from "../lib/email.js";
 import { addressSettings, generateLocalPart } from "./alias-format.js";
-import { badRequest, conflict, notFound } from "../lib/errors.js";
+import { HttpError, badRequest, conflict, notFound } from "../lib/errors.js";
 import { addressOut } from "./serialize.js";
 import { checkCategory, matchCategory } from "./categories.js";
 import { domainOf, repliesUnavailableReason } from "./replies.js";
 import { noMailWarning, pickDomain } from "./sites.js";
+import { catchAllKeptByOther } from "./ingest/recipients.js";
 
 export function messageCounts(deps: Deps, ids: string[]) {
   const map = new Map<string, { unread: number; total: number }>();
@@ -127,6 +128,14 @@ export function reservedByDirectory(d: Pick<Deps, "db">, userId: string, localPa
   return !!dir && dir.userId !== userId;
 }
 
+/** 409 for a name on a domain whose preserved catch-all belongs to another user (see catchAllKeptByOther). */
+const catchAllReserved = (domain: string) =>
+  new HttpError(
+    409,
+    "catch_all_reserved",
+    `${domain} forwards unknown addresses to its owner's catch-all: only its owner can create addresses on it`,
+  );
+
 /** Creates an address for `user`. Shared by `POST /v1/addresses` and the alias-service compatibility API. */
 export function createAddress(d: Deps, user: User, body: NewAddress): { a: Address; domain: string; avoided: string[] } {
   const pick = body.domain
@@ -145,6 +154,7 @@ export function createAddress(d: Deps, user: User, body: NewAddress): { a: Addre
     : pick!.domain;
   if (!domain) throw badRequest(body.domain ? `Unknown domain ${body.domain}` : "No active domain is configured yet");
   if (domain.status !== "active") throw badRequest(`Domain ${domain.name} is not active yet`);
+  if (catchAllKeptByOther(d, domain, user)) throw catchAllReserved(domain.name);
   if (body.local_part !== undefined && !LOCAL_PART_RE.test(body.local_part)) {
     throw badRequest("local_part may contain a-z, 0-9, '.', '_' and '-', must start and end with a letter or digit (max 64)");
   }

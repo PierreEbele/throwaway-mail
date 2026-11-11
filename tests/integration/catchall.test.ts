@@ -110,6 +110,55 @@ describe("existing catch-all is preserved", () => {
   });
 });
 
+describe("names on a domain with a preserved catch-all", () => {
+  it("only the catch-all's owner and admins can create addresses there", async () => {
+    const dom = await addDomain(admin, DOMAIN);
+    await addDomain(admin, "mail.example.test");
+    const { loginAs } = await import("../helpers.js");
+    const u = loginAs(t, "u@example.org");
+
+    const direct = await u.post("/v1/addresses", { site_name: "Bank", domain: DOMAIN, local_part: "bank" });
+    expect(direct.status).toBe(409);
+    expect(direct.json.error.code).toBe("catch_all_reserved");
+    expect((await u.post("/v1/addresses", { site_name: "Bank", domain: DOMAIN })).status).toBe(409);
+    // A generated address never lands on that domain.
+    for (let i = 0; i < 4; i++) {
+      expect((await u.post("/v1/addresses", { site_name: `Site ${i}`, domain_choice: "random" })).json.address.email).toMatch(
+        /@mail\.example\.test$/,
+      );
+    }
+    const backup = await u.post("/v1/import", { addresses: [{ email: `shop@${DOMAIN}`, site_name: "Shop" }] });
+    expect(backup.json.addresses_created).toBe(0);
+    const csv = `alias,note,enabled,mailboxes\r\nforum@${DOMAIN},Forum,True,me@example.org\r\n`;
+    expect((await u.post("/v1/import/aliases", { content: csv, dry_run: false })).json.created).toBe(0);
+    // Mail to the refused name still follows the catch-all.
+    expect((await ingest(t, `bank@${DOMAIN}`, simpleEml({ text: "x" }))).json.action).toBe("forward");
+
+    // Admins can, and so can a non-admin owner of the domain.
+    expect((await admin.post("/v1/addresses", { site_name: "Bank", domain: DOMAIN, local_part: "bank2" })).status).toBe(201);
+    const uid = (await u.get("/v1/auth/me")).json.user.id;
+    expect((await admin.patch(`/v1/domains/${dom.id}`, { owner_id: uid })).status).toBe(200);
+    expect((await u.post("/v1/addresses", { site_name: "Bank", domain: DOMAIN, local_part: "bank" })).status).toBe(201);
+  });
+
+  it("another user's directory does not take mail from the catch-all", async () => {
+    await addDomain(admin, DOMAIN);
+    const { loginAs } = await import("../helpers.js");
+    const u = loginAs(t, "u@example.org");
+    expect((await u.post("/v1/directories", { name: "ulex" })).status).toBe(201);
+    expect((await admin.post("/v1/directories", { name: "boss" })).status).toBe(201);
+
+    expect((await ingest(t, `ulex.shop@${DOMAIN}`, simpleEml({ text: "x" }))).json).toMatchObject({
+      action: "forward",
+      forward_to: "me@personal.example",
+    });
+    expect((await u.get("/v1/addresses")).json.addresses).toHaveLength(0);
+    // The catch-all owner's directory keeps working.
+    expect((await ingest(t, `boss.shop@${DOMAIN}`, simpleEml({ text: "y" }))).json.action).toBe("store_only");
+    expect((await admin.get("/v1/addresses")).json.addresses.map((a: { email: string }) => a.email)).toContain(`boss.shop@${DOMAIN}`);
+  });
+});
+
 describe("site suggestion", () => {
   it("derives a site from the sender domain", () => {
     expect(suggestSite("mail.github.com")).toEqual({ siteName: "Github", siteUrl: "https://github.com" });
