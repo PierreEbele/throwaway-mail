@@ -57,6 +57,32 @@ describe("unsubscribe pages", () => {
     expect(
       confirmationForm(`<form action="/unsub"><input name="email" required><button>Unsubscribe</button></form>`, new URL("https://n.io")),
     ).toBeNull());
+  it("ignores scripts and unclosed tags when reading the page", () => {
+    expect(isUnsubscribeSuccess("<script>var s = 'You have been unsubscribed'</SCRIPT><p>Are you sure?</p>")).toBe(false);
+    expect(isUnsubscribeSuccess("<script>unclosed <p>You have been <b>unsubscribed</b></p>")).toBe(true);
+  });
+  it("skips unclosed buttons and forms like before", () => {
+    const html = `<form action="/search"><input name="q"></form><form method="post" action="/unsub">
+      <button type="submit" name="op" value="yes">Unsubscribe</button><button name="x"></form><form action="/unsub">`;
+    expect(confirmationForm(html, new URL("https://n.io/"))).toEqual({ url: "https://n.io/unsub", method: "POST", body: "op=yes" });
+  });
+  it("reads a hostile page of the maximum size in linear time", () => {
+    const size = 512 * 1024;
+    const pages = [
+      "<script>".repeat(size / 8),
+      "<a ".repeat(size / 3),
+      "<form ".repeat(size / 6),
+      '<form action="/unsub">'.repeat(size / 21),
+      '<form action="/unsub">' + "<input ".repeat(size / 7) + "</form>",
+      '<form action="/unsub">' + "<button>".repeat(size / 8) + "</form>",
+    ];
+    for (const html of pages) {
+      const t = performance.now();
+      isUnsubscribeSuccess(html);
+      confirmationForm(html, new URL("https://n.io/u"));
+      expect(performance.now() - t).toBeLessThan(1000);
+    }
+  });
   it("ignores unrelated forms", () =>
     expect(confirmationForm(`<form action="/search"><input name="q"><button>Search</button></form>`, new URL("https://n.io"))).toBeNull());
 });
