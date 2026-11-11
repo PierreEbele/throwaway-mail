@@ -129,6 +129,8 @@ const EnvSchema = z.object({
     .string()
     .optional()
     .transform((v) => !(v === "0" || v === "false" || v === "no")),
+  /** Comma-separated authserv-ids whose Authentication-Results headers are read (case-insensitive). Empty: all. */
+  TRUSTED_AUTHSERV_IDS: z.string().default(""),
 });
 
 export type Config = ReturnType<typeof loadConfig>;
@@ -191,6 +193,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     offsiteBackup,
     oidcAllowedGroups: parsed.OIDC_ALLOWED_GROUPS.split(",")
       .map((g) => g.trim())
+      .filter(Boolean),
+    /** Lower-case authserv-ids from TRUSTED_AUTHSERV_IDS; empty: every Authentication-Results header is read. */
+    trustedAuthservIds: parsed.TRUSTED_AUTHSERV_IDS.split(",")
+      .map((x) => x.trim().toLowerCase())
       .filter(Boolean),
     oidcRedirectUri: `${parsed.APP_URL.replace(/\/$/, "")}/v1/auth/oidc/callback`,
     /** Every public origin of the app; the first one is the primary (APP_URL). */

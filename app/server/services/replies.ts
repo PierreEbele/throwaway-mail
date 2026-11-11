@@ -222,9 +222,9 @@ export async function handleReply(deps: Deps, domain: Domain, token: string, inp
     .all()
     .map((d) => d.email.toLowerCase());
   const auth = {
-    spf: authResult(email.headers, "spf"),
-    dkim: authResult(email.headers, "dkim"),
-    dmarc: authResult(email.headers, "dmarc"),
+    spf: authResult(email.headers, "spf", deps.config.trustedAuthservIds),
+    dkim: authResult(email.headers, "dkim", deps.config.trustedAuthservIds),
+    dmarc: authResult(email.headers, "dmarc", deps.config.trustedAuthservIds),
   };
   const authenticated = auth.dmarc === "pass" || (auth.dmarc !== "fail" && (auth.dkim === "pass" || auth.spf === "pass"));
   const deny = (reason: string, detail: string) => {

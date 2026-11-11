@@ -155,6 +155,17 @@ describe("reverse-alias replies", () => {
     expect(smtp.sent).toHaveLength(0);
   });
 
+  it("only trusts Authentication-Results from TRUSTED_AUTHSERV_IDS when it is set", async () => {
+    const { t, admin, a, smtp } = await setup({ SMTP_RELAY_URL: RELAY, TRUSTED_AUTHSERV_IDS: "other.example, MX.Cloudflare.net" });
+    const { contact } = await enableAndReceive(t, admin, a);
+    const to = contact.reverse_address;
+    const forged = "Authentication-Results: smtp.personal.example; dkim=pass header.d=personal.example; dmarc=pass";
+    expect((await ingest(t, to, reply(to, { auth: forged }))).json).toMatchObject({ action: "reject", reason: "reply_not_allowed" });
+    expect(smtp.sent).toHaveLength(0);
+    expect((await ingest(t, to, reply(to))).json).toMatchObject({ action: "store_only", reason: "reply_sent" });
+    expect(smtp.sent).toHaveLength(1);
+  });
+
   it("bounces when the relay fails", async () => {
     const { t, admin, a, smtp } = await setup();
     const { contact } = await enableAndReceive(t, admin, a);

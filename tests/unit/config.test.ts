@@ -35,6 +35,13 @@ describe("config", () => {
     expect(c.oidcRedirectUri).toBe("https://jetable.example.test/v1/auth/oidc/callback");
     expect(c.oidcAllowedGroups).toEqual(["admins", "family"]);
   });
+  it("parses TRUSTED_AUTHSERV_IDS into lower-case ids (empty: trust every header)", () => {
+    expect(loadConfig({ TRUSTED_AUTHSERV_IDS: " MX.Cloudflare.net, ,mx.example.org" }).trustedAuthservIds).toEqual([
+      "mx.cloudflare.net",
+      "mx.example.org",
+    ]);
+    expect(loadConfig({}).trustedAuthservIds).toEqual([]);
+  });
   it("reports invalid values readably", () => {
     expect(() => loadConfig({ APP_URL: "not a url" })).toThrow(/Invalid configuration:\n  APP_URL/);
   });

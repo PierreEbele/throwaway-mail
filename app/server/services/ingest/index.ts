@@ -162,9 +162,9 @@ export async function ingestMessage(deps: Deps, input: IngestInput): Promise<Ing
   }
   const clean = email.html ? sanitizeEmail(email.html) : null;
   const auth = {
-    spf: authResult(email.headers, "spf"),
-    dkim: authResult(email.headers, "dkim"),
-    dmarc: authResult(email.headers, "dmarc"),
+    spf: authResult(email.headers, "spf", deps.config.trustedAuthservIds),
+    dkim: authResult(email.headers, "dkim", deps.config.trustedAuthservIds),
+    dmarc: authResult(email.headers, "dmarc", deps.config.trustedAuthservIds),
   };
   const headers = email.headers.map((h) => ({ key: h.key, value: h.value.slice(0, MAX_HEADER_VALUE) })).slice(0, MAX_HEADERS);
   const senderAddr = email.from?.address?.toLowerCase() ?? sender?.full ?? null;
