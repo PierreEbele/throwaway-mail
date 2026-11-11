@@ -21,10 +21,20 @@ export function InvitePage() {
   const afterSignIn = useAfterSignIn();
   const t = useT().auth;
   const accept = useMutation({
-    mutationFn: () => post(`/v1/auth/invite/${token}`, { name: name || undefined, password }),
-    onSuccess: () => afterSignIn(),
+    mutationFn: () => post<{ sign_in_required?: boolean }>(`/v1/auth/invite/${token}`, { name: name || undefined, password }),
+    // After a reset, an account with a second factor gets no session: it signs in normally.
+    onSuccess: (res) => (res?.sign_in_required ? undefined : afterSignIn()),
   });
   if (info.isLoading) return <Spinner />;
+  if (accept.data?.sign_in_required)
+    return (
+      <AuthCard subtitle={t.newPassword}>
+        <p className="text-sm">{t.passwordSetSignIn}</p>
+        <Link to="/login" className="btn-primary mt-4 w-full">
+          {t.goSignIn}
+        </Link>
+      </AuthCard>
+    );
   const inv = info.data;
   if (!inv?.valid)
     return (

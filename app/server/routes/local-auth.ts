@@ -178,7 +178,8 @@ export function registerLocalAuth(r: ApiRouter) {
     {
       method: "post",
       path: "/v1/auth/invite/:token",
-      summary: "Accept an invite (creates the local account) or a reset link (sets a new password); signs in",
+      summary:
+        "Accept an invite (creates the local account) or a reset link (sets a new password); signs in, except after a reset of an account with a second factor ({ ok, sign_in_required: true }: sign in normally)",
       tags: ["auth"],
       auth: "none",
       body: z.object({ name, password: passwordSchema }),
@@ -211,6 +212,8 @@ export function registerLocalAuth(r: ApiRouter) {
       });
       const { user, reset } = result;
       audit(d, user.id, reset ? "user.password_reset" : "user.created_via_invite", user.id, { email: user.email }, clientIp(c));
+      // A reset link stands in for the password only: an account with a second factor still signs in with it.
+      if (reset && secondFactorRequired(d, user)) return c.json({ ok: true, sign_in_required: true });
       return signedIn(c, user);
     },
   );
