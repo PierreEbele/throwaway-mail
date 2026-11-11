@@ -9,7 +9,7 @@ import { LOCAL_PART_RE, normalizeRecipient } from "../lib/email.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { refreshDestination } from "../services/destinations.js";
 import { addressOut } from "../services/serialize.js";
-import { reservedByDirectory } from "../services/addresses.js";
+import { heldAfterDeletion, reservedByDirectory } from "../services/addresses.js";
 
 const SENDER_NOISE =
   /^(?:mail|email|e|em|mg|news|newsletter|noreply|no-reply|notifications?|notify|info|bounce|bounces|send|mailer|mx|smtp|accounts?|account|members?|hello|team|support|mkt|marketing|click|links?)\./;
@@ -159,7 +159,8 @@ export function registerReview(r: ApiRouter) {
           .from(addresses)
           .where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, rcpt.local)))
           .get() ||
-        reservedByDirectory(d, user.id, rcpt.local)
+        reservedByDirectory(d, user.id, rcpt.local) ||
+        heldAfterDeletion(d, user.id, domain.id, rcpt.local)
       ) {
         throw conflict(`${rcpt.full} already exists`);
       }

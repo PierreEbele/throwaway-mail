@@ -5,7 +5,7 @@ import { csvObjects } from "../lib/csv.js";
 import { LOCAL_PART_RE } from "../lib/email.js";
 import { badRequest } from "../lib/errors.js";
 import { categoryByName } from "./categories.js";
-import { createAddress, reservedByDirectory } from "./addresses.js";
+import { createAddress, heldAfterDeletion, reservedByDirectory } from "./addresses.js";
 import { catchAllKeptByOther } from "./ingest/recipients.js";
 
 /**
@@ -175,7 +175,7 @@ export function importAliases(d: Deps, user: User, list: SourceAlias[], opts: Im
             .from(addresses)
             .where(and(eq(addresses.domainId, domain.id), eq(addresses.localPart, srcLocal)))
             .get();
-        if (taken || reservedByDirectory(d, user.id, srcLocal)) {
+        if (taken || reservedByDirectory(d, user.id, srcLocal) || heldAfterDeletion(d, user.id, domain.id, srcLocal)) {
           row.reason = `${srcLocal}@${domain.name} already exists`;
           continue;
         }

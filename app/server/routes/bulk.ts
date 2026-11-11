@@ -4,6 +4,7 @@ import type { ApiRouter } from "../lib/http.js";
 import { addresses, messages, type Address } from "../db/schema.js";
 import { badRequest } from "../lib/errors.js";
 import { checkCategory } from "../services/categories.js";
+import { recordDeletedAddresses } from "../services/addresses.js";
 
 /** Actions on several addresses at once. */
 export function registerBulk(r: ApiRouter) {
@@ -31,7 +32,10 @@ export function registerBulk(r: ApiRouter) {
         checkCategory(d, user, body.category_id);
         affected = d.db.update(addresses).set({ categoryId: body.category_id, updatedAt: now }).where(where).run().changes;
       } else if (body.action === "delete") {
-        affected = d.db.delete(addresses).where(where).run().changes;
+        affected = d.db.transaction(() => {
+          recordDeletedAddresses(d, d.db.select().from(addresses).where(where).all());
+          return d.db.delete(addresses).where(where).run().changes;
+        });
       } else if (body.action === "read") {
         const ids = d.db
           .select({ id: addresses.id })

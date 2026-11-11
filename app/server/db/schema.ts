@@ -426,6 +426,26 @@ export const addressDestinations = sqliteTable(
  * On-the-fly addresses: mail to <name>.<site>@domain creates an address for <site>
  * owned by the directory's user, without visiting the app first.
  */
+/**
+ * Address names that were deleted, with who held them: for DELETED_ADDRESS_HOLD_DAYS (services/addresses.ts) only
+ * that user may register the name again, so nobody else receives mail meant for the previous holder.
+ */
+export const deletedAddresses = sqliteTable(
+  "deleted_addresses",
+  {
+    id: text("id").primaryKey(),
+    domainId: text("domain_id")
+      .notNull()
+      .references(() => domains.id, { onDelete: "cascade" }),
+    localPart: text("local_part").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    deletedAt: integer("deleted_at").notNull(),
+  },
+  (t) => [uniqueIndex("deleted_addresses_domain_local_uq").on(t.domainId, t.localPart)],
+);
+
 export const directories = sqliteTable("directories", {
   id: text("id").primaryKey(),
   userId: text("user_id")

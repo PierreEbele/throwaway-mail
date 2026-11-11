@@ -7,7 +7,14 @@ import { addressOut } from "../services/serialize.js";
 import { categoryByName, checkCategory } from "../services/categories.js";
 import { domainOf, repliesUnavailableReason } from "../services/replies.js";
 import { noMailWarning } from "../services/sites.js";
-import { addressWithCounts, checkDestination, createAddress, messageCounts, ownedAddress } from "../services/addresses.js";
+import {
+  addressWithCounts,
+  checkDestination,
+  createAddress,
+  messageCounts,
+  ownedAddress,
+  recordDeletedAddresses,
+} from "../services/addresses.js";
 
 const SiteUrl = z
   .string()
@@ -282,10 +289,13 @@ export function registerAddresses(r: ApiRouter) {
       const d = c.get("deps");
       const user = c.get("user")!;
       const { a } = ownedAddress(d, user, c.req.param("id")!);
-      d.db
-        .delete(addresses)
-        .where(and(eq(addresses.id, a.id), eq(addresses.userId, user.id)))
-        .run();
+      d.db.transaction(() => {
+        recordDeletedAddresses(d, [a]);
+        d.db
+          .delete(addresses)
+          .where(and(eq(addresses.id, a.id), eq(addresses.userId, user.id)))
+          .run();
+      });
       d.bus.publish(user.id, { type: "address.deleted", address_id: a.id });
       return c.json({ ok: true });
     },
