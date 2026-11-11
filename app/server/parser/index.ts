@@ -37,8 +37,18 @@ export function bodyText(input: ParseInput): string {
 const toParsed = (c: CodeCandidate): ParsedCode => ({ value: c.value, raw: c.raw, confidence: c.confidence, method: c.method });
 const toLink = (l: LinkCandidate) => ({ url: l.url, original: l.original, label: l.label, confidence: l.confidence, method: l.method });
 
+/** Only this much of the text and HTML bodies is analysed: codes and links sit near the top of a mail. */
+export const MAX_PARSE_CHARS = 256 * 1024;
+
+/** The input cut to the analysis budget. */
+export function boundedInput<T extends ParseInput>(input: T): T {
+  const cut = (s: string | null | undefined) => (s && s.length > MAX_PARSE_CHARS ? s.slice(0, MAX_PARSE_CHARS) : s);
+  return { ...input, text: cut(input.text), html: cut(input.html) };
+}
+
 /** Deterministic, pure parser. */
-export function parseMessage(input: ParseInput): ParseResult {
+export function parseMessage(full: ParseInput): ParseResult {
+  const input = boundedInput(full);
   let text = bodyText(input);
   const emphasized = input.html ? emphasizedTokens(input.html) : new Set<string>();
   let candidates = extractCodes({ subject: input.subject, text, emphasized });

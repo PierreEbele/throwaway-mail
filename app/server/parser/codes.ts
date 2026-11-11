@@ -35,8 +35,39 @@ function maskNoise(t: string): string {
   const blank = (s: string) => " ".repeat(s.length);
   return t
     .replace(/\b(?:https?:\/\/|www\.)[^\s<>"]+/gi, blank)
-    .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, blank)
-    .replace(/\[[^\]\n]*(?:https?:|www\.)[^\]\n]*\]/gi, blank);
+    .replace(/(?<![\w.+-])[\w.+-]{1,64}@[\w-]+(?:\.[\w-]+)+/g, blank)
+    .replace(/\[[^[\]\n]*\]/g, (s) => (/https?:|www\./i.test(s) ? blank(s) : s));
+}
+
+/** Start offsets of every line, so the line around a match is found by binary search instead of a rescan. */
+function lineStarts(t: string): number[] {
+  const starts = [0];
+  for (let i = t.indexOf("\n"); i >= 0; i = t.indexOf("\n", i + 1)) starts.push(i + 1);
+  return starts;
+}
+
+function lineAt(starts: number[], index: number): number {
+  let lo = 0;
+  let hi = starts.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (starts[mid]! <= index) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
+}
+
+const LEAD_NOISE = /[:\-–—•*>\s]/;
+const TRAIL_NOISE = /[.\s]/;
+
+/** The line without surrounding blanks, leading bullets/colons and trailing dots (linear, no backtracking). */
+function trimLine(line: string): string {
+  const t = line.trim();
+  let a = 0;
+  let b = t.length;
+  while (a < b && LEAD_NOISE.test(t[a]!)) a++;
+  while (b > a && TRAIL_NOISE.test(t[b - 1]!)) b--;
+  return t.slice(a, b);
 }
 
 /** Spans that look like phone numbers (≥ 9 digits split by separators). */
@@ -50,6 +81,9 @@ function phoneSpans(t: string): Array<[number, number]> {
   }
   return spans;
 }
+
+/** Each candidate is scored against its surroundings; past this many, the rest of the body is not looked at. */
+const MAX_RAW_MATCHES = 1000;
 
 function findRawMatches(t: string): RawMatch[] {
   const out: RawMatch[] = [];
@@ -78,7 +112,10 @@ function findRawMatches(t: string): RawMatch[] {
     if (UPPERCASE_STOPWORDS.has(v)) continue;
     push(v, v, m.index, /\d/.test(v) ? "alnum" : "letters");
   }
-  return out;
+  if (out.length <= MAX_RAW_MATCHES) return out;
+  // Huge bodies full of number-like tokens: keep the candidates nearest the top, in their original order.
+  const cutoff = out.map((r) => r.index).sort((a, b) => a - b)[MAX_RAW_MATCHES - 1]!;
+  return out.filter((r) => r.index <= cutoff).slice(0, MAX_RAW_MATCHES);
 }
 
 function findKeyword(windowText: string, list: string[], fromEnd: boolean): { kw: string; dist: number } | null {
@@ -115,6 +152,17 @@ export function extractCodes(input: CodeInput): CodeCandidate[] {
   const emphasized = input.emphasized ?? new Set<string>();
 
   const byValue = new Map<string, CodeCandidate>();
+  const starts = lineStarts(masked);
+  const lines = new Map<number, { line: string; lower: string; trimmed: string }>();
+  const lineInfo = (n: number) => {
+    let info = lines.get(n);
+    if (!info) {
+      const line = masked.slice(starts[n]!, n + 1 < starts.length ? starts[n + 1]! - 1 : masked.length);
+      info = { line, lower: line.toLowerCase(), trimmed: trimLine(line) };
+      lines.set(n, info);
+    }
+    return info;
+  };
 
   for (const rm of findRawMatches(masked)) {
     const start = rm.index;
@@ -123,10 +171,7 @@ export function extractCodes(input: CodeInput): CodeCandidate[] {
 
     const before = masked.slice(Math.max(0, start - 160), start);
     const after = masked.slice(end, end + 100);
-    const lineStart = masked.lastIndexOf("\n", start - 1) + 1;
-    const lineEndIdx = masked.indexOf("\n", end);
-    const line = masked.slice(lineStart, lineEndIdx < 0 ? masked.length : lineEndIdx);
-    const lineTrim = line.trim().replace(/^[:\-–—•*>\s]+|[.\s]+$/g, "");
+    const { lower: lineLower, trimmed: lineTrim } = lineInfo(lineAt(starts, start));
 
     // Hard rejections
     if (/[$€£¥]\s?$/.test(before) || /^\s?(?:€|eur\b|usd\b|\$|dollars?|euros?|chf\b|gbp\b)/i.test(after) || /^[.,]\d{2}\b/.test(after))
@@ -164,7 +209,6 @@ export function extractCodes(input: CodeInput): CodeCandidate[] {
     consider(strongAfter, 40, 100);
     consider(weakAfter, 20, 60);
     if (kwScore > 0) {
-      const lineLower = line.toLowerCase();
       if (keyword && lineLower.includes(keyword)) kwScore += 12;
       credit(kwScore, "keyword");
     }

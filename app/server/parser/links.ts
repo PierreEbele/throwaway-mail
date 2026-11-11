@@ -86,6 +86,10 @@ function cleanUrl(u: string): string {
   return decodeEntities(u.trim()).replace(/[.,;:!?)\]>'"]+$/, "");
 }
 
+const CONTEXT_LOOKBACK = 2000;
+/** Plain-text URLs examined per message (the rest of a huge body is ignored). */
+const MAX_TEXT_URLS = 500;
+
 export function extractLinks(input: { text?: string | null; html?: string | null }): LinkCandidate[] {
   const found = new Map<string, LinkCandidate>();
   const add = (rawUrl: string, label: string, method: LinkCandidate["method"]) => {
@@ -123,10 +127,15 @@ export function extractLinks(input: { text?: string | null; html?: string | null
   if (input.text) {
     const re = /https?:\/\/[^\s<>"'\]]+/gi;
     let m: RegExpExecArray | null;
-    while ((m = re.exec(input.text))) {
-      const lineStart = input.text.lastIndexOf("\n", m.index - 1) + 1;
-      const prevLineStart = input.text.lastIndexOf("\n", Math.max(0, lineStart - 2)) + 1;
-      const ctx = input.text.slice(prevLineStart, m.index).replace(/\s+/g, " ").trim().slice(-120);
+    for (let n = 0; n < MAX_TEXT_URLS && (m = re.exec(input.text)); n++) {
+      // The label is the last 120 characters before the URL: a bounded look-back keeps this linear on long lines.
+      const win = input.text.slice(Math.max(0, m.index - CONTEXT_LOOKBACK), m.index);
+      const nl = win.lastIndexOf("\n");
+      const ctx = win
+        .slice(nl < 0 ? 0 : win.lastIndexOf("\n", nl - 1) + 1)
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(-120);
       add(m[0], ctx, "text");
     }
   }
