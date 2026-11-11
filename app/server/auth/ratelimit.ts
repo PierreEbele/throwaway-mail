@@ -1,17 +1,36 @@
-/** Fixed-window in-memory rate limiter (single process, which is all a 1 GB VPS needs). */
+import { createHash } from "node:crypto";
+
+/** Short, fixed-size stand-in for a caller-supplied value (an API key header, a forwarded address). */
+export const limiterKey = (value: string) => createHash("sha256").update(value).digest("hex").slice(0, 32);
+
+/**
+ * Fixed-window in-memory rate limiter (single process, which is all a 1 GB VPS needs). Memory stays bounded:
+ * long keys are hashed, finished windows are swept once per window, and past `maxKeys` the oldest windows are
+ * dropped.
+ */
 export class RateLimiter {
   private windows = new Map<string, { start: number; count: number }>();
+  private lastSweep = 0;
   constructor(
     private limit: number,
     private windowMs = 60_000,
+    private maxKeys = 50_000,
   ) {}
 
-  hit(key: string, now = Date.now()): { ok: boolean; retryAfter: number; remaining: number } {
+  get size() {
+    return this.windows.size;
+  }
+
+  hit(rawKey: string, now = Date.now()): { ok: boolean; retryAfter: number; remaining: number } {
+    const key = rawKey.length > 64 ? `#${limiterKey(rawKey)}` : rawKey;
+    if (now - this.lastSweep >= this.windowMs) this.sweep(now);
     let w = this.windows.get(key);
     if (!w || now - w.start >= this.windowMs) {
+      // Re-inserted so the map stays ordered by window start, oldest first.
+      this.windows.delete(key);
       w = { start: now, count: 0 };
       this.windows.set(key, w);
-      if (this.windows.size > 50_000) this.sweep(now);
+      if (this.windows.size > this.maxKeys) this.windows.delete(this.windows.keys().next().value!);
     }
     w.count++;
     const remaining = Math.max(0, this.limit - w.count);
@@ -20,7 +39,11 @@ export class RateLimiter {
   }
 
   private sweep(now: number) {
-    for (const [k, w] of this.windows) if (now - w.start >= this.windowMs) this.windows.delete(k);
+    this.lastSweep = now;
+    for (const [k, w] of this.windows) {
+      if (now - w.start < this.windowMs) break; // ordered by start: the rest are newer
+      this.windows.delete(k);
+    }
   }
 }
 

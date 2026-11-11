@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Client, makeTestApp } from "../helpers.js";
-import { AuthLimits, SlidingWindowLimiter } from "../../app/server/auth/ratelimit.js";
+import { AuthLimits, RateLimiter, SlidingWindowLimiter } from "../../app/server/auth/ratelimit.js";
 
 const PW = "correct horse battery";
 
@@ -21,6 +21,22 @@ describe("sliding window limiter", () => {
     expect(l.hit("other", 10_000)).toBe(0);
     l.reset("k");
     expect(l.retryAfter("k", 10_001)).toBe(0);
+  });
+});
+
+describe("fixed window limiter", () => {
+  it("limits per key and keeps its memory bounded", () => {
+    const l = new RateLimiter(2, 10_000, 100);
+    expect(l.hit("k", 0).ok).toBe(true);
+    expect(l.hit("k", 1).ok).toBe(true);
+    expect(l.hit("k", 2)).toMatchObject({ ok: false, retryAfter: 10 });
+    expect(l.hit("k", 10_000).ok).toBe(true);
+    // Many distinct keys, however long, never grow the map past its cap...
+    for (let i = 0; i < 1_000; i++) l.hit(`compat:${String(i).padStart(16_000, "x")}`, 10_000 + i);
+    expect(l.size).toBe(100);
+    // ...and finished windows are swept by time, whatever the size.
+    l.hit("late", 30_000);
+    expect(l.size).toBe(1);
   });
 });
 
