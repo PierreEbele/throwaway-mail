@@ -182,8 +182,9 @@ E-mail and password, hashed with scrypt.
   7 days). Send it yourself; the app does not e-mail it. Opening it lets the person choose a password and signs
   them in. Pending links can be revoked; creating a new link for the same e-mail replaces the old one.
 - **Password reset**: **Reset password** next to a local user creates the same kind of link for their existing
-  account. Using it sets a new password and signs out all their sessions. Users change their own password in
-  **Account** (other sessions are signed out).
+  account. Using it sets a new password and signs out all their sessions. It also signs them in, unless the account
+  has a second factor (authenticator app, or passkey required at login): they then sign in normally with the new
+  password and that factor. Users change their own password in **Account** (other sessions are signed out).
 - **Roles** of local accounts are set by admins in **Admin → Users**; the last admin cannot be demoted.
 - Password logins share the `LOGIN_RATE_LIMIT_PER_MINUTE` budget per IP.
 

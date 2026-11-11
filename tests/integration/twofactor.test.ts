@@ -161,6 +161,30 @@ describe("two-factor authentication", () => {
     expect(actions).toEqual(expect.arrayContaining(["user.2fa_enabled", "user.2fa_reset"]));
   });
 
+  it("a password reset link does not sign in an account with a second factor", async () => {
+    const { t, clock } = app();
+    const admin = await setup(t);
+    const inv = await admin.post("/v1/admin/invites", { email: "u@example.org" });
+    const u = new Client(t);
+    await u.post(`/v1/auth/invite/${inv.json.url.split("/invite/")[1]}`, { password: PW });
+    const { secret } = await enrol(u, clock);
+
+    const reset = await admin.post("/v1/admin/invites", { email: "u@example.org" });
+    const v = new Client(t);
+    const r = await v.post(`/v1/auth/invite/${reset.json.url.split("/invite/")[1]}`, { password: "a brand new passphrase" });
+    expect(r.status).toBe(200);
+    expect(r.json).toEqual({ ok: true, sign_in_required: true });
+    expect(r.headers.get("set-cookie")).toBeNull();
+    expect((await v.get("/v1/auth/me")).status).toBe(401);
+    expect((await u.get("/v1/auth/me")).status).toBe(401); // other sessions still end
+
+    // The new password works, and the second factor is still asked for.
+    const login = await v.post("/v1/auth/login", { email: "u@example.org", password: "a brand new passphrase" });
+    expect(login.json.two_factor_required).toBe(true);
+    const done = await v.post("/v1/auth/login/2fa", { challenge: login.json.challenge, code: totp(secret, clock.now) });
+    expect(done.json.user.email).toBe("u@example.org");
+  });
+
   it("stores the secret encrypted when APP_SECRET is set, plain otherwise", async () => {
     const envs: Record<string, string>[] = [{ APP_SECRET }, {}];
     for (const env of envs) {
