@@ -74,7 +74,8 @@ curl -s -X DELETE -H "Authorization: Bearer $KEY" $TM/v1/addresses/adr_…      
 curl -s -N -H "Authorization: Bearer $KEY" $TM/v1/events                                      # live events (SSE)
 ```
 
-Errors always look like `{"error":{"code":"bad_request","message":"…","details":[…]}}`. Rate limits answer `429` with `Retry-After`.
+Errors always look like `{"error":{"code":"bad_request","message":"…","details":[…]}}`. Rate limits answer `429` with `Retry-After`. Request bodies are JSON and must be sent with
+`Content-Type: application/json`; any other content type answers `415`.
 
 ## Node.js SDK
 

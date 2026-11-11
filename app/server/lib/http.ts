@@ -1,7 +1,7 @@
 import type { Context, Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../context.js";
-import { badRequest, forbidden, unauthorized } from "./errors.js";
+import { badRequest, forbidden, HttpError, unauthorized } from "./errors.js";
 
 export type Method = "get" | "post" | "patch" | "put" | "delete";
 export type AuthLevel = "none" | "user" | "admin";
@@ -21,6 +21,11 @@ export interface RouteSpec<B extends Schema, Q extends Schema> {
 }
 
 export type Ctx = Context<AppEnv>;
+
+/** `application/json`, with or without parameters (`; charset=utf-8`). */
+export function isJsonContentType(value: string | undefined): boolean {
+  return /^application\/json\s*(?:;|$)/i.test(value?.trim() ?? "");
+}
 
 function formatIssues(err: z.ZodError) {
   return err.issues.map((i) => ({ path: i.path.join("."), message: i.message }));
@@ -42,6 +47,9 @@ export class ApiRouter {
       if (spec.auth === "admin" && user?.role !== "admin") throw forbidden("Admin only");
       let body: unknown = undefined;
       if (spec.body) {
+        // Only JSON: a cross-site form can post text/plain shaped like JSON without a CORS preflight, never application/json.
+        if (!isJsonContentType(c.req.header("content-type")))
+          throw new HttpError(415, "unsupported_media_type", "Request body must be JSON, sent with Content-Type: application/json");
         let json: unknown;
         try {
           json = await c.req.json();

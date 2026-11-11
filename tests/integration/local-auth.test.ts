@@ -64,6 +64,21 @@ describe("first-run setup", () => {
 });
 
 describe("password login", () => {
+  it("only accepts a JSON body sent as application/json", async () => {
+    const t = makeTestApp();
+    await setup(t);
+    const post = (type: string | null, body: string) =>
+      t.app.request("/v1/auth/login", { method: "POST", headers: type ? { "content-type": type } : {}, body });
+    // What a cross-site HTML form can send without a preflight: a text/plain body shaped like JSON.
+    const form = await post("text/plain", `{"email":"root@example.org","password":"${PW}","x":"="}`);
+    expect(form.status).toBe(415);
+    expect(form.headers.get("set-cookie")).toBeNull();
+    expect((await post(null, JSON.stringify({ email: "root@example.org", password: PW }))).status).toBe(415);
+    expect((await post("application/x-www-form-urlencoded", "email=root%40example.org")).status).toBe(415);
+    const ok = await post("Application/JSON; charset=utf-8", JSON.stringify({ email: "root@example.org", password: PW }));
+    expect(ok.status).toBe(200);
+  });
+
   it("signs in with the right password and gives one generic error otherwise", async () => {
     const t = makeTestApp();
     await setup(t);
