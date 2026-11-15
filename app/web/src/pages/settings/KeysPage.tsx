@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, post } from "../../api";
-import type { Address, ApiKey } from "../../types";
+import type { Address, ApiKey, Domain } from "../../types";
 import { Badge, CopyButton, EmptyState, ErrorText, PageHeader, Spinner, confirmAction } from "../../components/ui";
 import { invalidate } from "../../queries";
 import { fullDate, timeAgo } from "../../util";
@@ -14,6 +14,8 @@ export function KeysPage() {
   const [scope, setScope] = useState<"full" | "read">("full");
   const [restrict, setRestrict] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [restrictDomains, setRestrictDomains] = useState(false);
+  const [pickedDomains, setPickedDomains] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
   const [expiryDays, setExpiryDays] = useState("");
   const t = useT().settings.keys;
@@ -24,12 +26,15 @@ export function KeysPage() {
     enabled: restrict,
   });
   const addrLabel = new Map((addrs.data ?? []).map((a) => [a.id, a.email]));
+  const doms = useQuery({ queryKey: ["domains"], queryFn: () => get<{ domains: Domain[] }>("/v1/domains").then((r) => r.domains) });
+  const domLabel = new Map((doms.data ?? []).map((x) => [x.id, x.name]));
   const create = useMutation({
     mutationFn: () =>
       post<{ key: string }>("/v1/keys", {
         name,
         scope,
         address_ids: restrict ? [...picked] : null,
+        domain_ids: restrictDomains ? [...pickedDomains] : null,
         expires_in_days: expiryDays ? Number(expiryDays) : undefined,
       }),
     onSuccess: (r) => {
@@ -38,6 +43,8 @@ export function KeysPage() {
       setScope("full");
       setRestrict(false);
       setPicked(new Set());
+      setRestrictDomains(false);
+      setPickedDomains(new Set());
       setExpiryDays("");
       invalidate(qc, ["keys"]);
     },
@@ -89,14 +96,58 @@ export function KeysPage() {
             ))}
           </select>
         </div>
-        <button className="btn-primary" disabled={create.isPending || (restrict && picked.size === 0)}>
+        <button
+          className="btn-primary"
+          disabled={create.isPending || (restrict && picked.size === 0) || (restrictDomains && pickedDomains.size === 0)}
+        >
           {t.create}
         </button>
         <div className="w-full">
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={restrict} onChange={(e) => setRestrict(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={restrict}
+              onChange={(e) => {
+                setRestrict(e.target.checked);
+                if (e.target.checked) setRestrictDomains(false);
+              }}
+            />
             {t.restrict}
           </label>
+          <label className="mt-1 flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={restrictDomains}
+              onChange={(e) => {
+                setRestrictDomains(e.target.checked);
+                if (e.target.checked) setRestrict(false);
+              }}
+            />
+            {t.restrictDomains}
+          </label>
+          {restrictDomains && (
+            <div className="mt-2 rounded border border-zinc-200 p-2 text-sm dark:border-zinc-800">
+              {doms.isLoading && <Spinner />}
+              {(doms.data ?? [])
+                .filter((x) => x.status === "active")
+                .map((x) => (
+                  <label key={x.id} className="flex items-center gap-2 py-0.5">
+                    <input
+                      type="checkbox"
+                      checked={pickedDomains.has(x.id)}
+                      onChange={(e) => {
+                        const next = new Set(pickedDomains);
+                        if (e.target.checked) next.add(x.id);
+                        else next.delete(x.id);
+                        setPickedDomains(next);
+                      }}
+                    />
+                    <span className="font-mono">{x.name}</span>
+                  </label>
+                ))}
+              <p className="mt-1 text-xs text-zinc-500">{t.selected(pickedDomains.size)}</p>
+            </div>
+          )}
           {restrict && (
             <div className="mt-2 rounded border border-zinc-200 p-2 dark:border-zinc-800">
               <input
@@ -180,6 +231,11 @@ export function KeysPage() {
                     {k.address_ids && (
                       <span className="block text-xs text-zinc-500" title={k.address_ids.map((id) => addrLabel.get(id) ?? id).join(", ")}>
                         {t.addressCount(k.address_ids.length)}
+                      </span>
+                    )}
+                    {k.domain_ids && (
+                      <span className="block text-xs text-zinc-500" title={k.domain_ids.map((id) => domLabel.get(id) ?? id).join(", ")}>
+                        {t.domainCount(k.domain_ids.length)}
                       </span>
                     )}
                   </td>

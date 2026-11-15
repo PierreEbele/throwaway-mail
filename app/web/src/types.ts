@@ -202,6 +202,7 @@ export interface ApiKey {
   revoked_at: number | null;
   scope: "full" | "read";
   address_ids: string[] | null;
+  domain_ids: string[] | null;
   expires_at: number | null;
 }
 export interface AuditEntry {

@@ -85,6 +85,9 @@ export const settings = area(
       filter: "Filter addresses",
       selected: (n: number) => `${n} selected`,
       addressCount: (n: number) => `${n} address${n === 1 ? "" : "es"}`,
+      restrictDomains:
+        "Only some domains (the key creates and sees addresses on these domains only; random and rotating domains stay within them)",
+      domainCount: (n: number) => `${n} domain${n === 1 ? "" : "s"}`,
     },
   },
   {
@@ -170,6 +173,9 @@ export const settings = area(
       filter: "Filtrer les adresses",
       selected: (n) => `${n} sélectionnée${n > 1 ? "s" : ""}`,
       addressCount: (n) => `${n} adresse${n > 1 ? "s" : ""}`,
+      restrictDomains:
+        "Seulement certains domaines (la clé ne crée et ne voit d’adresses que sur ces domaines ; les domaines aléatoires ou en rotation restent parmi eux)",
+      domainCount: (n) => `${n} domaine${n > 1 ? "s" : ""}`,
     },
   },
 );
