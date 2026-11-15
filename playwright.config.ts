@@ -36,6 +36,8 @@ export default defineConfig({
         // Local accounts next to SSO (two-factor-login.spec.ts) and an outgoing relay run by send-from-alias.spec.ts.
         LOCAL_LOGIN: "true",
         LOGIN_RATE_LIMIT_PER_MINUTE: "1000",
+        // Every spec signs in as the same admin within a minute: lift the per-user API rate limit.
+        RATE_LIMIT_PER_MINUTE: "100000",
         SMTP_RELAY_URL: "smtp://127.0.0.1:3297?tls=none",
       },
     },
