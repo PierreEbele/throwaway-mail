@@ -279,6 +279,8 @@ export interface ApiKey {
   scope?: ApiKeyScope;
   /** Addresses the key is restricted to; null means every address. */
   address_ids?: string[] | null;
+  /** Domains the key is restricted to (it creates and sees addresses on them only); null means every domain. */
+  domain_ids?: string[] | null;
   /** Epoch ms after which the key stops working; null means never. */
   expires_at?: number | null;
   [key: string]: unknown;
@@ -289,6 +291,8 @@ export type ApiKeyScope = "full" | "read";
 export interface CreateApiKeyOptions {
   scope?: ApiKeyScope;
   address_ids?: string[] | null;
+  /** Domain ids or names. */
+  domain_ids?: string[] | null;
   expires_at?: number | null;
   expires_in_days?: number;
 }

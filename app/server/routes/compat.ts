@@ -36,7 +36,8 @@ function caller(c: Context<AppEnv>) {
   const raw = c.req.header("authentication") ?? /^Bearer\s+(\S+)$/i.exec(c.req.header("authorization") ?? "")?.[1];
   const r = raw ? resolveApiKey(c.get("deps"), raw.trim()) : null;
   if (!r) throw new HttpError(401, "invalid_api_key", "Invalid or revoked API key");
-  // Every compat endpoint creates an address: read-only and address-restricted keys cannot use it.
+  // Every compat endpoint creates an address: read-only and address-restricted keys cannot use it
+  // (domain-restricted keys can, on their domains).
   if (r.scope.readOnly || r.scope.addressIds)
     throw new HttpError(403, "insufficient_scope", "This API key cannot create addresses (read-only or restricted to some addresses)");
   return r;
@@ -70,15 +71,20 @@ export function registerCompat(app: Hono<AppEnv>, limiter: RateLimiter) {
   });
 
   app.post("/api/alias/random/new", async (c) => {
-    const { user } = caller(c);
+    const { user, scope } = caller(c);
     const body = await jsonBody(c);
     const note = str(body.note, 120);
     const site = cleanHost(c.req.query("hostname")) ?? siteFromText(note);
-    const { a, domain } = createAddress(c.get("deps"), user, {
-      site_name: site ?? "Bitwarden",
-      site_url: site ? `https://${site}` : null,
-      label: note || "Bitwarden",
-    });
+    const { a, domain } = createAddress(
+      c.get("deps"),
+      user,
+      {
+        site_name: site ?? "Bitwarden",
+        site_url: site ? `https://${site}` : null,
+        label: note || "Bitwarden",
+      },
+      scope.domainIds,
+    );
     const o = addressOut(a, domain);
     return c.json(
       { id: a.id, alias: o.email, email: o.email, creation_timestamp: Math.floor(a.createdAt / 1000), enabled: true, note: a.label },
@@ -87,16 +93,21 @@ export function registerCompat(app: Hono<AppEnv>, limiter: RateLimiter) {
   });
 
   app.post("/api/v1/aliases", async (c) => {
-    const { user } = caller(c);
+    const { user, scope } = caller(c);
     const body = await jsonBody(c);
     const description = str(body.description, 200);
     const site = siteFromText(description);
-    const { a, domain } = createAddress(c.get("deps"), user, {
-      domain: str(body.domain, 253)?.toLowerCase() || undefined,
-      site_name: site ?? "Bitwarden",
-      site_url: site ? `https://${site}` : null,
-      label: description || "Bitwarden",
-    });
+    const { a, domain } = createAddress(
+      c.get("deps"),
+      user,
+      {
+        domain: str(body.domain, 253)?.toLowerCase() || undefined,
+        site_name: site ?? "Bitwarden",
+        site_url: site ? `https://${site}` : null,
+        label: description || "Bitwarden",
+      },
+      scope.domainIds,
+    );
     const o = addressOut(a, domain);
     return c.json(
       {

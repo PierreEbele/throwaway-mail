@@ -47,23 +47,25 @@ export interface DomainPick {
 /**
  * Domain for a new address when the caller did not force one: active domains minus those the site rejected, then the
  * user's choice (first, random, rotate), or `choice` for this call. `preferred` (name or id) wins when it is active and not rejected.
+ * `only` limits every step to those domain ids (random and rotate then pick among them).
  * When the site rejected every domain, falls back to all active domains (minus `exclude`).
  */
 export function pickDomain(
   d: Deps,
   user: User,
   site: { site_name?: string | null; site_url?: string | null },
-  opts: { preferred?: string; exclude?: string[]; choice?: User["domainChoice"] } = {},
+  opts: { preferred?: string; exclude?: string[]; choice?: User["domainChoice"]; only?: ReadonlySet<string> | null } = {},
 ): DomainPick {
   const choice = opts.choice ?? user.domainChoice;
   const exclude = new Set(opts.exclude ?? []);
+  // `only`: the allowed domains (an API key's domains, or the caller's pool); nothing outside it is ever picked.
   const active = d.db
     .select()
     .from(domains)
     .where(eq(domains.status, "active"))
     .orderBy(asc(domains.createdAt), asc(sql`rowid`))
     .all()
-    .filter((x) => !catchAllKeptByOther(d, x, user));
+    .filter((x) => !catchAllKeptByOther(d, x, user) && (!opts.only || opts.only.has(x.id)));
   const rejected = rejectedDomainIds(d, site.site_name, site.site_url);
   const avoided = active.filter((x) => rejected.has(x.id));
   let pool = active.filter((x) => !rejected.has(x.id) && !exclude.has(x.id));

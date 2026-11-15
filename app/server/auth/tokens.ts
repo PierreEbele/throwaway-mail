@@ -36,6 +36,7 @@ export function deleteSession(deps: Deps, sessionId: string) {
 export interface ApiKeyOptions {
   scope?: "full" | "read";
   addressIds?: string[] | null;
+  domainIds?: string[] | null;
   expiresAt?: number | null;
 }
 
@@ -44,6 +45,8 @@ export interface ApiKeyScope {
   readOnly: boolean;
   /** Address ids the key is limited to; null means every address of the user. */
   addressIds: ReadonlySet<string> | null;
+  /** Domain ids the key is limited to: it only creates and sees addresses on them; null means every domain. */
+  domainIds: ReadonlySet<string> | null;
 }
 
 export function createApiKey(deps: Deps, userId: string, name: string, opts: ApiKeyOptions = {}) {
@@ -58,6 +61,7 @@ export function createApiKey(deps: Deps, userId: string, name: string, opts: Api
     createdAt: deps.now(),
     scope: opts.scope ?? "full",
     addressIds: opts.addressIds && opts.addressIds.length ? [...new Set(opts.addressIds)] : null,
+    domainIds: opts.domainIds && opts.domainIds.length ? [...new Set(opts.domainIds)] : null,
     expiresAt: opts.expiresAt ?? null,
   };
   deps.db.insert(apiKeys).values(row).run();
@@ -81,6 +85,7 @@ export function resolveApiKey(deps: Deps, key: string): { user: User; keyId: str
   const scope: ApiKeyScope = {
     readOnly: row.k.scope === "read",
     addressIds: row.k.addressIds ? new Set(row.k.addressIds) : null,
+    domainIds: row.k.domainIds ? new Set(row.k.domainIds) : null,
   };
   return { user: row.u, keyId: row.k.id, scope };
 }

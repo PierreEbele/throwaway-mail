@@ -35,7 +35,7 @@ export function registerAddresses(r: ApiRouter) {
       path: "/v1/addresses",
       summary: "Create an address for a site",
       description:
-        "The local part defaults to a readable random string (word-word-1234). `domain` is a domain name or id. Without it, the domain follows the user's domain choice (first, random, rotate) and skips domains the site is known to reject (`avoided_domains` in the response).",
+        "The local part defaults to a readable random string (word-word-1234). `domain` is a domain name or id. Without it, the domain follows the user's domain choice (first, random, rotate) and skips domains the site is known to reject (`avoided_domains` in the response). `domain_pool` limits that choice to a list of domains (e.g. a random domain among three). A domain-restricted API key only creates addresses on its domains (403 domain_not_allowed otherwise).",
       tags: ["addresses"],
       auth: "user",
       body: z.object({
@@ -50,6 +50,12 @@ export function registerAddresses(r: ApiRouter) {
           .enum(["first", "random", "rotate"])
           .optional()
           .describe("Overrides the user's domain choice for this address, when `domain` is not given"),
+        domain_pool: z
+          .array(z.string().trim().min(1))
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Pick the domain only among these (names or ids), when `domain` is not given"),
         site_name: z.string().trim().min(1).max(120),
         site_url: SiteUrl.optional(),
         local_part: z.string().trim().toLowerCase().optional(),
@@ -78,7 +84,7 @@ export function registerAddresses(r: ApiRouter) {
       if (body.category !== undefined && body.category_id !== undefined) throw badRequest("Pass category or category_id, not both");
       const { category, create_category, ...rest } = body;
       const category_id = category !== undefined ? categoryByName(d, user, category, create_category) : rest.category_id;
-      const { a, domain, avoided } = createAddress(d, user, { ...rest, category_id });
+      const { a, domain, avoided } = createAddress(d, user, { ...rest, category_id }, c.get("apiScope")?.domainIds);
       const o = addressWithCounts(d, a, domain);
       return c.json({ id: a.id, email: o.email, address: o, avoided_domains: avoided }, 201);
     },
@@ -120,6 +126,8 @@ export function registerAddresses(r: ApiRouter) {
       const conds: SQL[] = [eq(addresses.userId, user.id), eq(addresses.isUnassigned, false)];
       const scoped = c.get("apiScope")?.addressIds;
       if (scoped) conds.push(inArray(addresses.id, [...scoped]));
+      const scopedDomains = c.get("apiScope")?.domainIds;
+      if (scopedDomains) conds.push(inArray(addresses.domainId, [...scopedDomains]));
       if (query.status && query.status !== "all") conds.push(eq(addresses.status, query.status));
       else if (!query.status) conds.push(ne(addresses.status, "archived"));
       if (query.domain) conds.push(eq(domains.name, query.domain.toLowerCase()));

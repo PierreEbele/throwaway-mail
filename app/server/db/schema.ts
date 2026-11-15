@@ -147,6 +147,8 @@ export const apiKeys = sqliteTable(
       .default("full"),
     /** JSON array of address ids this key is limited to; null means every address. */
     addressIds: text("address_ids", { mode: "json" }).$type<string[]>(),
+    /** JSON array of domain ids this key is limited to (addresses it may create and see); null means every domain. */
+    domainIds: text("domain_ids", { mode: "json" }).$type<string[]>(),
     expiresAt: integer("expires_at"),
   },
   (t) => [index("api_keys_user_idx").on(t.userId)],

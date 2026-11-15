@@ -91,8 +91,15 @@ export function registerDomains(r: ApiRouter) {
     { method: "get", path: "/v1/domains", summary: "List domains (admins also see Cloudflare details)", tags: ["domains"], auth: "user" },
     (c) => {
       const d = c.get("deps");
-      const isAdmin = c.get("user")!.role === "admin";
-      const rows = d.db.select().from(domains).orderBy(asc(domains.createdAt)).all();
+      // A domain-restricted API key only sees its domains, without admin details.
+      const scoped = c.get("apiScope")?.domainIds;
+      const isAdmin = c.get("user")!.role === "admin" && !scoped;
+      const rows = d.db
+        .select()
+        .from(domains)
+        .orderBy(asc(domains.createdAt))
+        .all()
+        .filter((x) => !scoped || scoped.has(x.id));
       return c.json({
         domains: rows.filter((x) => isAdmin || x.status === "active").map((x) => (isAdmin ? full(d, x) : domainOut(x, false))),
       });

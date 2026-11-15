@@ -15,6 +15,13 @@
       "when": 1794384986359,
       "tag": "0001_deleted_addresses",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794736172678,
+      "tag": "0002_api_key_domains",
+      "breakpoints": true
     }
   ]
 }

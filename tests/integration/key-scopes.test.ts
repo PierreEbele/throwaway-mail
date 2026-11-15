@@ -133,4 +133,75 @@ describe("API key scopes", () => {
     t.deps.now = realNow;
     expect(r.status).toBe(401);
   });
+
+  it("domain-restricted keys create and see addresses on their domains only", async () => {
+    const { t, admin, a } = await setup(); // a is on mail.example.test
+    await addDomain(admin, "one.example.test");
+    await addDomain(admin, "two.example.test");
+    const doms = (await admin.get("/v1/domains")).json.domains as { id: string; name: string }[];
+    const id = (name: string) => doms.find((x) => x.name === name)!.id;
+    expect((await admin.post("/v1/keys", { name: "x", domain_ids: ["nope.example.test"] })).status).toBe(400);
+    expect((await admin.post("/v1/keys", { name: "x", domain_ids: [id("one.example.test")], address_ids: [a.id] })).status).toBe(400);
+
+    const { c, apiKey, secret } = await keyClient(t, admin, { domain_ids: ["one.example.test", id("two.example.test")] });
+    expect(new Set(apiKey.domain_ids)).toEqual(new Set([id("one.example.test"), id("two.example.test")]));
+
+    // Created addresses stay within the key's domains, whatever the domain choice.
+    const seen = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      const r = await c.post("/v1/addresses", { site_name: `Site ${i}`, domain_choice: "random" });
+      expect(r.status).toBe(201);
+      seen.add(r.json.email.split("@")[1]);
+    }
+    expect(seen).toEqual(new Set(["one.example.test", "two.example.test"]));
+    const rotated = [];
+    for (let i = 0; i < 4; i++)
+      rotated.push((await c.post("/v1/addresses", { site_name: `Rot ${i}`, domain_choice: "rotate" })).json.email.split("@")[1]);
+    expect(new Set(rotated)).toEqual(new Set(["one.example.test", "two.example.test"]));
+    expect(rotated[0]).not.toBe(rotated[1]);
+    const forced = await c.post("/v1/addresses", { site_name: "Forced", domain: "mail.example.test" });
+    expect(forced.status).toBe(403);
+    expect(forced.json.error.code).toBe("domain_not_allowed");
+    expect((await c.post("/v1/addresses", { site_name: "Pool", domain_pool: ["mail.example.test"] })).status).toBe(403);
+    const pooled = await c.post("/v1/addresses", { site_name: "Pool", domain_pool: ["two.example.test", "mail.example.test"] });
+    expect(pooled.json.email).toMatch(/@two\.example\.test$/);
+
+    // It only sees addresses and domains it may use.
+    const list = (await c.get("/v1/addresses?status=all")).json.addresses as { email: string }[];
+    expect(list.length).toBe(25); // 20 random + 4 rotating + 1 pooled
+    expect(list.every((x) => !x.email.endsWith("@mail.example.test"))).toBe(true);
+    expect((await c.get(`/v1/addresses/${a.id}`)).status).toBe(404);
+    expect(((await c.get("/v1/domains")).json.domains as { name: string }[]).map((x) => x.name).sort()).toEqual([
+      "one.example.test",
+      "two.example.test",
+    ]);
+    for (const path of ["/v1/export", "/v1/categories", "/v1/keys", "/v1/review"]) expect((await c.get(path)).status, path).toBe(403);
+    expect((await c.post("/v1/keys", { name: "escalate" })).status).toBe(403);
+    // A replacement could land on another domain: refused, even for one of its own addresses.
+    const ownId = ((await c.get("/v1/addresses?status=all")).json.addresses as { id: string }[])[0]!.id;
+    expect((await c.post(`/v1/addresses/${ownId}/replace`, {})).status).toBe(403);
+    expect((await c.post(`/v1/addresses/${ownId}/rejected`, { replace: true })).status).toBe(403);
+
+    // The alias-service compatibility API (Bitwarden) works, on the key's domains.
+    const r = await compat(t, secret);
+    expect(r.status).toBe(201);
+    expect((await r.json()).alias).toMatch(/@(one|two)\.example\.test$/);
+  });
+
+  it("domain_pool picks a random or rotating domain among a list", async () => {
+    const { admin } = await setup();
+    await addDomain(admin, "one.example.test");
+    await addDomain(admin, "two.example.test");
+    const seen = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      const r = await admin.post("/v1/addresses", {
+        site_name: `S${i}`,
+        domain_choice: "random",
+        domain_pool: ["mail.example.test", "two.example.test"],
+      });
+      seen.add(r.json.email.split("@")[1]);
+    }
+    expect(seen).toEqual(new Set(["mail.example.test", "two.example.test"]));
+    expect((await admin.post("/v1/addresses", { site_name: "X", domain_pool: ["nope.example.test"] })).status).toBe(400);
+  });
 });

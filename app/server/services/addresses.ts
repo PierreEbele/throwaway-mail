@@ -115,6 +115,8 @@ export interface NewAddress {
   domain_choice?: User["domainChoice"];
   /** Never pick these domains (when `domain` is not given). */
   exclude_domain_ids?: string[];
+  /** Pick only among these domains (names or ids), e.g. for a random or rotating domain on a chosen list. */
+  domain_pool?: string[];
 }
 
 /**
@@ -166,14 +168,54 @@ const catchAllReserved = (domain: string) =>
     `${domain} forwards unknown addresses to its owner's catch-all: only its owner can create addresses on it`,
   );
 
-/** Creates an address for `user`. Shared by `POST /v1/addresses` and the alias-service compatibility API. */
-export function createAddress(d: Deps, user: User, body: NewAddress): { a: Address; domain: string; avoided: string[] } {
+/**
+ * Domain ids an address may be created on: the caller's `domain_pool` (names or ids) within the API key's domains.
+ * Null when neither restricts anything.
+ */
+function allowedDomains(d: Deps, pool: string[] | undefined, keyDomains: ReadonlySet<string> | null | undefined) {
+  let ids: Set<string> | null = null;
+  if (pool?.length) {
+    const rows = d.db
+      .select({ id: domains.id, name: domains.name })
+      .from(domains)
+      .where(
+        or(
+          inArray(domains.id, pool),
+          inArray(
+            domains.name,
+            pool.map((x) => x.toLowerCase()),
+          ),
+        ),
+      )
+      .all();
+    const known = new Set(rows.flatMap((r) => [r.id, r.name]));
+    const unknown = pool.find((x) => !known.has(x) && !known.has(x.toLowerCase()));
+    if (unknown) throw badRequest(`Unknown domain ${unknown} in domain_pool`);
+    ids = new Set(rows.map((r) => r.id));
+  }
+  if (keyDomains) ids = ids ? new Set([...ids].filter((x) => keyDomains.has(x))) : new Set(keyDomains);
+  if (ids && !ids.size) throw new HttpError(403, "domain_not_allowed", "None of these domains is allowed for this API key");
+  return ids;
+}
+
+/**
+ * Creates an address for `user`. Shared by `POST /v1/addresses` and the alias-service compatibility API.
+ * `keyDomains`: the domains of a domain-restricted API key; nothing outside them can be used.
+ */
+export function createAddress(
+  d: Deps,
+  user: User,
+  body: NewAddress,
+  keyDomains?: ReadonlySet<string> | null,
+): { a: Address; domain: string; avoided: string[] } {
+  const only = allowedDomains(d, body.domain_pool, keyDomains);
   const pick = body.domain
     ? null
     : pickDomain(d, user, body, {
         preferred: body.preferred_domain,
         exclude: body.exclude_domain_ids,
         choice: body.domain_choice,
+        only,
       });
   const domain = body.domain
     ? d.db
@@ -185,6 +227,7 @@ export function createAddress(d: Deps, user: User, body: NewAddress): { a: Addre
   if (!domain) throw badRequest(body.domain ? `Unknown domain ${body.domain}` : "No active domain is configured yet");
   if (domain.status !== "active") throw badRequest(`Domain ${domain.name} is not active yet`);
   if (catchAllKeptByOther(d, domain, user)) throw catchAllReserved(domain.name);
+  if (only && !only.has(domain.id)) throw new HttpError(403, "domain_not_allowed", `Domain ${domain.name} is not allowed here`);
   if (body.local_part !== undefined && !LOCAL_PART_RE.test(body.local_part)) {
     throw badRequest("local_part may contain a-z, 0-9, '.', '_' and '-', must start and end with a letter or digit (max 64)");
   }

@@ -1,7 +1,7 @@
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import type { ApiRouter } from "../lib/http.js";
-import { addresses, apiKeys } from "../db/schema.js";
+import { addresses, apiKeys, domains } from "../db/schema.js";
 import { badRequest, notFound } from "../lib/errors.js";
 import { createApiKey } from "../auth/tokens.js";
 
@@ -14,6 +14,7 @@ const keyOut = (k: typeof apiKeys.$inferSelect) => ({
   revoked_at: k.revokedAt,
   scope: k.scope,
   address_ids: k.addressIds ?? null,
+  domain_ids: k.domainIds ?? null,
   expires_at: k.expiresAt,
 });
 
@@ -38,13 +39,20 @@ export function registerKeys(r: ApiRouter) {
       path: "/v1/keys",
       summary: "Create an API key (the secret is shown once)",
       description:
-        "`scope`: `full` (default) or `read` (GET only, every write returns 403 insufficient_scope). `address_ids` restricts the key to those addresses: it only lists them, only gets their SSE events, can only reach `/v1/addresses/:id/…` and `/v1/messages/:id/…` routes for them (other ids answer 404), and every other route, address creation and the compatibility API answer 403. `expires_at` (epoch ms) or `expires_in_days` make the key stop working afterwards. Read-only and address-restricted keys cannot create or revoke keys.",
+        "`scope`: `full` (default) or `read` (GET only, every write returns 403 insufficient_scope). `address_ids` restricts the key to those addresses: it only lists them, only gets their SSE events, can only reach `/v1/addresses/:id/…` and `/v1/messages/:id/…` routes for them (other ids answer 404), and every other route, address creation and the compatibility API answer 403. `domain_ids` (ids or names) restricts the key to those domains: it only creates addresses on them (random and rotating domains stay within them; any other domain answers 403 domain_not_allowed), only lists and reaches addresses on them, only sees them in `GET /v1/domains`, and may use the compatibility API; account-wide routes answer 403. `expires_at` (epoch ms) or `expires_in_days` make the key stop working afterwards. Read-only and restricted keys cannot create or revoke keys.",
       tags: ["keys"],
       auth: "user",
       body: z.object({
         name: z.string().trim().min(1).max(80),
         scope: z.enum(["full", "read"]).default("full"),
         address_ids: z.array(z.string()).min(1).max(1000).nullable().optional().describe("Restrict the key to these address ids"),
+        domain_ids: z
+          .array(z.string().trim().min(1))
+          .min(1)
+          .max(100)
+          .nullable()
+          .optional()
+          .describe("Restrict the key to these domains (ids or names)"),
         expires_at: z.number().int().positive().nullable().optional().describe("Epoch ms after which the key stops working"),
         expires_in_days: z.number().int().min(1).max(3650).optional(),
       }),
@@ -65,7 +73,29 @@ export function registerKeys(r: ApiRouter) {
           .all();
         if (owned.length !== ids.length) throw badRequest("Unknown address in address_ids");
       }
-      const { key, row } = createApiKey(d, user.id, body.name, { scope: body.scope, addressIds: ids, expiresAt });
+      if (ids && body.domain_ids) throw badRequest("Pass address_ids or domain_ids, not both");
+      let domainIds: string[] | null = null;
+      if (body.domain_ids) {
+        const wanted = [...new Set(body.domain_ids)];
+        const rows = d.db
+          .select({ id: domains.id, name: domains.name })
+          .from(domains)
+          .where(
+            or(
+              inArray(domains.id, wanted),
+              inArray(
+                domains.name,
+                wanted.map((x) => x.toLowerCase()),
+              ),
+            ),
+          )
+          .all();
+        const known = new Set(rows.flatMap((x) => [x.id, x.name]));
+        const unknown = wanted.find((x) => !known.has(x) && !known.has(x.toLowerCase()));
+        if (unknown) throw badRequest(`Unknown domain ${unknown} in domain_ids`);
+        domainIds = [...new Set(rows.map((x) => x.id))];
+      }
+      const { key, row } = createApiKey(d, user.id, body.name, { scope: body.scope, addressIds: ids, domainIds, expiresAt });
       return c.json({ key, api_key: keyOut({ ...row, lastUsedAt: null, revokedAt: null }) }, 201);
     },
   );
