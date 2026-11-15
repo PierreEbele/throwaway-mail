@@ -276,10 +276,12 @@ describe("original headers", () => {
   it("keeps the full header section and long values", async () => {
     const { t, admin, a } = await setup();
     const long = "x".repeat(5000);
-    const r = (await ingest(t, a.email, `X-Long: ${long}\r\n` + simpleEml({ text: "hi" }))).json;
+    // A body no generated header (such as the random Message-ID) can contain, to check the body is left out.
+    const body = "BODY-MARKER-ONLY-IN-TEXT";
+    const r = (await ingest(t, a.email, `X-Long: ${long}\r\n` + simpleEml({ text: body }))).json;
     const m = (await admin.get(`/v1/messages/${r.message_id}`)).json.message;
     expect(m.raw_headers).toContain(`X-Long: ${long}`);
-    expect(m.raw_headers).not.toContain("hi");
+    expect(m.raw_headers).not.toContain(body);
     expect(m.headers.find((h: { key: string }) => h.key === "x-long").value).toHaveLength(5000);
   });
 
